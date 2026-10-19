@@ -19,10 +19,3 @@ func TestListResponseFormat(t *testing.T) {
 		t.Error("expected items array with 2 elements")
 	}
 }
-
-func TestAcceptedResponseFormat(t *testing.T) {
-	data := acceptedResponse(map[string]any{"runId": "run_1", "status": "queued"})
-	if data["runId"] != "run_1" {
-		t.Errorf("runId = %v, want run_1", data["runId"])
-	}
-}

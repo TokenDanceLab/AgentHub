@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════════════════════
-   Docs page public types — extracted for Phase 19 strangler slice #582.
+   Docs page public types (#582).
    ═══════════════════════════════════════════════════════════════════════ */
 
 import type { DesignNavIconName } from '../../designIcons';
@@ -27,7 +27,7 @@ export interface DocsPageNavItem {
 }
 
 export interface DocsPageProps {
-  /** Error message when the Hub documents request failed (#1821). Present
+  /** Error message when the Hub documents request failed. Present
    *  only in real-data mode; the page must render an error state instead of
    *  collapsing into the empty list. */
   documentsError?: string | undefined;

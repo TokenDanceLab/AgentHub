@@ -165,9 +165,9 @@ describe('useErrorReporter snapshot stability (#1795)', () => {
   });
 });
 
-// #2072 P1: verify that friendlyErrorMessage filters backend technical strings
+// #2072: verify that friendlyErrorMessage filters backend technical strings
 // so callers using t(key, {detail: friendlyErrorMessage(...)}) never leak them.
-describe('error.message passthrough elimination (#2072 P1)', () => {
+describe('error.message passthrough elimination (#2072)', () => {
   const technicalMessagesFiltered = [
     'HTTP 503 Service Unavailable',
     'TypeError: Cannot read properties of null',
@@ -204,8 +204,8 @@ describe('error.message passthrough elimination (#2072 P1)', () => {
   });
 });
 
-// #2072 P1: categorizeError errcode-aware — known codes get specialized copy.
-describe('errcode-aware toast copy (#2072 P1)', () => {
+// #2072: categorizeError errcode-aware — known codes get specialized copy.
+describe('errcode-aware toast copy (#2072)', () => {
   beforeEach(() => {
     globalErrorReporter.clear();
   });
@@ -258,8 +258,8 @@ describe('errcode-aware toast copy (#2072 P1)', () => {
   });
 });
 
-// #2072 P1: each of the 5 specified errcodes has a dedicated i18n key mapping.
-describe('errcode key mapping completeness (#2072 P1)', () => {
+// #2072: each of the 5 specified errcodes has a dedicated i18n key mapping.
+describe('errcode key mapping completeness (#2072)', () => {
   it('maps all 5 specified errcodes to dedicated i18n keys', async () => {
     const { ERRCode_KEYS } = await import('./errorReporting');
     const requiredCodes = [
@@ -284,7 +284,7 @@ describe('errcode key mapping completeness (#2072 P1)', () => {
   });
 });
 
-describe('event stream error filtering (#2072 P2-⑯)', () => {
+describe('event stream error filtering (#2072)', () => {
   it('filters technical strings from event_stream_parse errors', () => {
     const captured: ToastConfig[] = [];
     setToastHandler((cfg) => captured.push(cfg));
@@ -323,11 +323,10 @@ describe('event stream error filtering (#2072 P2-⑯)', () => {
   });
 });
 
-/* #2154 P3-8: the network toast's recovery action reloads the document — it
-   does not re-send the failed request. The label used to read "重试 / Retry",
-   so clicking it silently threw away the composer draft, the session/panel
-   state and any in-flight run view. */
-describe('network recovery action honesty (#2154 P3-8)', () => {
+/* #2154: the network toast's recovery action reloads the document — it
+   does not re-send the failed request. The action's label must say reload,
+   not retry — a retry label would imply re-sending the failed request. */
+describe('network recovery action honesty (#2154)', () => {
   beforeEach(() => {
     globalErrorReporter.clear();
   });

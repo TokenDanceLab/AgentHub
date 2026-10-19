@@ -2,7 +2,7 @@
 // session stores for Desktop import UI. It never mutates third-party stores.
 package sessionindex
 
-// Residual product surface #1173: local runtime session aggregation index.
+// Local runtime session aggregation index.
 
 // RuntimeID identifies an installed Agent Runtime family (adapter id).
 type RuntimeID string

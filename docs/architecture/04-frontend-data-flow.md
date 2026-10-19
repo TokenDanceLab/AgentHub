@@ -1,6 +1,6 @@
 # Frontend Data Flow
 
-> 子文档 | 主索引：[architecture.md](../architecture.md) · Hub API：[01-hub-server.md](01-hub-server.md) · 最后更新：2026-08-28
+> 子文档 | 主索引：[architecture.md](../architecture.md) · Hub API：[01-hub-server.md](01-hub-server.md) · 最后更新：2026-10-18
 
 本文档只记录 Desktop/Web/Mobile 共享前端的数据流合同和 source owner。具体 hook、组件 props、测试用例数量以源码和测试为准，不在这里复制清单。
 
@@ -10,8 +10,8 @@
 
 规则：
 
-- `app/workbench/`（`@agenthub/workbench`）拥有端级 workbench shell；`app/shared/` 拥有 transcript、composer、inspector 和 chatview 组件合同。依赖方向固定为 workbench → shared 单向（#1759）。
-- 通用组件放在 `app/shared/src/ui/`，Desktop/Web 从 shared 导入，不维护端内副本；组件样式使用 CSS Modules，并消费 `app/shared/src/styles/` 的 OKLCH/语义 token，避免组件级硬编码颜色。新 shared 组件必须同时提供 `<组件>.test.tsx`、`<组件>.stories.tsx`，并逐项勾选 [component-acceptance.md](../component-acceptance.md) 的验收表；缺件不得合入。
+- `app/workbench/`（`@agenthub/workbench`）拥有端级 workbench shell；`app/shared/` 拥有 transcript、composer、inspector 和 chatview 组件合同。依赖方向固定为 workbench → shared 单向。
+- 通用组件放在 `app/shared/src/ui/`，Desktop/Web 从 shared 导入，不维护端内副本；组件样式使用 CSS Modules，并消费 `app/shared/src/styles/` 的 OKLCH/语义 token，避免组件级硬编码颜色。新 shared 组件的测试、stories 与验收要求见 [component-acceptance.md](../component-acceptance.md)。
 - Desktop/Web/Mobile 只提供 platform adapter、认证、查询、runtime bridge 和壳层能力。
 - Shared UI 不直接调用 Tauri invoke、Hub client 或 Edge client。
 - Desktop renderer 不直接执行 CLI；本地执行走 Tauri host typed API、Local Edge 和 Edge adapter。
@@ -33,6 +33,8 @@ interface AgentHubPlatform {
 }
 ```
 
+完整接口（含 `messageActions`、`terminal`、`workspaceFiles`、`workspaceGit`、`checkpoint`、`agentActivity`）以 `app/shared/src/platform/types.ts` 为准；上面的片段只列常用成员。
+
 Desktop adapter 负责 Local Edge、Hub REST/WS、Tauri file/dialog/window/keyring/notification、workspace allowlist 和 TokenDance ID loopback callback。Web/Mobile adapters 负责 Hub session、Hub REST/WS、remote target routing、browser-safe preview 和 remote approval；Mobile native capability proof 另走 Mobile gates。
 
 UI 可以根据 `capabilities` 隐藏或禁用动作，但不能 fork 另一套组件。
@@ -47,21 +49,21 @@ UI 可以根据 `capabilities` 隐藏或禁用动作，但不能 fork 另一套�
 | Data mode compatibility contract | `app/shared/src/demo/dataMode.ts`, `app/shared/src/testing/e2eDataModeContract.ts` |
 | Desktop app shell and adapter wiring | `app/desktop/src/App.tsx`, `app/desktop/src/platform/`, `app/desktop/src/api/` |
 | Web/Mobile app shell and adapter wiring | `app/web/src/App.tsx`, `app/web/src/platform/`, `app/web/src/api/`, `app/mobile-rn/src/platform/`, `app/mobile-rn/src/api/` |
-| Client lane E2E/contract gates | `app/desktop/src/__e2e__/chat-flow-ui.spec.ts`, `app/web/src/__e2e__/`, `app/mobile-rn/src/importBoundary.test.ts`, `app/mobile-rn/src/api/` |
+| Client E2E / contract gates | `app/desktop/src/__e2e__/chat-flow-ui.spec.ts`, `app/web/src/__e2e__/`, `app/mobile-rn/src/importBoundary.test.ts`, `app/mobile-rn/src/api/` |
 
 ## 工程列焦点合同
 
 - 自动展开：active run 或新产物 evidence 可自动展开工程列；用户在运行中手动收回时按会话持久化抑制，切换会话恢复各自选择；无 active run/产物的纯聊天不改变布局默认。窄视口可延后自动展开以保留可恢复的聊天表面，头部按钮与键盘切换仍可用。
 - Preview 焦点：工程列 `Preview` 标签跟随最新规范化 preview/artifact evidence，但不修改 `RightInspector` 当前详情标签；只有显式“在详情中查看 / View details”动作才请求 inspector 切换到 Browser 或 Files，避免快览与详情表面争焦点。
-- 产物卡聚焦（F10）：Transcript 中携带真实 `artifactId` 的产物卡通过一次性的 `WORKBENCH_ENGINEERING_PREVIEW_FOCUS_EVENT` 请求工程列选择对应 artifact 并激活 `Preview`；事件携带 `conversationId`，工程列拒绝其他会话的 intent。该事件是瞬时 UI intent，不写入 transcript/store；artifact 不可解析时显示已有诚实不可用态，不回退到另一份最新产物。
+- 产物卡聚焦：Transcript 中携带真实 `artifactId` 的产物卡通过一次性的 `WORKBENCH_ENGINEERING_PREVIEW_FOCUS_EVENT` 请求工程列选择对应 artifact 并激活 `Preview`；事件携带 `conversationId`，工程列拒绝其他会话的 intent。该事件是瞬时 UI intent，不写入 transcript/store；artifact 不可解析时显示已有诚实不可用态，不回退到另一份最新产物。
 - 表面边界：Desktop 可经 Local Edge 支持的 `PreviewPort` 解析产物内容，Web 保持 Hub-only；Hub 未提供安全 preview URL/content endpoint 时，Preview 必须诚实显示不可用，不构造 Local Edge URL。
 
-## 全局状态栏合同（F5 #1994）
+## 全局状态栏合同
 
-- `WorkbenchFrame` 将 `MainchainStatusStrip` 渲染为全局底部状态栏（shell 第 3 行、rail 右侧），所有 rail 页面可见；全局段 = 连接态 + F6 注意力 chips + F14 usage chip（与 rail/sidebar 同源推导），会话段（证据链 + 导出）仅聊天页且 `showMainchainStatus` 开启时渲染；当前 web/desktop 两 shell 均传 `false`，会话段实际关闭（开启需 shell 接线决策）。
+- `WorkbenchFrame` 将 `MainchainStatusStrip` 渲染为全局底部状态栏（shell 第 3 行、rail 右侧），所有 rail 页面可见；全局段 = 连接态 + 注意力 chips + usage chip（与 rail/sidebar 同源推导），会话段（证据链 + 导出）仅聊天页且 `showMainchainStatus` 开启时渲染。
 - 诚实合同：无数据不渲染；作用域计数带标注；awaiting chip 在聊天页发一次性 `agenthub:approval-jump` 做 transcript 内高亮，其他页面先回聊天并选中首个等待会话。
 
-## 会话目标横幅合同（F8 #1998）
+## 会话目标横幅合同
 
 - `deriveGoalSummary`（`workbenchGoalSummary.ts`）从 transcript 的 goal 工具调用（create/update goal）纯派生目标摘要：工具名词汇表是显式 SSOT，未知词汇/缺目标文本/创建失败一律 none（fail-closed，不渲染不猜测）。`ConversationHost` 仅在聊天页头部投影 `WorkbenchGoalBanner`（transcript 的投影，非新数据源）；停止入口仅在 `onCancelRun` 接入时渲染，无暂停按钮（Hub 无暂停通道）；状态芯片复用注意力模型色板。
 
@@ -138,13 +140,7 @@ Stubbed Hub, fixture, readiness-only and manifest-only outputs must set `real_te
 | Claim | Minimum useful gate |
 |---|---|
 | Transcript ordering/grouping/markdown | Shared Vitest over `app/shared/src/transcript/` and `app/shared/src/chatview/` |
-| Send visibility and auto-follow | Desktop/Web Playwright chat-flow specs; Mobile remains framework/boundary-only until a dedicated UI slice |
-| Layout cleanliness | Desktop/Web Visual QA merge gate 分别运行 `app/desktop/scripts/visual-qa-shell.mjs` 与 `app/web/scripts/visual-qa-shell.mjs`（package script：`visual:qa:shell`）；标准审阅矩阵为 `1440x810` light+dark，同一 gate 还补充 Web `768x900`、Desktop `800x900` 的窄视口非空白/几何合同；`app/web/scripts/visual-qa.mjs` 是可选/遗留多场景电池，不是 merge gate（旧视觉分数断言已删除，见 [07-design-system-ssot.md](07-design-system-ssot.md)） |
+| Send visibility and auto-follow | Desktop/Web Playwright chat-flow specs; Mobile remains framework/boundary-only until dedicated Mobile UI work starts |
+| Layout cleanliness | Visual QA gate: see [07-design-system-ssot.md](07-design-system-ssot.md) §7 |
 | Data boundary | `app/shared/src/testing/e2eDataModeContract.ts` plus surface-specific E2E assertions |
 | Packaged Desktop | Tauri package/sidecar/icon/installer evidence, not Vite-only |
-
-## 前端 CI 易踩坑（站立规则）
-
-- `exactOptionalPropertyTypes`：禁 `...{ optional: maybeUndefined }`，defined 时赋值；async handler 传 `() => void` 用 `void fn()` 包装。`noUncheckedIndexedAccess`：CSS module / `Record<string,string>` 索引用 `styles.foo ?? ''`。
-- CSS helper 参数类型用 `Record<string,string>`，不要 `Pick<typeof styles,'a'|'b'>`（与 `CSSModuleClasses` 不兼容）。Nav 图标只用 `DesignNavIcon`（见 `DesignNavIconName`）；禁散落 nav glyph。
-- 11px (0.6875rem) 为 CJK 最小可读字号；badge/chip 用此值，正文标签 ≥12px。CI 统一 `changes` job（`dorny/paths-filter@v4`，Go-only 跳前端、CSS-only 跳 Go；`scripts/verify/verify-ci-gates.py` 校验）。

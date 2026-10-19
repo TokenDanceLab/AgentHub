@@ -1,6 +1,6 @@
 /* ==========================================================================
    SplitConversationPane — read-only pane for an inactive split group
-   (#1997, UX F3).
+   (#1997).
 
    Renders the cached transcript snapshot of a non-active conversation in
    read-only mode (no composer, no block actions — single-active-session

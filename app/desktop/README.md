@@ -1,8 +1,8 @@
 # AgentHub Desktop
 
-最后更新：2026-09-02
+最后更新：2026-10-19
 
-`app/desktop/` 是 AgentHub Tauri 桌面端入口，负责本地工作台、Hub 登录、多端 IM、设置、Agent/Profile 管理、Diff/Preview/Approval 和 Local Edge 可见状态。旧长版 README 见 [../../docs/history.md](../../docs/history.md)。
+`app/desktop/` 是 AgentHub Tauri 桌面端入口，负责本地工作台、Hub 登录、多端 IM、设置、Agent/Profile 管理、Diff/Preview/Approval 和 Local Edge 可见状态。
 
 ## Boundary
 
@@ -31,34 +31,34 @@ Desktop UI -> Local Edge Server -> Agent Runtime adapter -> Claude Code / Codex 
 
 Start Local Edge when testing online local execution:
 
-```powershell
-go run ./edge-server/cmd/agenthub-edge --addr 127.0.0.1:3210 --agent-default claude-acp
+```bash
+go run ./edge-server/cmd/agenthub-edge --addr 127.0.0.1:3210 --agent-default claude-acp --dev
 ```
 
 Start Desktop renderer:
 
-```powershell
-corepack.cmd pnpm --dir app/desktop install --ignore-scripts
-corepack.cmd pnpm --dir app/desktop dev
+```bash
+corepack pnpm --dir app/desktop install --ignore-scripts
+corepack pnpm --dir app/desktop dev
 ```
 
 `vite.config.ts` owns strict port `5173`.
 
 ## Tauri Development
 
-```powershell
-corepack.cmd pnpm --dir app/desktop build
-corepack.cmd pnpm --dir app/desktop tauri dev
+```bash
+corepack pnpm --dir app/desktop build
+corepack pnpm --dir app/desktop tauri dev
 ```
 
 `pnpm build` only builds the renderer. `tauri dev` and packaged-release claims require Rust/Tauri prerequisites and separate evidence.
 
 ## Verification
 
-```powershell
-corepack.cmd pnpm --dir app/desktop typecheck
-corepack.cmd pnpm --dir app/desktop test:ci
-corepack.cmd pnpm --dir app/desktop test:e2e:chat-flow
+```bash
+corepack pnpm --dir app/desktop typecheck
+corepack pnpm --dir app/desktop test:ci
+corepack pnpm --dir app/desktop test:e2e:chat-flow
 ```
 
 Local Edge smoke:

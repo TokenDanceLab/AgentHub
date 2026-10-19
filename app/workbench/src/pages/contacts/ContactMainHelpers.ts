@@ -2,12 +2,12 @@ import styles from '../ContactsPage.module.css';
 import type { ContactProfile } from './types';
 
 /* ═══════════════════════════════════════════════════════════════════════
-   ContactMainHelpers — pure residual slices from ContactMainParts (#672)
+   ContactMainHelpers — pure helpers for ContactMainParts (#672)
    and ContactMainSections (#707).
 
    Profile popover planners, empty-state class props, search keydown
    parsing, and exactOptionalPropertyTypes-safe FriendRequestCard prop
-   builders. No React hooks / no intentional UX change.
+   builders. No React hooks.
    ═══════════════════════════════════════════════════════════════════════ */
 
 export type ContactProfileAction = { label: string };

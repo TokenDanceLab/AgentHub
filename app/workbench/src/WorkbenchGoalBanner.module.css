@@ -1,4 +1,4 @@
-/* ═══ Conversation goal banner (#1998, UX F8) ═══
+/* ═══ Conversation goal banner (#1998) ═══
    Projection strip between the workspace header and the transcript:
    status chip (attention-model classes) + objective copy + fail-closed
    stop entry. Layout must never overflow horizontally: the objective

@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/agenthub/hub-server/internal/cache"
 	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/model"
 	"github.com/agenthub/hub-server/internal/repository"
@@ -13,23 +14,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// mockCompeteAggregator implements CompeteAggregator for tests.
-type mockCompeteAggregator struct {
-	summary string
-}
-
-func (m *mockCompeteAggregator) CompareResults(_ context.Context, _ string, entries []model.CompeteSummaryEntry) (string, error) {
-	if m.summary != "" {
-		return m.summary, nil
-	}
-	return "Comparison: " + strings.Join(entryMemberIDs(entries), " vs "), nil
-}
-
 func TestCompeteMode(t *testing.T) {
 	db := setupAgentTeamStateSQLite(t)
-	aggregator := &mockCompeteAggregator{}
-	svc := NewAgentTeamService(db, nil, nil)
-	svc.SetCompeteAggregator(aggregator)
+	svc := NewAgentTeamService(db, nil, cache.NoOpCache{})
 
 	team := &model.AgentTeam{OwnerID: "user-1", Name: "Compete Team"}
 	require.NoError(t, repository.CreateTeam(db, team))
@@ -98,7 +85,7 @@ func TestCompeteMode(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, resp)
 	assert.Equal(t, run.ID, resp.TeamRunID)
-	assert.Contains(t, resp.Summary, "Comparison:")
+	assert.Contains(t, resp.Summary, "Comparison summary")
 	assert.Len(t, resp.Entries, 2)
 
 	// Verify events include compete dispatched and aggregated.
@@ -120,9 +107,7 @@ func TestCompeteMode(t *testing.T) {
 
 func TestCompeteModeAutoSelectsExecutors(t *testing.T) {
 	db := setupAgentTeamStateSQLite(t)
-	aggregator := &mockCompeteAggregator{}
-	svc := NewAgentTeamService(db, nil, nil)
-	svc.SetCompeteAggregator(aggregator)
+	svc := NewAgentTeamService(db, nil, cache.NoOpCache{})
 
 	team := &model.AgentTeam{OwnerID: "user-1", Name: "Auto Compete Team"}
 	require.NoError(t, repository.CreateTeam(db, team))
@@ -176,7 +161,7 @@ func TestCompeteModeAutoSelectsExecutors(t *testing.T) {
 
 func TestCompeteModeRejectsExceedingMaxAgents(t *testing.T) {
 	db := setupAgentTeamStateSQLite(t)
-	svc := NewAgentTeamService(db, nil, nil)
+	svc := NewAgentTeamService(db, nil, cache.NoOpCache{})
 	svc.SetCompeteMaxAgents(2)
 
 	team := &model.AgentTeam{OwnerID: "user-1", Name: "Max Compete Team"}

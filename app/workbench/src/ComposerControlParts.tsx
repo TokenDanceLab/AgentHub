@@ -21,7 +21,7 @@ import type { ComposerExecutionTarget } from './unifiedComposerHelpers';
 /* ═══════════════════════════════════════════════════════════════════════
    Composer control chrome — agent/target pickers + attach/send buttons.
 
-   Residual extract from UnifiedComposerParts for Phase 30 #706.
+   Helper module for UnifiedComposerParts (#706).
    DesignNavIcon only for icon glyphs.
    CSS remains on shared AgentHubWorkbench.module.css.
    ═══════════════════════════════════════════════════════════════════════ */
@@ -104,7 +104,7 @@ export function ComposerSendButton({
   submitDisabled: boolean;
   /**
    * When true (and `onCancel` is provided) the send button morphs into a stop
-   * button that cancels the active agent run (#1462 CF13). Reuses the send
+   * button that cancels the active agent run (#1462). Reuses the send
    * button chrome so the hit target stays stable across the morph.
    */
   isRunning?: boolean | undefined;

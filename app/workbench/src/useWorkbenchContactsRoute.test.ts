@@ -6,12 +6,12 @@ import {
 } from './mockData';
 import { useWorkbenchContactsRoute } from './useWorkbenchContactsRoute';
 
-describe('useWorkbenchContactsRoute mock cursor pagination (#1510)', () => {
+describe('useWorkbenchContactsRoute mock cursor pagination ', () => {
   it('loads the first page (PAGE_SIZE) and reports hasMore when the pool is larger', () => {
     const { result } = renderHook(() => useWorkbenchContactsRoute({}));
 
     expect(result.current.contactsData.members).toHaveLength(WORKBENCH_MOCK_PAGE_SIZE);
-    expect(result.current.contactsData.members[0]?.id).toBe('maintainer');
+    expect(result.current.contactsData.members[0]?.id).toBe('demo-user');
     expect(result.current.hasMore).toBe(true);
     expect(result.current.loadingMore).toBe(false);
     expect(typeof result.current.onLoadMore).toBe('function');

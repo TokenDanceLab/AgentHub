@@ -11,7 +11,6 @@ import {
   buildHubFetchInit,
   buildHubUrl,
   buildMultipartFetchInit,
-  buildTokenRefreshFailedLogPrefix,
   buildTokenRefreshReportContext,
   classifyHubRequestCatch,
   createAuthOnlyHeaders,
@@ -69,7 +68,7 @@ describe('hubClientTransportUtils (#810 / #913 / #935 / #957 / #978 / #990 / #10
     );
   });
 
-  it('resolves fetch, builds fetch inits, and classifies residual transport (#935)', () => {
+  it('resolves fetch, builds fetch inits, and classifies transport (#935)', () => {
     const injected = (async () => new Response()) as typeof globalThis.fetch;
     expect(resolveHubFetch(injected)).toBe(injected);
     expect(resolveHubFetch(undefined)).toBe(globalThis.fetch);
@@ -121,7 +120,7 @@ describe('hubClientTransportUtils (#810 / #913 / #935 / #957 / #978 / #990 / #10
     expect(classifyHubRequestCatch('other')).toEqual({ kind: 'other', error: 'other' });
   });
 
-  it('peels abort timeout, refresh retry, and catch resolution (#957)', async () => {
+  it('handles abort timeout, refresh retry, and catch resolution (#957)', async () => {
     expect(shouldRetryWithRefreshedToken('tok')).toBe(true);
     expect(shouldRetryWithRefreshedToken('')).toBe(false);
     expect(shouldRetryWithRefreshedToken(null)).toBe(false);
@@ -182,11 +181,10 @@ describe('hubClientTransportUtils (#810 / #913 / #935 / #957 / #978 / #990 / #10
     expect(resolveHubRequestCatch('other', ctx)).toEqual({ kind: 'other', error: 'other' });
   });
 
-  it('peels request/upload context + catch effect plan (#978)', () => {
+  it('plans request/upload context + catch effect (#978)', () => {
     expect(hasTokenRefreshHandler(undefined)).toBe(false);
     expect(hasTokenRefreshHandler(null as unknown as undefined)).toBe(false);
     expect(hasTokenRefreshHandler(async () => 'tok')).toBe(true);
-    expect(buildTokenRefreshFailedLogPrefix()).toBe('[HubClient] Token refresh failed');
 
     const prepared = prepareHubRequestContext({
       baseUrl: 'https://hub.example.com',
@@ -300,7 +298,7 @@ describe('hubClientTransportUtils (#810 / #913 / #935 / #957 / #978 / #990 / #10
     expect(headers.get('Authorization')).toBe('Bearer tok-1');
   });
 
-  it('peels exactOptional client context + refresh residual (#990)', () => {
+  it('builds the client context with exactOptional fields + refresh helper (#990)', () => {
     // Explicit undefined from optional getters must not materialize as keys.
     const prepared = prepareHubRequestContextFromClient({
       baseUrl: 'https://hub.example.com',
@@ -375,7 +373,7 @@ describe('hubClientTransportUtils (#810 / #913 / #935 / #957 / #978 / #990 / #10
     expect(logs.some((line) => line.includes('[HubClient]'))).toBe(true);
   });
 
-  it('peels fetch-with-timeout + unauthorized refresh residual (#1023)', async () => {
+  it('fetches with timeout and refreshes on unauthorized (#1023)', async () => {
     const calls: Array<{ url: string; method?: string; hasAuth: boolean; body?: BodyInit | null }> =
       [];
     const fetchImpl: typeof fetch = async (input, init) => {
@@ -499,7 +497,7 @@ describe('hubClientTransportUtils (#810 / #913 / #935 / #957 / #978 / #990 / #10
     ).toThrow(defaultErr);
   });
 
-  it('peels full JSON request + multipart upload residual (#1044)', async () => {
+  it('sends full JSON requests + multipart uploads (#1044)', async () => {
     const jsonCalls: Array<{ url: string; auth: string | null }> = [];
     const fetchImpl: typeof fetch = async (input, init) => {
       const headers = new Headers(init?.headers);
@@ -547,7 +545,7 @@ describe('hubClientTransportUtils (#810 / #913 / #935 / #957 / #978 / #990 / #10
     });
     expect(ok).toBe('ok');
 
-    // app error catch residual rethrows
+    // app error catch rethrows
     const appErr = new AppError({ error: { code: 'X', message: 'm' } }, 500);
     const boomFetch: typeof fetch = async () => {
       throw appErr;
@@ -561,7 +559,7 @@ describe('hubClientTransportUtils (#810 / #913 / #935 / #957 / #978 / #990 / #10
       }),
     ).rejects.toBe(appErr);
 
-    // multipart peel
+    // multipart upload
     const form = new FormData();
     form.set('hash', 'h1');
     const multiCalls: Array<{ url: string; method?: string }> = [];
@@ -586,7 +584,7 @@ describe('hubClientTransportUtils (#810 / #913 / #935 / #957 / #978 / #990 / #10
     ]);
   });
 
-  it('peels createHubClient transport runtime + envelope wrappers (#1055)', async () => {
+  it('builds createHubClient transport runtime + envelope wrappers (#1055)', async () => {
     const runtime = resolveHubClientRuntime({
       baseUrl: 'https://hub.example.com///',
       fetch: async () => new Response('{}', { status: 200 }),
@@ -676,7 +674,7 @@ describe('hubClientTransportUtils (#810 / #913 / #935 / #957 / #978 / #990 / #10
     expect(result).toEqual({ ok: true });
     expect(calls[0]?.url).toBe('https://hub.example.com/client/auth/me');
 
-    // dual-route fallback residual via transport
+    // dual-route fallback via transport
     let attempt = 0;
     const fallbackFetch: typeof fetch = async (input) => {
       attempt += 1;

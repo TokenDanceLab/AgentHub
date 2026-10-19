@@ -16,11 +16,6 @@ import (
 	"github.com/agenthub/edge-server/internal/store"
 )
 
-// process_executor_pure.go holds ProcessExecutorConfig, constructor pure
-// helpers, and fluent wiring methods. Residual pure-helper peel #1121
-// moved domain pure helpers into process_executor_pure_*.go companions.
-// Zero behavior change — pure move only.
-
 var ErrProcessBusRequired = errors.New("process event bus is required")
 
 var ErrProcessCommandRequired = errors.New("process command is required")
@@ -89,12 +84,6 @@ func resolveProcessExecutorTimeouts(cfg ProcessExecutorConfig) (runTimeout, shut
 		resolvePositiveDuration(cfg.ShutdownForceTimeout, defaultShutdownForceTimeout)
 }
 
-// shouldStatConfiguredWorkDir reports whether the constructor must validate a
-// configured process workdir via os.Stat.
-func shouldStatConfiguredWorkDir(workDir string) bool {
-	return workDir != ""
-}
-
 // buildProcessExecutor constructs the default ProcessExecutor maps/state. Pure
 // relative to I/O: callers supply already-resolved deps and timeouts.
 func buildProcessExecutor(
@@ -142,11 +131,10 @@ func newProcessExecutor(bus *events.Bus, runStore store.RunLifecycleStore, cfg P
 		return nil, err
 	}
 	profile, err := NewGenericRunnerProfile(cfg.Command, cfg.Args, cfg.Env, cfg.ExtraEnv, cfg.WorkDir)
-	ctor := planNewProcessExecutor(err, cfg.WorkDir)
-	if ctor.FailProfile {
+	if err != nil {
 		return nil, err
 	}
-	if ctor.StatWorkDir {
+	if cfg.WorkDir != "" {
 		info, statErr := os.Stat(cfg.WorkDir)
 		if err := validateConfiguredWorkDir(cfg.WorkDir, info, statErr); err != nil {
 			return nil, err
@@ -165,21 +153,6 @@ func newProcessExecutor(bus *events.Bus, runStore store.RunLifecycleStore, cfg P
 		EvidenceGateConfigFromEnv(),
 		FaultEscalationConfigFromEnv(),
 	), nil
-}
-
-// newProcessExecutorPlan is the pure constructor gate after profile construction.
-type newProcessExecutorPlan struct {
-	FailProfile bool
-	StatWorkDir bool
-}
-
-// planNewProcessExecutor maps profile construction error + configured workDir into
-// constructor control flags. Stat/Validate side-effects stay in NewProcessExecutor.
-func planNewProcessExecutor(profileErr error, workDir string) newProcessExecutorPlan {
-	return newProcessExecutorPlan{
-		FailProfile: shouldFailNewRunnerProfile(profileErr),
-		StatWorkDir: shouldStatConfiguredWorkDir(workDir),
-	}
 }
 
 // SetMetrics attaches Prometheus instrumentation to this executor.

@@ -59,7 +59,7 @@ func TestDispatchRouteHubRelay_PushReached_MarksSentAndDispatched(t *testing.T) 
 
 	assert.Equal(t, 1, relay.calls)
 	require.Len(t, relay.targetIDs, 1)
-	assert.Equal(t, "dev-1", relay.targetIDs[0], "relay push must target the bound device id, not the inviter user id (#2154 F15)")
+	assert.Equal(t, "dev-1", relay.targetIDs[0], "relay push must target the bound device id, not the inviter user id (#2154)")
 	assert.Equal(t, 1, outbox.marked, "live push must mark delivery sent")
 }
 

@@ -159,7 +159,7 @@ export const teamRunDemoTranscript: TranscriptBlock[] = [
     id: 'teamrun-user-1',
     kind: 'text',
     createdAt: '2026-06-08T10:10:00+08:00',
-    author: { id: 'maintainer', name: 'maintainer', role: 'human' },
+    author: { id: 'demo', name: 'Demo User', role: 'human' },
     text: '打开 TeamRun fixture，只做 UI evidence capture，不登录、不跑真实 CLI/model。',
   },
   {

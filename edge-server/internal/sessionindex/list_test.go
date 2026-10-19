@@ -62,7 +62,7 @@ func TestListRecentClaudeAndCodexFixtures(t *testing.T) {
 	if err := os.MkdirAll(filepath.Dir(claudeHistory), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	hist := `{"display":"Wire local session index","pastedContents":{},"timestamp":1,"project":"D:\\Code","sessionId":"` + sessA + `"}` + "\n"
+	hist := `{"display":"Wire local session index","pastedContents":{},"timestamp":1,"project":"C:\\Users\\Example\\project","sessionId":"` + sessA + `"}` + "\n"
 	if err := os.WriteFile(claudeHistory, []byte(hist), 0o644); err != nil {
 		t.Fatal(err)
 	}

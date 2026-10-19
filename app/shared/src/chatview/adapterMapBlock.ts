@@ -1,6 +1,5 @@
 /**
  * Chatview adapter single-block → RowItem mapper.
- * Peel companion of adapter (#1143). Pure only; zero behavior change.
  */
 
 import type {

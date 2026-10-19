@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""verify-real-e2e-artifacts — raw L3 artifact 脱敏 fail-closed 门禁（#1873 Slice D）。
+"""verify-real-e2e-artifacts — 真实 E2E artifact 脱敏 fail-closed 门禁。
 
-Public Actions 不得上传含私有运行事实的原始 artifact（Playwright JSON report /
+公开 CI 不得上传含敏感运行数据的原始 artifact（Playwright JSON report /
 HTML report / trace.zip / 失败截图）。本门禁在 lane 上传前对原始 artifact 做内容
 扫描，任何私有信息泄漏 → 非零退出（fail-closed）。
 
 复用 verify-real-e2e-lane-manifest.py 的 private_info_violation（同一份正则 SSOT，
-避免两套阈值漂移，AGENTS §5.5），并新增 raw-text 才有的凭据形态：JWT / Bearer /
+避免两套阈值漂移），并新增 raw-text 才有的凭据形态：JWT / Bearer /
 OIDC callback 参数 / 运行期凭据前缀（cs_/c_）/ 测试账号邮箱 / Set-Cookie /
 请求正文中的 password。
 
@@ -15,11 +15,10 @@ OIDC callback 参数 / 运行期凭据前缀（cs_/c_）/ 测试账号邮箱 / S
   html-*/**              HTML report（含测试元数据 / attachment 路径）
   test-results/**        trace.zip（解包后扫 trace.trace / trace.network / trace.stacks
                          等文本成员）；失败截图/视频（PNG/JPEG/WEBM 二进制）跳过——
-                         视觉隐私由 Slice A 路由处理，非本门禁文本扫描范围。
+                         视觉隐私由上传路由处理，非本门禁文本扫描范围。
 
-显式跳过（由其它机制负责，不重复扫描）：
-  manifest-*.json        已由 verify-real-e2e-lane-manifest.py 校验
-  real-e2e-account.env   凭据文件，已从 upload 路径显式排除
+manifest-*.json 由 verify-real-e2e-lane-manifest.py 先做 schema 合同校验，再作为
+上传内容进入本扫描；real-e2e-account.env 是凭据文件，不上传，因此显式跳过。
 
 用法：
   python3 scripts/verify/verify-real-e2e-artifacts.py <artifacts-dir>
@@ -82,7 +81,7 @@ def _violations_for_text(text, path, mv):
     if private:
         violations.append(private)
     if JWT_RE.search(text):
-        violations.append(f"{path}: JWT token leaked (redact; route raw trace to private evidence store)")
+        violations.append(f"{path}: JWT token leaked (redact; route raw trace to non-public evidence storage)")
     if BEARER_RE.search(text):
         violations.append(f"{path}: Bearer token leaked")
     for match in OIDC_CALLBACK_RE.finditer(text):
@@ -99,17 +98,39 @@ def _violations_for_text(text, path, mv):
 
 
 def _is_skipped(name):
-    return name in SKIP_BASENAMES or name.startswith("manifest-")
+    return name in SKIP_BASENAMES
+
+
+def _decode_text(raw, path, violations):
+    """Decode a text artifact strictly; ambiguity is a violation, not a pass.
+
+    UTF-16 with BOM decodes natively. BOM-less UTF-16 decodes as UTF-8 with
+    interleaved NULs, which defeats every value pattern, so any NUL or decode
+    failure fails closed instead of degrading to replacement characters.
+    """
+    try:
+        if raw.startswith((bytes([0xFF, 0xFE]), bytes([0xFE, 0xFF]))):
+            text = raw.decode("utf-16", errors="strict")
+        else:
+            text = raw.decode("utf-8", errors="strict")
+        if "\x00" in text:
+            raise ValueError("NUL bytes in text artifact")
+    except (UnicodeDecodeError, ValueError) as exc:
+        violations.append(f"{path}: text artifact is not unambiguous UTF-8/UTF-16 ({exc})")
+        return None
+    return text
 
 
 def _scan_text_file(path, mv, violations):
     try:
-        with open(path, encoding="utf-8", errors="replace") as handle:
-            text = handle.read()
+        with open(path, "rb") as handle:
+            raw = handle.read()
     except OSError as exc:
         violations.append(f"{path}: unreadable artifact ({exc})")
         return
-    violations.extend(_violations_for_text(text, path, mv))
+    text = _decode_text(raw, path, violations)
+    if text is not None:
+        violations.extend(_violations_for_text(text, path, mv))
 
 
 def _scan_zip(path, mv, violations):
@@ -124,10 +145,12 @@ def _scan_zip(path, mv, violations):
                 if not lower.endswith((".trace", ".network", ".stacks", ".json", ".txt")):
                     continue
                 try:
-                    text = zf.read(name).decode("utf-8", errors="replace")
+                    raw = zf.read(name)
                 except (KeyError, OSError):
                     continue
-                violations.extend(_violations_for_text(text, f"{path}::{name}", mv))
+                text = _decode_text(raw, f"{path}::{name}", violations)
+                if text is not None:
+                    violations.extend(_violations_for_text(text, f"{path}::{name}", mv))
     except zipfile.BadZipFile as exc:
         violations.append(f"{path}: bad trace zip ({exc})")
     except OSError as exc:
@@ -136,6 +159,7 @@ def _scan_zip(path, mv, violations):
 
 def _scan_dir(root, mv):
     violations = []
+    scanned = 0
     for dirpath, dirnames, filenames in os.walk(root):
         dirnames[:] = [d for d in dirnames if not d.startswith(".")]
         for filename in filenames:
@@ -143,6 +167,7 @@ def _scan_dir(root, mv):
                 continue
             path = os.path.join(dirpath, filename)
             lower = filename.lower()
+            scanned += 1
             if lower.endswith(".zip"):
                 _scan_zip(path, mv, violations)
             elif lower.endswith(BINARY_SUFFIXES):
@@ -159,6 +184,8 @@ def _scan_dir(root, mv):
                     _scan_text_file(path, mv, violations)
                 except (UnicodeDecodeError, OSError):
                     continue
+    if scanned == 0:
+        violations.append(f"{root}: no artifact files were scanned (fail-closed)")
     return violations
 
 
@@ -179,8 +206,7 @@ def main():
         for v in violations:
             print(f"artifact sanitize violation: {v}", file=sys.stderr)
         raise ArtifactSanitizeError(
-            f"{len(violations)} raw-artifact private-info leak(s); route raw evidence to private store, "
-            f"upload only sanitized manifest + redacted summary"
+            f"{len(violations)} raw-artifact sensitive-info leak(s); upload only the sanitized manifest"
         )
 
     print("raw L3 artifacts sanitize ok")

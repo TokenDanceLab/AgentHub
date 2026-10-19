@@ -118,11 +118,9 @@ func constantTimeEqual(got, want string) bool {
 // Defense layers (in priority order):
 //  1. Dev mode → nil (debug endpoints public; dev-only convenience).
 //  2. Configured local auth token → BearerAuth(token) (pre-shared secret).
-//  3. Configured Hub JWT secret → Hub-JWT validation fallback. This closes
-//     the gap where an operator configures HubJWTSecret for the REST auth
-//     middleware but leaves LocalAuthToken empty: previously debugAuthFunc
-//     returned nil, which exposed pprof/config/state to any caller even
-//     though Hub-JWT mode is a production-grade deployment.
+//  3. Configured Hub JWT secret → Hub-JWT validation fallback. This keeps
+//     Hub-JWT deployments usable when LocalAuthToken is empty without
+//     exposing pprof/config/state to unauthenticated callers.
 //  4. Neither configured → deny-all (fail-closed). In the normal Run()
 //     flow this branch is unreachable: when neither token is configured,
 //     startup auto-generates a local token, which satisfies layer 2.

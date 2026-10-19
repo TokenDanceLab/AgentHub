@@ -9,14 +9,13 @@ import { getAccessToken } from '@/hooks/useAuth';
 // ── Cache keys (#2252) ───────────────────────────────────────────
 //
 // Transcripts live in the shared SSOT threads family
-// (`hubQueryKeys.threads.messages`), which is what `hubEventBridge` invalidates
-// on every MESSAGE_* frame and what `resyncMessagesAfterReconnect` scans after
-// a reconnect/gap. They used to live under the `['hub','sessions']` prefix
-// below, so all six bridge invalidations and the resync discovery missed them
-// — peer messages never refreshed and reconnect resync was a silent no-op.
+// (`hubQueryKeys.threads.messages`), which `hubEventBridge` invalidates on
+// every MESSAGE_* frame and `resyncMessagesAfterReconnect` scans after a
+// reconnect/gap. Transcripts must not live under the `['hub','sessions']`
+// prefix or both the bridge invalidations and the resync discovery miss them.
 //
 // `hubSessionsListKey` is the *session list* only (`useHubSessions`); it is not
-// a transcript key and no longer covers transcripts by prefix.
+// a transcript key and does not cover transcripts by prefix.
 const hubSessionsListKey = hubQueryKeys.threads.list;
 
 /**

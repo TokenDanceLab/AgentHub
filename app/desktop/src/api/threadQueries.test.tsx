@@ -1,5 +1,4 @@
-// Contract tests for the Edge thread-transcript cache keys (#2274 A-12 / A-13,
-// ADR-029).
+// Contract tests for the Edge thread-transcript cache keys (#2274, ADR-029).
 //
 // The assertion style is deliberate: every query is seeded by rendering the
 // *production hook* so the cache entry carries the key the app really uses, and
@@ -81,8 +80,8 @@ describe('the live transcript query key', () => {
     await seedTranscript('thread-1');
 
     // Derived from the cache the production hook actually populated, not from a
-    // literal the test wrote: this is the fact A-13's `['threadItems', id]`
-    // and A-12's `threads.root` both got wrong.
+    // literal the test wrote: this is the fact the `['threadItems', id]`
+    // and `threads.root` keys both got wrong.
     const keys = queryClient.getQueryCache().findAll().map((q) => q.queryKey);
     expect(keys).toContainEqual(['edge', 'threadItems', 'thread-1']);
     expect(keys).toContainEqual(edgeQueryKeys.threads.items('thread-1'));
@@ -142,7 +141,7 @@ describe('the two dead keys this replaced (negative controls)', () => {
 
     await act(async () => {
       // Missing the 'edge' segment of the real key, so it prefix-matches no
-      // cache entry (#2274 A-13: three dead invalidations, two of them the
+      // cache entry (#2274: three dead invalidations, two of them the
       // deliberate 2s/4s async-response compensations).
       await queryClient.invalidateQueries({ queryKey: ['threadItems', 'thread-1'] });
     });
@@ -164,7 +163,7 @@ describe('the two dead keys this replaced (negative controls)', () => {
     // The list refetches — which is why threads.root stays at those call sites.
     await waitFor(() => expect(vi.mocked(fetchThreads)).toHaveBeenCalledTimes(2));
     // The transcript does not: ['edge','threads'] is not a prefix of
-    // ['edge','threadItems',…] (#2274 A-12).
+    // ['edge','threadItems',…] (#2274).
     expect(vi.mocked(fetchThreadItems)).toHaveBeenCalledTimes(1);
   });
 

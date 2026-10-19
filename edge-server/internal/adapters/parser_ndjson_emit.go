@@ -1,7 +1,5 @@
 package adapters
 
-// Residual pure-helper peel #1113: emit helpers + route decision + hook wrapper.
-
 func (p *NDJSONStreamParser) emitRouteDecision(scope map[string]any, structuredOutput any) {
 	decision, ok := normalizeRouteDecisionPayload(structuredOutput)
 	if !ok {
@@ -32,7 +30,7 @@ func (p *NDJSONStreamParser) emitSessionInit(scope map[string]any, msg *claudeSD
 		"permissionMode": msg.PermissionMode,
 		"version":        msg.Version,
 	}
-	// P0: Extract session_id so AgentHub can track sessions for --resume.
+	// Extract session_id so AgentHub can track sessions for --resume.
 	if msg.SessionID != "" {
 		payload["sessionId"] = msg.SessionID
 	}

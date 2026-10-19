@@ -8,7 +8,7 @@ import { useStrings } from '@/i18n/strings';
 import { useAgentHubTheme } from '@/theme';
 import type { MobileAppFixture, MobileRun, MobileThread } from '@/types';
 
-type ChatDisplayName = 'maintainer' | 'TokenDance' | 'AgentHub';
+type ChatDisplayName = 'Demo User' | 'TokenDance' | 'AgentHub';
 
 interface ChatScreenProps {
   fixture: MobileAppFixture;
@@ -31,8 +31,8 @@ function formatChatCopy(value: string): string {
 function formatChatDisplayName(name: string | undefined, role?: string): ChatDisplayName {
   const normalized = name?.trim().toLowerCase() ?? '';
 
-  if (normalized.includes('maintainer') || role === 'human') {
-    return 'maintainer';
+  if (role === 'human' || normalized === 'demo user') {
+    return 'Demo User';
   }
   if (normalized.includes('tokendance')) {
     return 'TokenDance';
@@ -42,7 +42,7 @@ function formatChatDisplayName(name: string | undefined, role?: string): ChatDis
 }
 
 function getDisplayInitials(name: ChatDisplayName): string {
-  if (name === 'maintainer') {
+  if (name === 'Demo User') {
     return 'D';
   }
   if (name === 'TokenDance') {
@@ -515,7 +515,7 @@ function PinnedCard({
                 style={{ color: tokens.color.inkMuted, ...tokens.type.role.caption }}
               >
                 {activeRun
-                  ? `${t.pinnedBy} maintainer · ${formatChatCopy(activeRun.updatedAt)}`
+                  ? `${t.pinnedBy} Demo User · ${formatChatCopy(activeRun.updatedAt)}`
                   : `${t.pinnedBy} AgentHub`}
               </Text>
             </View>
@@ -705,7 +705,7 @@ function MessageBlock({
     block.kind === 'run_session' ||
     block.kind === 'tool_call';
   const displayName = formatChatDisplayName(block.author.name, block.author.role);
-  const isHuman = block.author.role === 'human' || displayName === 'maintainer';
+  const isHuman = block.author.role === 'human' || displayName === 'Demo User';
   const isText = block.kind === 'text';
   const avatar = getDisplayInitials(displayName);
   const reviewIcon =

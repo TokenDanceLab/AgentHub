@@ -52,7 +52,7 @@ func TestRegisterDoesNotPanic(t *testing.T) {
 	if EventBusPanics == nil {
 		t.Error("EventBusPanics 在 Register() 后不应为 nil")
 	}
-	// G3/G4/G9 新增 counter nil 检查（#1441 nil-guard 模式：单测不调 Register 时为 nil）
+	// 新增 counter nil 检查（#1441 nil-guard 模式：单测不调 Register 时为 nil）
 	if DeliveryOutboxRetryAttempts == nil {
 		t.Error("DeliveryOutboxRetryAttempts 在 Register() 后不应为 nil")
 	}
@@ -115,7 +115,7 @@ func TestRegisteredMetricsAccessible(t *testing.T) {
 	// 使用 _test_access 前缀避免污染其他测试的断言值
 	HTTPRequestsTotal.WithLabelValues("_test_access_", "/_access_check", "000").Inc()
 	HTTPDuration.WithLabelValues("_test_access_", "/_access_check", "000").Observe(0.001)
-	// G3/G4/G9 新增 CounterVec 各创建一条观测记录以暴露 metric family
+	// 新增 CounterVec 各创建一条观测记录以暴露 metric family
 	DeliveryOutboxDeadLetters.WithLabelValues("_test_access_").Inc()
 	AgentDispatchEdgeHTTPFailures.WithLabelValues("_test_access_").Inc()
 	JWTVerificationFailures.WithLabelValues("_test_access_").Inc()
@@ -143,13 +143,13 @@ func TestRegisteredMetricsAccessible(t *testing.T) {
 		"redis_pool_hits_total",
 		"eventbus_queue_length",
 		"eventbus_panics_total",
-		// G3 plain Counters
+		// Delivery outbox plain Counters
 		"delivery_outbox_retry_attempts_total",
 		"delivery_outbox_redispatch_failures_total",
 		"delivery_outbox_scan_failures_total",
-		// G9 plain Counter
+		// Auth failure plain Counter
 		"jti_blacklist_check_errors_total",
-		// #2154 F2 step ① plain Counter
+		// plain Counter
 		"refresh_token_reuse_total",
 	}
 	for _, name := range expectedNames {
@@ -282,7 +282,7 @@ func TestEventBusCounter(t *testing.T) {
 	}
 }
 
-// ── #2246 slice 1：safego PanicObserver 按 name 分派 eventbus_panics_total ──
+// ── #2246：safego PanicObserver 按 name 分派 eventbus_panics_total ──
 //
 // 本块用例一律用 before/after 差值断言，与执行顺序无关。这里原先写着「这些用例
 // 追加在 TestEventBusCounter 之后是**有意的**……仍必须排在其后」，那条顺序约束的
@@ -434,9 +434,7 @@ func TestPanicObserver_ConcurrentEventBusPanicsCountEveryOne(t *testing.T) {
 	}
 }
 
-// waitGroupDone 等待 WaitGroup 归零。不用 time.Sleep：test-sleep 棘轮
-// （scripts/verify/verify-test-sleep-ratchet.py）按文件计预算，改动既有文件的
-// sleep 计数会顶破基线。
+// waitGroupDone 等待 WaitGroup 归零；不用 time.Sleep，避免测试等待变成时间竞态。
 func waitGroupDone(t *testing.T, wg *sync.WaitGroup) {
 	t.Helper()
 	done := make(chan struct{})

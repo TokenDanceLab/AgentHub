@@ -2,12 +2,9 @@
 // for the AgentHub Orchestrator. It tracks runtime agent instances, their
 // status, and enables communication between orchestrator and sub-agents.
 //
-// Reference: historical codex-cli AgentTree pattern indexed by docs/history.md.
-//
-// Residual pure-helper peel #1154: Registry core API stays here; types,
-// filtered lookup, status mutators, spawn-slot checks, and shutdown cascade
-// live in registry_types / registry_lookup / registry_status / registry_spawn /
-// registry_shutdown companions. Zero behavior change — pure move only.
+// Companion files cover filtered lookup, status mutators, spawn-slot checks,
+// and shutdown cascade: registry_types / registry_lookup / registry_status /
+// registry_spawn / registry_shutdown.
 package agents
 
 import (
@@ -121,14 +118,4 @@ func (r *Registry) WithMaxConcurrent(n int) *Registry {
 		r.mu.Unlock()
 	}
 	return r
-}
-
-// MaxConcurrent returns the configured max concurrent sub-agents per parent.
-func (r *Registry) MaxConcurrent() int {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-	if r.maxConcurrent <= 0 {
-		return DefaultMaxConcurrent
-	}
-	return r.maxConcurrent
 }

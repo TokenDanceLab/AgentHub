@@ -1,9 +1,5 @@
 package agents
 
-// Residual pure-helper peel #1154: ShutdownCascade tree walk and pure
-// dedupe helper extracted from registry.go. Same package agents; zero
-// behavior change.
-
 import "time"
 
 // ShutdownCascade recursively marks the agent tree rooted at rootID as

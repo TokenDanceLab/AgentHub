@@ -12,8 +12,8 @@ import type { FileItem, RunResultInfo } from './inspector/OverviewPanel';
 import type { BrowserPreviewFocusRequest } from './workbenchSessionChromeHelpers';
 
 /* ═══════════════════════════════════════════════════════════════════════
-   rightInspectorTypes — public props / shared residual types for
-   RightInspector (#661). No intentional UX change.
+   rightInspectorTypes — public props / shared types for
+   RightInspector (#661).
    ═══════════════════════════════════════════════════════════════════════ */
 
 export interface RightInspectorProps {

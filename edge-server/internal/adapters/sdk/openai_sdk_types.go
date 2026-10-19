@@ -2,9 +2,6 @@ package sdk
 
 import "strings"
 
-// Residual pure-helper peel #1152: OpenAI Chat Completions API request/SSE types.
-// Grouped into package sdk (#1760); public Adapter surface unchanged.
-
 // --- OpenAI API types ---
 
 type openaiChatRequest struct {

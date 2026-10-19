@@ -20,7 +20,7 @@ export const DESIGN_DONE_TASK: TaskItem = {
   assignee: 'Builder',
   startTime: '6月2日',
   dueDate: '6月2日',
-  creator: 'contributor-a',
+  creator: 'Alice',
   status: '已完成',
 };
 

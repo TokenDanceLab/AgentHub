@@ -16,45 +16,15 @@ import (
 	"github.com/agenthub/hub-server/internal/uuidv7"
 )
 
-// CompeteAggregator is the interface for calling an LLM to compare
-// multiple agent outputs and produce a comparison summary for compete mode.
-type CompeteAggregator interface {
-	// CompareResults sends the collected results to an LLM and returns a
-	// comparison summary. The entries slice contains one entry per worker
-	// with its assignment result.
-	CompareResults(ctx context.Context, taskPrompt string, entries []model.CompeteSummaryEntry) (string, error)
-}
-
-// noOpCompeteAggregator returns a plain diff when no LLM is configured.
-type noOpCompeteAggregator struct{}
-
-func (noOpCompeteAggregator) CompareResults(_ context.Context, taskPrompt string, entries []model.CompeteSummaryEntry) (string, error) {
+// buildCompeteSummary produces the baseline comparison summary for compete mode.
+func buildCompeteSummary(taskPrompt string, entries []model.CompeteSummaryEntry) string {
 	var b strings.Builder
 	b.WriteString("Comparison summary (no LLM configured):\n\n")
 	fmt.Fprintf(&b, "Task: %s\n\n", taskPrompt)
 	for i, e := range entries {
 		fmt.Fprintf(&b, "=== Agent %d (member %s) ===\n%s\n\n", i+1, e.MemberID, truncateResult(e.Result, 2000))
 	}
-	return b.String(), nil
-}
-
-// defaultCompeteAggregator returns the baseline aggregator to use when no
-// external aggregator is injected.
-func defaultCompeteAggregator() CompeteAggregator {
-	return noOpCompeteAggregator{}
-}
-
-// ensureCompeteAggregator returns the configured aggregator or a no-op fallback.
-func (s *AgentTeamService) ensureCompeteAggregator() CompeteAggregator {
-	if s.competeAggregator != nil {
-		return s.competeAggregator
-	}
-	return defaultCompeteAggregator()
-}
-
-// SetCompeteAggregator injects a custom aggregator for compete mode.
-func (s *AgentTeamService) SetCompeteAggregator(a CompeteAggregator) {
-	s.competeAggregator = a
+	return b.String()
 }
 
 // HandleCompeteRouteDecision dispatches the same task to multiple team members
@@ -295,11 +265,7 @@ func (s *AgentTeamService) GenerateCompeteSummary(ctx context.Context, userID, r
 		comparePrompt = req.Prompt + "\n\nOriginal task: " + taskPrompt
 	}
 
-	aggregator := s.ensureCompeteAggregator()
-	summary, err := aggregator.CompareResults(ctx, comparePrompt, entries)
-	if err != nil {
-		return nil, err
-	}
+	summary := buildCompeteSummary(comparePrompt, entries)
 
 	resp := &model.CompeteSummaryResponse{
 		TeamRunID: runID,

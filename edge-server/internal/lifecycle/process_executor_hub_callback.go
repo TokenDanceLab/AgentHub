@@ -36,13 +36,11 @@ type TaskEventReporter interface {
 var _ TaskEventReporter = (*hub.CallbackClient)(nil)
 
 // hubStreamChunkSeq provides a per-run monotonic chunk index for deterministic
-// client_msg_id (UUIDv5) generation in fireHubStream. Lazily populated via
+// client_msg_id UUIDv5 generation in fireHubStream. Lazily populated via
 // sync.Map so concurrent stream events for the same run get strictly
 // increasing indices without lock contention. Entries are deleted in
 // fireHubDone/fireHubFail so a long-lived executor does not leak finished
-// run IDs. Package-scoped because the ProcessExecutor struct fields are out of
-// this lane's file scope; the map is keyed by runID and bounded by the live
-// run count.
+// run IDs. The map is keyed by runID and bounded by the live run count.
 var hubStreamChunkSeq sync.Map // runID -> *atomic.Int64
 
 // nextHubStreamChunkIdx returns the next monotonic chunk index for runID,
@@ -93,12 +91,24 @@ func (e *ProcessExecutor) hubTaskID(runID string) string {
 	return e.hubTasks[runID]
 }
 
+// bindHubTask records the Hub task and allocates the bounded final-content
+// collector. Desktop-owned runs and empty task IDs are no-ops.
+func (e *ProcessExecutor) bindHubTask(runID, taskID, callbackOwner string) {
+	if callbackOwner == "desktop" || taskID == "" {
+		return
+	}
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	e.hubTasks[runID] = taskID
+	e.hubOutputs[runID] = newHubOutputCollector(hubCallbackFinalMaxBytes)
+}
+
 // fireHubAck sends a TaskAck callback to Hub. Called when the run starts.
 // Errors are logged but never block the run lifecycle. Concurrency is bounded
 // by callbackSem so finish storms cannot spawn unbounded HTTP.
 func (e *ProcessExecutor) fireHubAck(runID string) {
 	taskID := e.hubTaskID(runID)
-	if !shouldFireHubCallback(e.hubCallback != nil, taskID) {
+	if e.hubCallback == nil || taskID == "" {
 		return
 	}
 	safego.SafeGo("hubAck", func() {
@@ -109,7 +119,7 @@ func (e *ProcessExecutor) fireHubAck(runID string) {
 		defer e.releaseHubCallbackSlot()
 		ctx, cancel := context.WithTimeout(context.Background(), hubCallbackTimeout)
 		defer cancel()
-		if err := e.hubCallback.TaskAck(ctx, taskID, runID); shouldLogHubCallbackFailure(err) {
+		if err := e.hubCallback.TaskAck(ctx, taskID, runID); err != nil {
 			slog.Warn("hub callback ack failed", "taskId", taskID, "runId", runID, "error", err)
 		}
 	})
@@ -123,7 +133,7 @@ func (e *ProcessExecutor) recordHubOutput(runID, text string) {
 	e.mu.Lock()
 	collector := e.hubOutputs[runID]
 	e.mu.Unlock()
-	if !shouldHaveHubOutputCollector(collector != nil) {
+	if collector == nil {
 		return
 	}
 	collector.Append(text)
@@ -137,7 +147,7 @@ func (e *ProcessExecutor) recordHubFinalFallback(runID, text string) {
 	e.mu.Lock()
 	collector := e.hubOutputs[runID]
 	e.mu.Unlock()
-	if !shouldHaveHubOutputCollector(collector != nil) {
+	if collector == nil {
 		return
 	}
 	collector.SetFallback(text)
@@ -147,7 +157,7 @@ func (e *ProcessExecutor) hubFinalContent(runID string) string {
 	e.mu.Lock()
 	collector := e.hubOutputs[runID]
 	e.mu.Unlock()
-	if !shouldHaveHubOutputCollector(collector != nil) {
+	if collector == nil {
 		return ""
 	}
 	return collector.Final()
@@ -160,8 +170,8 @@ func (e *ProcessExecutor) hubFinalContent(runID string) string {
 //
 // Delivery is ordered per run: chunks are queued to a per-run FIFO consumed by
 // a single goroutine, so the Hub receives stream chunks in emission order
-// (concurrent safego.SafeGo sends previously raced and could deliver a later chunk
-// first). Backpressure is non-blocking: when the queue is full the chunk is
+// (concurrent sends would race and could deliver a later chunk first).
+// Backpressure is non-blocking: when the queue is full the chunk is
 // dropped rather than stalling the run lifecycle (#987). FinalContent
 // collection via recordHubOutput is independent of stream send success.
 func (e *ProcessExecutor) fireHubStream(runID string, content string) {
@@ -170,7 +180,7 @@ func (e *ProcessExecutor) fireHubStream(runID string, content string) {
 		return
 	}
 	taskID := e.hubTaskID(runID)
-	if !shouldFireHubCallback(e.hubCallback != nil, taskID) {
+	if e.hubCallback == nil || taskID == "" {
 		return
 	}
 	for _, chunk := range splitHubCallbackText(content, hubCallbackChunkMaxBytes) {
@@ -202,7 +212,7 @@ func (e *ProcessExecutor) fireHubStream(runID string, content string) {
 // bounded by hubCallbackTimeout).
 func (e *ProcessExecutor) fireHubDone(runID string, _ map[string]any) {
 	taskID := e.hubTaskID(runID)
-	if !shouldFireHubCallback(e.hubCallback != nil, taskID) {
+	if e.hubCallback == nil || taskID == "" {
 		// Even when no callback fires, drop the per-run chunk-seq counter so
 		// the package-scoped map does not retain finished runs.
 		hubStreamChunkSeq.Delete(runID)
@@ -225,7 +235,7 @@ func (e *ProcessExecutor) fireHubDone(runID string, _ map[string]any) {
 // leaking past the terminal callback.
 func (e *ProcessExecutor) fireHubFail(runID string, reason string) {
 	taskID := e.hubTaskID(runID)
-	if !shouldFireHubCallback(e.hubCallback != nil, taskID) {
+	if e.hubCallback == nil || taskID == "" {
 		hubStreamChunkSeq.Delete(runID)
 		return
 	}
@@ -270,7 +280,7 @@ type hubCallbackJob struct {
 
 // hubCallbackQueueState is the per-run FIFO plus lifecycle flags. The mutex
 // guards enqueue-vs-close so a stream racing the terminal enqueue either lands
-// before the close (ordered) or observes closed and drops — never a send on a
+// before the close ordered or observes closed and drops — never a send on a
 // closed channel.
 type hubCallbackQueueState struct {
 	runID   string
@@ -386,7 +396,7 @@ func (e *ProcessExecutor) deliverHubCallbackJob(job hubCallbackJob) {
 
 	switch job.kind {
 	case hubJobStream:
-		if err := e.hubCallback.TaskStream(ctx, job.taskID, job.runID, job.clientMsgID, job.content); shouldLogHubCallbackFailure(err) {
+		if err := e.hubCallback.TaskStream(ctx, job.taskID, job.runID, job.clientMsgID, job.content); err != nil {
 			slog.Warn("hub callback stream failed", "taskId", job.taskID, "runId", job.runID, "error", err)
 		}
 	case hubJobStreamEvent:
@@ -394,15 +404,15 @@ func (e *ProcessExecutor) deliverHubCallbackJob(job hubCallbackJob) {
 		if !ok {
 			return
 		}
-		if err := reporter.TaskStreamEvent(ctx, job.taskID, job.runID, job.clientMsgID, job.eventType, job.payload); shouldLogHubCallbackFailure(err) {
+		if err := reporter.TaskStreamEvent(ctx, job.taskID, job.runID, job.clientMsgID, job.eventType, job.payload); err != nil {
 			slog.Warn("hub callback typed event failed", "taskId", job.taskID, "runId", job.runID, "eventType", job.eventType, "error", err)
 		}
 	case hubJobDone:
-		if err := e.hubCallback.TaskDone(ctx, job.taskID, job.result); shouldLogHubCallbackFailure(err) {
+		if err := e.hubCallback.TaskDone(ctx, job.taskID, job.result); err != nil {
 			slog.Warn("hub callback done failed", "taskId", job.taskID, "runId", job.runID, "error", err)
 		}
 	case hubJobFail:
-		if err := e.hubCallback.TaskFail(ctx, job.taskID, job.runID, job.content); shouldLogHubCallbackFailure(err) {
+		if err := e.hubCallback.TaskFail(ctx, job.taskID, job.runID, job.content); err != nil {
 			slog.Warn("hub callback fail failed", "taskId", job.taskID, "runId", job.runID, "error", err)
 		}
 	}
@@ -433,13 +443,6 @@ type hubStreamFlusher interface {
 	FlushHubStream()
 }
 
-func newHubCallbackEmitter(executor *ProcessExecutor, runID string, inner adapters.EventEmitter) adapters.EventEmitter {
-	if !shouldWrapHubCallbackEmitter(executor != nil, inner != nil) {
-		return inner
-	}
-	return &hubCallbackEmitter{executor: executor, runID: runID, inner: inner}
-}
-
 func (e *hubCallbackEmitter) Emit(eventType string, scope map[string]any, payload any) {
 	e.inner.Emit(eventType, scope, payload)
 	if _, typed := e.executor.hubCallback.(TaskEventReporter); typed && shouldForwardHubTypedEvent(eventType) {
@@ -449,10 +452,10 @@ func (e *hubCallbackEmitter) Emit(eventType string, scope map[string]any, payloa
 	}
 	e.executor.fireHubTaskStreamEvent(e.runID, eventType, payload)
 	text, effect := hubCallbackTextForEvent(eventType, payload)
-	if !shouldApplyHubCallbackSideEffect(text, effect) {
+	if text == "" || effect == hubCallbackNone {
 		return
 	}
-	if isHubCallbackStreamEffect(effect) {
+	if effect == hubCallbackStream {
 		// Feed the final-content collector per event: the done callback must
 		// carry the complete output regardless of stream coalescing.
 		e.executor.recordHubOutput(e.runID, text)
@@ -466,7 +469,7 @@ func (e *hubCallbackEmitter) Emit(eventType string, scope map[string]any, payloa
 		e.executor.fireHubStream(e.runID, text)
 		return
 	}
-	if isHubCallbackFallbackEffect(effect) {
+	if effect == hubCallbackFallback {
 		e.flushPendingHubStream()
 		e.executor.recordHubFinalFallback(e.runID, text)
 	}

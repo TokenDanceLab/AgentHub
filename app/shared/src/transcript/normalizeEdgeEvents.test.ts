@@ -772,8 +772,8 @@ describe('normalizeEdgeEventsToTranscript edge cases', () => {
   // and were previously dropped by the default console.warn branch.
 
   it('wires run.agent.mcp_tool_call to a tool_call block (MCP server tool activity)', () => {
-    // Emitted by edge-server/internal/adapters/parser_ndjson_parse_msg.go:29,68
-    // (event name const: orchestration/contracts.go:163) alongside
+    // Emitted by edge-server/internal/adapters/parser_ndjson_parse_msg.go:27,66
+    // (event name const: orchestration/contracts.go:161) alongside
     // run.agent.tool_call; same payload shape (toolName, callId, input).
     const blocks = normalizeEdgeEventsToTranscript([
       edgeEvent('evt-mcp-tool', 1, 'run.agent.mcp_tool_call', {
@@ -889,7 +889,6 @@ describe('normalizeEdgeEventsToTranscript edge cases', () => {
       'run.agent.plan_proposed',
       'run.agent.plan_approved',
       'run.agent.plan_rejected',
-      'run.agent.plan_expired',
       'run.agent.tool_rejected',
       'run.agent.session_init',
       'run.agent.session_state_changed',

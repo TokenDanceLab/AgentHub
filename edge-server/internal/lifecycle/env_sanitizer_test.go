@@ -615,3 +615,14 @@ func envToMap(env []string) map[string]string {
 	}
 	return m
 }
+
+func TestIsWhitelistedEnvKeyAcceptsWindowsProgramFilesX86(t *testing.T) {
+	if runtime.GOOS != "windows" {
+		t.Skip("Windows-only whitelist")
+	}
+	for _, key := range []string{"ProgramFiles(x86)", "CommonProgramFiles(x86)"} {
+		if !isWhitelistedEnvKey(key) {
+			t.Errorf("%q should be whitelisted", key)
+		}
+	}
+}

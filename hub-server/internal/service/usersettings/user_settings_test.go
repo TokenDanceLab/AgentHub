@@ -11,7 +11,7 @@ import (
 )
 
 // Validation runs before the repository is touched, so a nil repo is safe for
-// these cases (#2123 P1-1: input errors must surface as 400, not 500).
+// these cases (#2123: input errors must surface as 400, not 500).
 func TestUpsertSettings_ValidationErrorsAre400(t *testing.T) {
 	svc := NewService(nil)
 

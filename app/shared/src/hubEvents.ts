@@ -2,24 +2,13 @@
 // 1:1 mirror of the constants in hub-server/internal/ws/frame.go — every key
 // here MUST have a matching Type* constant there (and vice versa). Do not add
 // client-only event names: types without a server producer are dead protocol
-// surface (#1362 / #1422 removed sync.request/sync.events, run.agent.plan_*,
-// agent.regenerate, message.edited, agent.timeout wire, auth/auth.fail).
-/**
- * Every Hub WS frame is JSON: `{ type, payload, seq_id? }`.
- *
- * ⚠️ **`seq_id` 字段契约警戒（#2101 G5；对照表见 api/events.md「seq 字段对照表」）**：
- * - `seq_id` 是 **Hub Frame 的 per-connection 投递序号**，由
- *   `hub-server/internal/ws/fanout.go:91` 在 `Manager.PushToConn` 内 stamp，定义于
- *   `hub-server/internal/ws/frame.go:7-14`。**重连时从 1 重新计数**。
- * - 合法用途仅限同连接内丢帧检测；**禁止**当作跨连接幂等键、持久 cursor、业务去重键，
- *   **禁止**写入客户端→服务端请求帧。
- * - 这 **不是** Edge EventEnvelope 的 `seq`（per-bus 持久单调序号，跨连接稳定，用作
- *   replay cursor；定义于 `edge-server/internal/events/types.go:28-38`）。把两者混用
- *   会导致静默丢事件或重复 apply。
- *
- * 业务重复投递语义（UPSERT by id / idempotent on apply / watermark / ephemeral）以
- * api/events.md 为准——任何 WS 增量回放实现前必须先核对该契约。
- */
+// surface.
+// Every Hub WS frame is JSON: `{ type, payload, seq_id? }`. `seq_id` is the
+// per-connection delivery seq (reset on reconnect), not the Edge stream seq;
+// the contract and source anchors live in api/conventions.md「seq 字段对照表」.
+//
+// 业务重复投递语义（UPSERT by id / idempotent on apply / watermark / ephemeral）
+// 以 api/events.md 为准。
 
 export const HUB_EVENTS = {
   // ── Client→server frame types ─────────────────
@@ -70,11 +59,10 @@ export const HUB_EVENTS = {
   TEAM_ASSIGNMENT_DONE: 'team.assignment.done',
   TEAM_ASSIGNMENT_FAILED: 'team.assignment.failed',
 
-  // ── Team subagent live-stream (#1478 Phase A) ──
+  // ── Team subagent live-stream (#1478) ──
   // UPSERT by (agent_task_id, event_seq) + event_seq watermark; aggregates
-  // per-task run.agent.* flow into the team-run view. Phase A ships only the
-  // single-event stream frame; activity/batch/subscribe arrive later — do NOT
-  // add them until they have a wire producer (#1362/#1422 dead-surface ban).
+  // per-task run.agent.* flow into the team-run view. Only the single-event
+  // stream frame is on the wire today; activity/batch/subscribe are not.
   TEAM_SUBAGENT_STREAM: 'team.subagent.stream',
 
   // ── Notification & social ─────────────────────

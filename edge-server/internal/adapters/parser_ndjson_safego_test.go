@@ -1,6 +1,6 @@
 package adapters
 
-// #2246 slice 1: Parse guarded each line's parseLine call with a private, bare
+// #2246: Parse guarded each line's parseLine call with a private, bare
 // recover() that only wrote slog.Error("ndjson: panic in parseLine", ...) — no
 // stack, no counter, no PanicObserver. It now goes through pkg/safego.
 //
@@ -10,8 +10,7 @@ package adapters
 // stream keeps going, that Parse still returns nil, and that the panic is
 // attributed to a stable safego name so the Edge observer can label it.
 //
-// No time.Sleep in this file: the test-sleep ratchet budgets sleeps per file and
-// a newly added file has no baseline entry.
+// No time.Sleep in this file: the tests use bounded time.After waits.
 
 import (
 	"context"

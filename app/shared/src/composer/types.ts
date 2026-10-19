@@ -98,7 +98,7 @@ export interface ComposerState {
   /**
    * When non-null, the composer is editing an already-sent message (block id)
    * instead of composing a new one. Submit then routes to `editMessage`
-   * (#1462 CF16) rather than `submitComposerIntent`.
+   * (#1462) rather than `submitComposerIntent`.
    */
   editingMessageId: string | null;
 }

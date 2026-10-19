@@ -1,4 +1,4 @@
-// Routing helper for local Edge permission approvals (#1816 W1).
+// Routing helper for local Edge permission approvals (#1816).
 //
 // The shared approval card dispatches an ApprovalDecisionAction that carries
 // the requestId (the permission request id) but no Edge runId. The run that

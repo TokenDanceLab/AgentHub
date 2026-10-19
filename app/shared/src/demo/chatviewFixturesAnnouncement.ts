@@ -1,6 +1,5 @@
 /**
  * Chatview fixtures: Pinned announcement transcript.
- * Peel companion of chatviewFixtures (#1132). Pure only; zero behavior change.
  */
 
 import type { TranscriptBlock } from '../transcript/types'

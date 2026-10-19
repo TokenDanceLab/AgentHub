@@ -176,7 +176,7 @@ export function AccountScreen({
                   includeFontPadding: false,
                 }}
               >
-                maintainer
+                Demo User
               </Text>
               <AgentHubIcon color={tokens.color.inkSubtle} name="grid" size={22} />
               <AgentHubIcon color={tokens.color.inkSubtle} name="chevronRight" size={20} />

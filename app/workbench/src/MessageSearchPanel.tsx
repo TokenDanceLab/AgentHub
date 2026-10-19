@@ -356,11 +356,9 @@ export function MessageSearchPanel({
 }
 
 /*
-  Migration bridge (Wave 10): keep a default export so out-of-scope consumers
-  using `import MessageSearchPanel from './MessageSearchPanel'` keep compiling
-  — currently workbench/ConversationHost.tsx and workbench/MessageSearchPanel.stories.tsx,
-  both outside this lane's editable file set. The primary export is now the named
-  `export function MessageSearchPanel` above. Remove this bridge once those
-  consumers migrate to named imports.
+  Default export retained for existing default imports
+  (workbench/ConversationHost.tsx, workbench/MessageSearchPanel.stories.tsx).
+  Prefer the named `MessageSearchPanel` export above; drop this bridge once
+  those imports migrate.
 */
 export default MessageSearchPanel;

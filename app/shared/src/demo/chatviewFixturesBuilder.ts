@@ -1,6 +1,5 @@
 /**
  * Chatview fixtures: Builder DM transcript.
- * Peel companion of chatviewFixtures (#1132). Pure only; zero behavior change.
  */
 
 import type { EvidenceRefStatus, TranscriptBlock } from '../transcript/types'
@@ -51,7 +50,7 @@ export const chatviewBuilderTranscript: TranscriptBlock[] = [
     runtimeLabel: 'Claude Sonnet 4',
   },
 
-  /* ── Goal registration: long refactor states its objective (#1998, UX F8).
+  /* ── Goal registration: long refactor states its objective (#1998).
        Shape mirrors the real transcript projection: tool_call block with a
        bounded scalar input projection (objective). ── */
   {
@@ -447,7 +446,7 @@ export const chatviewBuilderTranscript: TranscriptBlock[] = [
     reason: 'Non-breaking incremental migration. Each call site changes one import line. Legacy stubs remain active until all call sites are migrated. Rollback: revert the PR — old client.ts untouched throughout.',
   },
 
-  /* ── Goal closed: migration finished, goal marked complete (#1998, UX F8) ── */
+  /* ── Goal closed: migration finished, goal marked complete (#1998) ── */
   {
     id: 'bgoal2', kind: 'tool_call', createdAt: T(37), author: B('builder'),
     callId: 'call-goal-update',

@@ -1,5 +1,5 @@
 -- 0066_agent_team_runs_token_usage.up.sql
--- P1 budget guard fast path: add a maintained token_usage_total counter column
+-- Add a maintained token_usage_total counter column
 -- to agent_team_runs so teamRunBudgetExceededDB can short-circuit the budget
 -- check in O(1) when the counter is non-NULL, instead of scanning every
 -- assignment + task + run event for the team run on every route decision

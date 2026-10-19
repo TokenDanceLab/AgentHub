@@ -11,7 +11,7 @@ import (
 )
 
 // TestDeployWorkspacePathConfinement pins the deploy path-confinement gate
-// (#2154 security scan P2): content-source paths recorded from agent events
+// (#2154): content-source paths recorded from agent events
 // must resolve inside the run workspace; absolute, dot-prefixed and
 // escaping paths fail closed.
 func TestDeployWorkspacePathConfinement(t *testing.T) {

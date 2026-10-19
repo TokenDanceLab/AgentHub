@@ -16,4 +16,18 @@ describe('FilePreview rendering', () => {
     expect(getByText('Desktop/Web')).toBeInTheDocument();
     expect(getByText('aligned')).toBeInTheDocument();
   });
+
+  it('renders PDF previews without a sandbox (ADR-023: Chromium blocks its viewer in sandboxed frames)', () => {
+    const { container } = render(
+      <FilePreview
+        filename="report.pdf"
+        content={'data:application/pdf;base64,'}
+        onClose={vi.fn()}
+      />,
+    );
+
+    const frame = container.querySelector('iframe');
+    expect(frame).not.toBeNull();
+    expect(frame).not.toHaveAttribute('sandbox');
+  });
 });

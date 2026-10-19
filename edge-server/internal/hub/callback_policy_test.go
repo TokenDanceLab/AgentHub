@@ -1,6 +1,6 @@
 package hub_test
 
-// Phase-2 outbound policy tests (#1564): retry budget, Retry-After, body
+// Outbound callback policy tests (#1564): retry budget, Retry-After, body
 // limit, action-level retry policy, redirect refusal, idempotency-key
 // stability, caller-deadline cancellation, and connection reuse.
 

@@ -29,8 +29,7 @@ type AssemblePayloadInput struct {
 
 // AssembleDispatchPayload builds the edge payload core (identity, custom-agent
 // profile, model params merge, team attribution, and optional history). Pure —
-// no DB / WS / cache. Empty CustomAgentID skips profile application (matches
-// HasCustomAgentBinding false path).
+// no DB / WS / cache. Empty CustomAgentID skips profile application.
 func AssembleDispatchPayload(in AssemblePayloadInput) Payload {
 	dp := NewPayload(
 		in.TaskID, in.AgentInstanceID, in.AgentType, in.TargetID, in.EdgeDeviceID, in.SessionID,

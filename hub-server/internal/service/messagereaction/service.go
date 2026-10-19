@@ -20,26 +20,16 @@ type Bus interface {
 }
 
 // Service owns IM message reaction orchestration: add/remove/list summaries +
-// access checks. Domain events go through Bus. Pure reaction normalize/summary
-// helpers remain in service/im (#628/#639/#651); this package is the first IM
-// typed-service extract (#662).
+// access checks. Domain events go through Bus. Reaction normalize and summary
+// helpers live in service/im.
 type Service struct {
 	db  *gorm.DB
 	bus Bus
 }
 
 // NewService constructs a message-reaction service.
-// bus may be nil for read-only/partial tests; write paths that publish no-op.
 func NewService(db *gorm.DB, bus Bus) *Service {
 	return &Service{db: db, bus: bus}
-}
-
-// SetBus injects (or replaces) the event bus port.
-func (s *Service) SetBus(bus Bus) {
-	if s == nil {
-		return
-	}
-	s.bus = bus
 }
 
 // publish is a nil-safe wrapper over the bus port.

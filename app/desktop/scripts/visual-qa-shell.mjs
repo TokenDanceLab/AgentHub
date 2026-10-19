@@ -1,10 +1,9 @@
 /**
- * P74 Visual QA — Desktop shell capture matrix (#1199 / #1286)
+ * Desktop visual QA — Desktop shell capture matrix (#1199 / #1286)
  * Viewport 1440x810 · themes light+dark · Demo workbench entry
  *
  * CURRENT GATE MATRIX (Desktop half). Pair with:
  *   app/web/scripts/visual-qa-shell.mjs
- * Score SSOT: visual-qa-scorecard
  * Optional multi-scene battery (not gate): app/web/scripts/visual-qa.mjs
  *
  * Usage (from app/desktop):
@@ -126,7 +125,7 @@ async function captureTheme(browser, theme, vp) {
       viewport: { width: window.innerWidth, height: window.innerHeight },
       workbenchShell: Boolean(document.querySelector('[data-testid="agenthub-workbench"]')),
       onboardingVisible: Boolean(document.querySelector('[data-testid="onboarding-overlay"]')),
-      // UX F8 (#1998): goal banner geometry on the demo chat landing page
+      // #1998: goal banner geometry on the demo chat landing page
       // (builder demo transcript carries a goal arc) — recorded on every
       // tier so the narrow 800 width proves no layout breakage.
       goalBanner: banner && bannerRect

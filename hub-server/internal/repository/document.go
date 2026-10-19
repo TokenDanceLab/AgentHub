@@ -29,7 +29,7 @@ func ListDocumentsByOwner(db *gorm.DB, ownerID string, filter model.DocumentFilt
 		filter.Limit = 50
 	}
 	if filter.Limit > config.MaxPageLimit {
-		// #2136 P1: repo cap was 200 while the API layer accepts up to
+		// #2136: repo cap was 200 while the API layer accepts up to
 		// MaxPageLimit=500; align so the declared contract holds.
 		filter.Limit = config.MaxPageLimit
 	}

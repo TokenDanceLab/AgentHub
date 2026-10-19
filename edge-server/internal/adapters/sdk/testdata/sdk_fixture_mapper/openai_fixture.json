@@ -26,7 +26,7 @@
       "decision": "review_required",
       "reason": "write action needs AgentHub approval evidence",
       "input": {
-        "command": "git diff --check origin/dev/maintainer...HEAD"
+        "command": "git diff --check origin/master...HEAD"
       },
       "traceRefs": ["trace:openai:guardrail"]
     },
@@ -44,7 +44,7 @@
       "type": "artifact_file",
       "callId": "call_apply_patch",
       "toolName": "apply_patch",
-      "path": "docs/reference/sdk-agent-strategy.md",
+      "path": "docs/reference/agent-protocols.md",
       "kind": "modified",
       "diff": "@@ docs fixture diff @@"
     },

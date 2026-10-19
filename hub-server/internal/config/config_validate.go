@@ -198,7 +198,7 @@ func isProductionEnv(env string) bool {
 	return false
 }
 
-// validateProdGuard enforces #2124 P1 scheme-b hardening: when running in
+// validateProdGuard enforces #2124 production hardening: when running in
 // production (server.env ∈ {production, prod, release}), safety-critical
 // settings MUST be explicitly configured. Dev/test environments are
 // unaffected so local development stays zero-friction.

@@ -1,7 +1,5 @@
 package store
 
-// Residual pure-helper peel #1144: run/artifact/profile/settings methods. Same package; zero behavior change.
-
 import (
 	"slices"
 	"time"

@@ -19,7 +19,7 @@ import { formatQuotePreview } from './unifiedComposerHelpers';
 /* ═══════════════════════════════════════════════════════════════════════
    Composer context chrome — reply / quote / mentions / mainchain / status.
 
-   Residual extract from UnifiedComposerParts for Phase 30 #706.
+   Helper module for UnifiedComposerParts (#706).
    CSS remains on shared AgentHubWorkbench.module.css.
    ═══════════════════════════════════════════════════════════════════════ */
 
@@ -81,7 +81,7 @@ export function ComposerQuoteBar({
 
 /**
  * Edit-context bar shown above the composer while editing an already-sent
- * message (#1462 CF16). Reuses the reply bar chrome so no new CSS is needed.
+ * message (#1462). Reuses the reply bar chrome so no new CSS is needed.
  */
 export function ComposerEditBar({
   isSubmitting,

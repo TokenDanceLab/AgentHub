@@ -82,7 +82,7 @@ export type { TooltipProps, TooltipSide } from './Tooltip';
 export { default as ErrorBoundary } from './ErrorBoundary';
 export type { ErrorConfig, ErrorBoundaryExtension } from './ErrorBoundary';
 
-// ── Wave 9 public barrel additions (previously exported only from file paths) ──
+// ── Public component exports ──
 export { Button } from './Button';
 export type { ButtonProps } from './Button';
 export { CodeBlock } from './CodeBlock';
@@ -90,6 +90,6 @@ export { Icon } from './Icon';
 export { SkeletonBar } from './SkeletonBar';
 export type { SkeletonBarProps, SkeletonBarVariant } from './SkeletonBar';
 
-// ── #1863 恢复：PermissionModePicker（#1860 按孤儿删除；现由 #1863 审批模式选择器消费）──
+// ── PermissionModePicker — consumed by the composer approval-mode picker ──
 export { PermissionModePicker } from './PermissionModePicker';
 export type { PermissionModePickerProps, PermissionModeOption } from './PermissionModePicker';

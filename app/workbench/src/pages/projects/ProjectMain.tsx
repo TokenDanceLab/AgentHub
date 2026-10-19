@@ -1,7 +1,7 @@
 /* ═══════════════════════════════════════════════════════════════════════
    Projects main pane shell — detail head, editor, tabs, empty state.
 
-   Extracted from ProjectsPage as Phase 20 residual thin #595.
+   Extracted from ProjectsPage (#595).
    CSS remains on shared ProjectsPage.module.css.
    EmptyState contracts preserved (titleLevel, optional class spreads, CTA).
    ═══════════════════════════════════════════════════════════════════════ */

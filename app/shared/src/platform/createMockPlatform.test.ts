@@ -50,7 +50,7 @@ describe('createMockPlatform', () => {
         id: 'desktop-1',
         name: 'notes.md',
         source: 'desktop',
-        path: '<REPO_ROOT>\\notes.md',
+        path: '/workspace/agenthub\\notes.md',
       }],
     });
 

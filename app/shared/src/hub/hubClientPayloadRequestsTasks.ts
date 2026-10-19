@@ -1,6 +1,5 @@
 /**
  * Hub client pure path+init request builders (domain companion).
- * Peel of hubClientPayloadRequests (#1101). Pure only; zero behavior change.
  */
 
 import type {

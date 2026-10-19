@@ -11,7 +11,7 @@ import (
 
 // statsCacheTTL is the freshness window for public stats. Chosen at 30s to
 // reduce messages-table full COUNT from per-request to ~2/min under steady
-// load while keeping website counters acceptably fresh. See #2102 F9.
+// load while keeping website counters acceptably fresh. See #2102.
 const statsCacheTTL = 30 * time.Second
 
 // PublicStats is the response body for public stats queries.

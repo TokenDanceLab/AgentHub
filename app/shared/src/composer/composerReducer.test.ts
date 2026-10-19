@@ -18,7 +18,7 @@ describe('composerReducer', () => {
       mention: { id: 'builder', label: 'Builder', model: 'glm-5.1' },
     });
     state = composerReducer(state, { type: 'setApprovalMode', approvalMode: 'workspace-write' });
-    state = composerReducer(state, { type: 'setWorkDir', workDir: '  <REPO_ROOT>  ' });
+    state = composerReducer(state, { type: 'setWorkDir', workDir: '  /workspace/agenthub  ' });
 
     expect(state).toMatchObject({
       conversationId: 'team',
@@ -26,7 +26,7 @@ describe('composerReducer', () => {
       mode: 'review',
       mentions: [{ id: 'builder', label: 'Builder', model: 'glm-5.1' }],
       approvalMode: 'workspace-write',
-      workDir: '  <REPO_ROOT>  ',
+      workDir: '  /workspace/agenthub  ',
     });
   });
 
@@ -60,10 +60,10 @@ describe('composerReducer', () => {
       }),
     );
 
-    const withWorkDir = composerReducer(ready, { type: 'setWorkDir', workDir: ' <REPO_ROOT> ' });
+    const withWorkDir = composerReducer(ready, { type: 'setWorkDir', workDir: ' /workspace/agenthub ' });
     expect(buildComposerIntent(withWorkDir)).toEqual(
       expect.objectContaining({
-        workDir: '<REPO_ROOT>',
+        workDir: '/workspace/agenthub',
       }),
     );
   });

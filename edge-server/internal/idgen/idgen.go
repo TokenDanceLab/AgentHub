@@ -1,11 +1,9 @@
 // Package idgen is the single implementation of prefixed random IDs for the
 // edge server: 16 lowercase hex chars derived from 8 crypto/rand bytes.
 //
-// Five near-identical copies previously lived in api/genID, events/genID,
-// mcp/generateID, runcontrol/generateRunID and orchestrator/genHexID; the
-// simple copies silently ignored crypto/rand errors and would emit all-zero
-// IDs (collision) while the mcp copy carried a monotonic fallback. The
-// unified implementation keeps the fallback everywhere.
+// IDs are opaque to callers: the caller-supplied prefix and uniqueness are
+// the only stable properties. When crypto/rand fails, Hex falls back to a
+// monotonic process-local counter (see Hex).
 //
 // Role in the backend ID scheme (#1675, canonical description in
 // hub-server/internal/uuidv7): edge IDs deliberately stay prefixed 16-hex

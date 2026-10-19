@@ -1,6 +1,6 @@
 /* ═══════════════════════════════════════════════════════════════════════
-   Settings pane content renderers — extracted for Phase 18 #572.
-   Residual thin: helpers + parts (#686).
+   Settings pane content renderers (#572).
+   Helper module: helpers + parts (#686).
    ═══════════════════════════════════════════════════════════════════════ */
 
 import React, { useEffect, useMemo, useState } from 'react';
@@ -57,7 +57,7 @@ export function AppearancePane(props: SettingsPageProps): React.ReactElement {
         <SettingsRow label="主题" description="默认浅色；左下角主题按钮只负责快速切换当前预览。">
           <SettingSegment options={['跟随系统', '浅色', '深色']} active={props.theme} onChange={(v) => props.onChangeSetting('theme', v)} />
         </SettingsRow>
-        {/* #1986 (UX F15): preset switcher lives in workbench settings; the
+        {/* #1986: preset switcher lives in workbench settings; the
             shared SSOT applies/persists/notifies so both surfaces stay in sync. */}
         <SettingsRow wide label={tw("settings.themePreset.label")} description={tw("settings.themePreset.description")}>
           <ThemePresetPicker groupLabel={tw("settings.themePreset.aria")} defaultLabel={tw("settings.themePreset.default")} />
@@ -181,7 +181,7 @@ export function LocalDevPane(props: SettingsPageProps): React.ReactElement {
         <SettingsRow label="工作区" description="当前设计 demo 仓库路径。">
           <SettingPath value={props.workspacePath} onCopy={() => writeClipboardText(props.workspacePath)} />
         </SettingsRow>
-        <SettingsRow label="目标项目" description="后续迁移到真实 AgentHub Desktop 的参考项目。">
+        <SettingsRow label="目标项目" description="参考项目路径。">
           <SettingPath value={props.targetProjectPath} onCopy={() => writeClipboardText(props.targetProjectPath)} />
         </SettingsRow>
         <SettingsRow comingSoon label="热更新覆盖层" description="保留 Vite 错误 overlay，开发时能直接看到语法问题。">
@@ -269,7 +269,7 @@ function formatKeys(keys: string[]): string {
 
 /**
  * Label key of the shortcut that collides with `shortcutId` in this group.
- * #2154 P3-6: returns the labelKey (not the raw shortcut id) so the conflict
+ * #2154: returns the labelKey (not the raw shortcut id) so the conflict
  * copy can name the other binding the way the rest of the pane does — the id
  * ('send', 'toggle-sidebar') is an internal identifier and means nothing to
  * the user.
@@ -294,7 +294,7 @@ export function ShortcutsPane(_props: SettingsPageProps): React.ReactElement {
   const [recordingId, setRecordingId] = useState<string | null>(null);
   // #1853 review: keep BOTH sides — the shortcut being recorded (whose row
   // shows the rejection) and the label of the shortcut it collided with
-  // (message context). #2154 P3-6: the colliding side is stored as a labelKey
+  // (message context). #2154: the colliding side is stored as a labelKey
   // so the copy renders a localized name instead of an internal id.
   const [conflictState, setConflictState] = useState<{ recordedId: string; conflictingLabelKey: string } | null>(null);
   const hasCustom = useMemo(() => hasCustomKeybindings(), [groups]);
@@ -337,7 +337,7 @@ export function ShortcutsPane(_props: SettingsPageProps): React.ReactElement {
     return () => document.removeEventListener('keydown', handleRecord, true);
   }, [recordingId]);
 
-  // #2154 P3-6: one shared, localized conflict sentence for both paths — the
+  // #2154: one shared, localized conflict sentence for both paths — the
   // rejected recording and the (defensive) already-conflicting row. Recording
   // refuses collisions before saving, so the second path only fires for
   // bindings stored before that guard existed.

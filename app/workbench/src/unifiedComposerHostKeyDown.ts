@@ -8,11 +8,10 @@ import {
 import { setComposerTextAction } from './unifiedComposerHostActions';
 
 /* ═══════════════════════════════════════════════════════════════════════
-   unifiedComposerHostKeyDown — pure keydown residual slices from
-   unifiedComposerHostHelpers (#780).
+   unifiedComposerHostKeyDown — pure keydown planners (#780).
 
    Keydown event field readers, submit/newline planners, and host effect
-   mappers. No React hooks / no intentional UX change.
+   mappers. No React hooks.
    ═══════════════════════════════════════════════════════════════════════ */
 
 export type ComposerHostKeyDownPlan =

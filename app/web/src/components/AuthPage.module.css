@@ -121,10 +121,8 @@
   gap: 12px;
 }
 
-/* #1827: the duplicated .field/.label/.input/.passwordWrapper/.error blocks
-   were the hand-written fork of the shared form family — removed; the family
-   (shared/src/ui/FormField|Input) owns field layout and the unified error
-   state (--td-danger + aria-invalid) now. */
+/* Field layout and the unified error state (--td-danger + aria-invalid) come
+   from the shared form family (shared/src/ui/FormField|Input). */
 .errorBanner {
   min-height: 44px;
   padding: 9px 12px;

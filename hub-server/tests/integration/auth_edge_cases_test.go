@@ -22,7 +22,7 @@ func TestAuthExpiredToken(t *testing.T) {
 	u := register(t, "texpired_user", "pass1234", "ExpiredUser")
 
 	// Generate a token that is already expired BEYOND the 30s clock-skew
-	// leeway (jwt.go WithLeeway, #2135 F1; jwt_test.go pins the contract:
+	// leeway (jwt.go WithLeeway, #2135; jwt_test.go pins the contract:
 	// -31s rejected, within-leeway accepted). A -1s TTL used to sit inside
 	// the leeway, so the test exercised acceptance, not rejection.
 	expiredToken, err := jwtutil.GenerateAccessToken(

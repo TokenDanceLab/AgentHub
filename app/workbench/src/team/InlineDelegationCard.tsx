@@ -1,4 +1,4 @@
-// InlineDelegationCard — #1406 Phase 3
+// InlineDelegationCard — #1406
 // Inline delegation status card mounted below a user message that triggered
 // agent dispatch (dispatchRole='dispatch'). Subscribes to
 // MessageDelegationStore by trigger_message_id and renders one compact card

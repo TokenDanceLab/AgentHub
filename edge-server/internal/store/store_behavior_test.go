@@ -41,7 +41,7 @@ func TestFileStoreSyncPersistWritesValidJSON(t *testing.T) {
 	if _, err := s.CreateThreadMessage("item_persist", thread.ID, "assistant", "persisted content"); err != nil {
 		t.Fatalf("CreateThreadMessage returned error: %v", err)
 	}
-	if _, err := s.PinThreadItem(thread.ID, "item_persist", "maintainer"); err != nil {
+	if _, err := s.PinThreadItem(thread.ID, "item_persist", "Demo User"); err != nil {
 		t.Fatalf("PinThreadItem returned error: %v", err)
 	}
 
@@ -87,7 +87,7 @@ func TestFileStoreSyncPersistWritesValidJSON(t *testing.T) {
 
 	// Verify pin.
 	pinKey := threadPinKey(thread.ID, "item_persist")
-	if got, ok := snapshot.Pins[pinKey]; !ok || got.PinnedBy != "maintainer" {
+	if got, ok := snapshot.Pins[pinKey]; !ok || got.PinnedBy != "Demo User" {
 		t.Fatalf("snapshot pin = %#v, want persisted pin", got)
 	}
 
@@ -358,13 +358,13 @@ func TestIsTerminalRunStatus(t *testing.T) {
 	terminal := []string{"cancelled", "failed", "finished", "completed_with_issues"}
 	nonTerminal := []string{"queued", "started", "running", "pending", "", "unknown"}
 	for _, s := range terminal {
-		if !isTerminalRunStatus(s) {
-			t.Fatalf("isTerminalRunStatus(%q) = false, want true", s)
+		if !IsTerminalRunStatus(s) {
+			t.Fatalf("IsTerminalRunStatus(%q) = false, want true", s)
 		}
 	}
 	for _, s := range nonTerminal {
-		if isTerminalRunStatus(s) {
-			t.Fatalf("isTerminalRunStatus(%q) = true, want false", s)
+		if IsTerminalRunStatus(s) {
+			t.Fatalf("IsTerminalRunStatus(%q) = true, want false", s)
 		}
 	}
 }
@@ -536,14 +536,14 @@ func TestArtifactBaseName(t *testing.T) {
 func TestIsTerminalRunStatusExhaustive(t *testing.T) {
 	// Every recognized terminal status should be terminal.
 	for _, s := range []string{"cancelled", "failed", "finished", "completed_with_issues"} {
-		if !isTerminalRunStatus(s) {
-			t.Fatalf("isTerminalRunStatus(%q) = false, want true", s)
+		if !IsTerminalRunStatus(s) {
+			t.Fatalf("IsTerminalRunStatus(%q) = false, want true", s)
 		}
 	}
 	// Common non-terminal statuses should NOT be terminal.
 	for _, s := range []string{"queued", "started", "running", "pending", "paused", "cancelling"} {
-		if isTerminalRunStatus(s) {
-			t.Fatalf("isTerminalRunStatus(%q) = true, want false", s)
+		if IsTerminalRunStatus(s) {
+			t.Fatalf("IsTerminalRunStatus(%q) = true, want false", s)
 		}
 	}
 }

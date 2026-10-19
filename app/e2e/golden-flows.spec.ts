@@ -1,11 +1,13 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { test, expect, request as pwRequest, type APIRequestContext, type Page } from '@playwright/test';
 
 /**
- * AgentHub Golden Flows（round-74 Phase 3）——最薄的「用户真实操作」验收层。
+ * AgentHub Golden Flows ——最薄的「用户真实操作」验收层。
  *
- * 纪律（AGENTS §5.5 L3 + #1839）：
+ * 纪律（AGENTS §5「测试分层（L0-L4）」L3）：
  *  - 只复用既有 real lane（playwright.real.config.ts + run-real-e2e-lane.sh），不引入新框架；
  *  - 全程真实 OIDC Authorization Code + PKCE（无自签 JWT、无 stub hub）；
  *  - agent 回复消息经**真实 Edge→Hub 回调契约**（/edge/agent-tasks/:id/ack|stream|done）
@@ -13,16 +15,19 @@ import { test, expect, request as pwRequest, type APIRequestContext, type Page }
  *
  * 四条流：
  *  GF1 真登录后主界面拿到真实数据（会话与消息来自 Hub，不是 demo）；
- *  GF2 「重新生成」用真 task identity 且成功（#2274 B-1 的回归门）；
- *  GF3 未登录 demo 不提供会失败的「重新生成」（B-1 的诚实门回归）；
- *  GF4 Edge 回调落地后 transcript 无需手动刷新（round-73 invalidation 修复的回归门）。
+ *  GF2 「重新生成」用真 task identity 且成功（#2274 回归门）；
+ *  GF3 未登录 demo 不提供会失败的「重新生成」（诚实门回归）；
+ *  GF4 Edge 回调落地后 transcript 无需手动刷新（缓存失效回归门）。
  */
 
 const ID = process.env.AGENTHUB_E2E_ID_BASE_URL || 'http://127.0.0.1:3000';
 const HUB = process.env.AGENTHUB_E2E_HUB_BASE_URL || 'http://127.0.0.1:8080';
 const WEB = process.env.AGENTHUB_E2E_WEB_BASE_URL || 'http://127.0.0.1:5174';
 const WEB_CALLBACK = `${WEB}/workbench/auth/tokendance/callback`;
-const ACCOUNT_ENV = `${process.env.AGENTHUB_E2E_ACCOUNT_ENV || '<REMOTE_WORKSPACE>/AgentHub/tests/artifacts/real-e2e-account.env'}`;
+const SPEC_DIR = path.dirname(fileURLToPath(import.meta.url));
+const REPO_ROOT = path.resolve(SPEC_DIR, '..', '..');
+const ACCOUNT_ENV = process.env.AGENTHUB_E2E_ACCOUNT_ENV
+  || path.join(REPO_ROOT, 'tests', 'artifacts', 'real-e2e-account.env');
 
 function readAccountEnv(): Record<string, string> {
   const out: Record<string, string> = {};
@@ -240,7 +245,7 @@ test.describe('AgentHub Golden Flows（真实栈）', () => {
     await context.close();
   });
 
-  test('GF2 「重新生成」发真 task id 且成功（#2274 B-1 回归门）', async ({ request, browser }) => {
+  test('GF2 「重新生成」发真 task id 且成功（#2274 回归门）', async ({ request, browser }) => {
     const prov = await provisionConversation(sharedApi, webSession, desktopSession, 'GF2');
 
     const context = await browser.newContext({ viewport: { width: 1440, height: 810 }, locale: 'en-US' });
@@ -259,7 +264,7 @@ test.describe('AgentHub Golden Flows（真实栈）', () => {
     expect(offered, 'regenerate entry offered for a stamped agent reply').toBe(true);
 
     await expect.poll(() => regenerateCalls.length, { timeout: 15_000 }).toBeGreaterThan(0);
-    // 身份合同：URL 里必须是**任务 id**，且请求成功（B-1 修复前这里是 message/client_msg id + 404）。
+    // 身份合同：URL 里必须是**任务 id**，且请求成功。
     expect(regenerateCalls[0]!.url).toContain(`/web/agent-tasks/${prov.taskId}/regenerate`);
     expect(regenerateCalls[0]!.status).toBe(200);
     await expect(page.getByText(/Regenerating|重新生成中/i).first()).toBeVisible({ timeout: 10_000 });

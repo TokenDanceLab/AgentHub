@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/agenthub/hub-server/internal/cache"
 	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/model"
 	"github.com/agenthub/hub-server/internal/repository"
@@ -15,7 +16,7 @@ import (
 
 func TestAgentTeamService_HandleRouteDecisionCreatesAssignmentAndAuditEvents(t *testing.T) {
 	db := setupAgentTeamStateSQLite(t)
-	svc := NewAgentTeamService(db, nil, nil)
+	svc := NewAgentTeamService(db, nil, cache.NoOpCache{})
 	team, supervisor, executor, run := seedAgentTeamRun(t, db)
 
 	assignment, err := svc.HandleRouteDecision(context.Background(), "user-1", team.ID, run.ID, model.CoordinatorRouteDecision{
@@ -77,7 +78,7 @@ func TestAgentTeamService_HandleRouteDecisionCreatesAssignmentAndAuditEvents(t *
 
 func TestAgentTeamService_HandleRouteDecisionRejectsMissingWorkerWithAuditEvent(t *testing.T) {
 	db := setupAgentTeamStateSQLite(t)
-	svc := NewAgentTeamService(db, nil, nil)
+	svc := NewAgentTeamService(db, nil, cache.NoOpCache{})
 	team, _, _, run := seedAgentTeamRun(t, db)
 
 	assignment, err := svc.HandleRouteDecision(context.Background(), "user-1", team.ID, run.ID, model.CoordinatorRouteDecision{
@@ -105,7 +106,7 @@ func TestAgentTeamService_HandleRouteDecisionRejectsMissingWorkerWithAuditEvent(
 
 func TestAgentTeamService_HandleRouteDecisionRejectsWhenTaskLimitReached(t *testing.T) {
 	db := setupAgentTeamStateSQLite(t)
-	svc := NewAgentTeamService(db, nil, nil)
+	svc := NewAgentTeamService(db, nil, cache.NoOpCache{})
 	team, supervisor, executor, run := seedAgentTeamRun(t, db)
 	for i := 0; i < model.MaxTasksPerTeamRun; i++ {
 		require.NoError(t, repository.CreateAssignment(db, &model.AgentTeamAssignment{
@@ -137,7 +138,7 @@ func TestAgentTeamService_HandleRouteDecisionRejectsWhenTaskLimitReached(t *test
 
 func TestAgentTeamService_HandleRouteDecisionRejectsWhenActiveSubagentLimitReached(t *testing.T) {
 	db := setupAgentTeamStateSQLite(t)
-	svc := NewAgentTeamService(db, nil, nil)
+	svc := NewAgentTeamService(db, nil, cache.NoOpCache{})
 	team, supervisor, executor, run := seedAgentTeamRun(t, db)
 	for i := 0; i < model.MaxActiveSubAgentsPerRun; i++ {
 		require.NoError(t, repository.CreateAssignment(db, &model.AgentTeamAssignment{
@@ -169,7 +170,7 @@ func TestAgentTeamService_HandleRouteDecisionRejectsWhenActiveSubagentLimitReach
 
 func TestAgentTeamService_HandleRouteDecisionRejectsWhenRouteRepeatLimitReached(t *testing.T) {
 	db := setupAgentTeamStateSQLite(t)
-	svc := NewAgentTeamService(db, nil, nil)
+	svc := NewAgentTeamService(db, nil, cache.NoOpCache{})
 	team, _, executor, run := seedAgentTeamRun(t, db)
 	repeated := model.CoordinatorRouteDecision{
 		Action:       "delegate",
@@ -199,7 +200,7 @@ func TestAgentTeamService_HandleRouteDecisionRejectsWhenRouteRepeatLimitReached(
 
 func TestAgentTeamService_HandleRouteDecisionRejectsTimedOutAssignment(t *testing.T) {
 	db := setupAgentTeamStateSQLite(t)
-	svc := NewAgentTeamService(db, nil, nil)
+	svc := NewAgentTeamService(db, nil, cache.NoOpCache{})
 	team, supervisor, executor, run := seedAgentTeamRun(t, db)
 	require.NoError(t, repository.CreateAssignment(db, &model.AgentTeamAssignment{
 		TeamRunID:    run.ID,
@@ -230,7 +231,7 @@ func TestAgentTeamService_HandleRouteDecisionRejectsTimedOutAssignment(t *testin
 
 func TestAgentTeamService_HandleRouteDecisionRejectsBudgetExceeded(t *testing.T) {
 	db := setupAgentTeamStateSQLite(t)
-	svc := NewAgentTeamService(db, nil, nil)
+	svc := NewAgentTeamService(db, nil, cache.NoOpCache{})
 	team, _, executor, run := seedAgentTeamRun(t, db)
 	agentTaskID := "budget-task-1"
 	require.NoError(t, repository.CreateTeamTask(db, &model.AgentTeamTask{
@@ -270,7 +271,7 @@ func TestAgentTeamService_HandleRouteDecisionRejectsBudgetExceeded(t *testing.T)
 // reached a terminal status, and that each rejection is audited.
 func TestAgentTeamService_HandleRouteDecisionRejectsTerminalRun(t *testing.T) {
 	db := setupAgentTeamStateSQLite(t)
-	svc := NewAgentTeamService(db, nil, nil)
+	svc := NewAgentTeamService(db, nil, cache.NoOpCache{})
 	team, _, executor, run := seedAgentTeamRun(t, db)
 	require.NoError(t, repository.UpdateTeamRunStatus(db, run.ID, model.TeamRunStatusCompleted))
 
@@ -316,7 +317,7 @@ func TestAgentTeamService_HandleRouteDecisionRejectsTerminalRun(t *testing.T) {
 // the first terminal outcome and does not emit a conflicting run.failed event.
 func TestAgentTeamService_FinishRouteDecisionDoesNotDowngradeTerminalRun(t *testing.T) {
 	db := setupAgentTeamStateSQLite(t)
-	svc := NewAgentTeamService(db, nil, nil)
+	svc := NewAgentTeamService(db, nil, cache.NoOpCache{})
 	_, _, _, run := seedAgentTeamRun(t, db)
 
 	require.NoError(t, svc.finishRouteDecision(run.ID, model.CoordinatorRouteDecision{

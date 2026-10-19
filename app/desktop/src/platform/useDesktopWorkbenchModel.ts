@@ -10,6 +10,7 @@ import {
 } from '@shared/demo';
 import { normalizeThreadItemsToTranscript } from '@shared/transcript';
 import { appDateLocaleTag } from '@shared/i18n/locale';
+import type { TFunction } from 'i18next';
 import { getI18n } from 'react-i18next';
 import { normalizeHubMessagesToTranscript } from '@shared/transcript';
 import { orderTranscriptBlocks } from '@shared/transcript';
@@ -85,7 +86,7 @@ export interface DesktopWorkbenchModel {
   };
   transcript: ReturnType<typeof normalizeThreadItemsToTranscript>;
   /**
-   * Unread-messages marker for the IM transcript (T8): anchor block id of the
+   * Unread-messages marker for the IM transcript: anchor block id of the
    * first unread message derived from the Hub session read watermark
    * (unread_count = next_seq − last_read_seq). Present only for Hub IM
    * sessions with unread messages. The shell renders the divider copy.
@@ -164,7 +165,7 @@ function hubSessionMatchId(session: { id?: string; session_id?: string }): strin
 export function useDesktopWorkbenchModel(
   selectedConversationId?: string,
   t?: (key: string) => string,
-  tApp?: (key: string, options?: any) => string,
+  tApp?: TFunction,
 ): DesktopWorkbenchModel {
   const dataModeOverride = useSyncExternalStore(
     subscribeWorkbenchDataModeOverride,
@@ -206,8 +207,6 @@ export function useDesktopWorkbenchModel(
   // Hub WS real-time ingestion for the workbench runs through
   // DesktopHubTaskBridge → useHubEventStream (api/hubWS subprotocol auth);
   // per-event cache invalidation is handled by the central hubEventBridge.
-  // (The former useHubWebSocket ?token= stack never authenticated and was
-  // removed in #1363.)
 
   // Hub data queries — only active in live mode when Hub is authenticated.
   const contactsQuery = useHubContacts({ enabled: hubReady });
@@ -391,7 +390,7 @@ export function useDesktopWorkbenchModel(
     return [];
   }, [activeHubSession, hubMessages, pinnedSnapshot, liveTranscript, threadItems, threads.length, hubSessions.length, t]);
 
-  // IM read-watermark marker (T8): only meaningful for Hub IM sessions.
+  // IM read-watermark marker: only meaningful for Hub IM sessions.
   // unread_count is the server-computed `next_seq − last_read_seq` watermark.
   const transcriptUnread = useMemo(
     () =>
@@ -535,7 +534,7 @@ function getWorkbenchDataMode(override: WorkbenchDataMode | undefined): Workbenc
   return resolveWorkbenchDataMode(import.meta.env.VITE_AGENTHUB_DATA_MODE, override);
 }
 
-function threadToConversation(thread: ThreadInfo, pins?: ThreadPinInfo[], tApp?: (key: string, options?: any) => string): WorkbenchConversation {
+function threadToConversation(thread: ThreadInfo, pins?: ThreadPinInfo[], tApp?: TFunction): WorkbenchConversation {
   const updatedLabel = thread.updatedAt ? formatTimestamp(thread.updatedAt) : undefined;
 
   const conversation: WorkbenchConversation = {
@@ -598,7 +597,7 @@ function formatPinTime(timestamp: string): string | undefined {
 
 function workspaceProjectToProjectInfo(
   project: { id: string; name?: string; description?: string; created_at?: string; updated_at?: string },
-  tApp?: (key: string, options?: any) => string,
+  tApp?: TFunction,
 ): ProjectInfo {
   const description = project.description?.trim() || 'Hub workspace project';
   return {

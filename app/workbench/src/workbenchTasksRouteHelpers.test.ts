@@ -21,7 +21,7 @@ const TASK: TaskItem = {
   assignee: 'Builder',
   startTime: '今天 10:00',
   dueDate: '今天 18:00',
-  creator: 'contributor-a',
+  creator: 'Alice',
   status: '进行中',
 };
 

@@ -1,7 +1,6 @@
 package auth
 
-// #2053（与 #2049 access 路径修复对称；风险母题 AH-SR-052，SECURITY.md
-// High/Accepted）行为级核验。
+// #2053（与 #2049 access 路径修复对称）行为级核验。
 //
 // 风险：Redis 故障时 refresh 黑名单检查吞错（fail-open），已登出/已轮换
 // 的 refresh token 可能在故障窗口内继续轮换出新令牌——撤销只存在于 Redis
@@ -155,7 +154,7 @@ func TestRefreshTokenRealRedisFailClosedMatrix(t *testing.T) {
 }
 
 // TestRefreshBlacklistCheckErrorsCounter proves that Redis errors in
-// enforceRefreshBlacklist increment RefreshBlacklistCheckErrors (#2064 item ①).
+// enforceRefreshBlacklist increment RefreshBlacklistCheckErrors (#2064).
 // Mirrors middleware/auth_fail_closed_redis_test.go JTIBlacklistCheckErrors pattern.
 func TestRefreshBlacklistCheckErrorsCounter(t *testing.T) {
 	metrics.Register()

@@ -5,7 +5,7 @@ import {
   demoRuntimeMutationDeniedReason,
 } from './demoMutationGate';
 
-describe('AH-SR-043 demo mutation fail-closed gate', () => {
+describe('demo mutation fail-closed gate', () => {
   it('inventories the web/shared demo and production mutation paths', () => {
     expect(WEB_DEMO_MUTATION_PATH_INVENTORY.map((path) => path.id)).toEqual([
       'web-platform-submit-composer',

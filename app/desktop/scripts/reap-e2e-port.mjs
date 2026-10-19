@@ -3,7 +3,7 @@
 // Root cause: playwright.config.ts used `reuseExistingServer: !process.env.CI`,
 // so locally a leftover dev server on the E2E port (a manual `pnpm dev` or an
 // interrupted Playwright child) was silently reused and the `webServer.env`
-// block never applied — HUB_URL fell back to the production default.
+// block never applied, so HUB_URL kept the default value.
 //
 // Playwright with `reuseExistingServer: false` does NOT kill the occupant; it
 // only throws "…already used…". To keep the run green while still using the

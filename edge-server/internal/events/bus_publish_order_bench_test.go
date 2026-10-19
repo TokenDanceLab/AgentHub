@@ -20,7 +20,7 @@ func silenceSlog(b *testing.B) {
 }
 
 // These benchmarks are the evidence behind the Publish ordering decision
-// (#2154 lane B). Wire order has to equal seq order (see bus_wireorder_test.go),
+// (#2154). Wire order has to equal seq order (see bus_wireorder_test.go),
 // and there were two ways to get it; these numbers are why the gate won.
 //
 // Run with:

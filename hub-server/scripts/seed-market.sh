@@ -13,11 +13,10 @@
 #   4. Dry run (--dry): Shows what would be inserted via API without making changes.
 #
 # Usage:
-#   cd hub-server
-#   bash scripts/seed-market.sh --sql    # Direct SQL (recommended)
-#   bash scripts/seed-market.sh          # API mode
-#   bash scripts/seed-market.sh --check  # Verify
-#   bash scripts/seed-market.sh --dry    # Dry run
+#   bash hub-server/scripts/seed-market.sh --sql    # Direct SQL (recommended)
+#   bash hub-server/scripts/seed-market.sh          # API mode
+#   bash hub-server/scripts/seed-market.sh --check  # Verify
+#   bash hub-server/scripts/seed-market.sh --dry    # Dry run
 
 set -euo pipefail
 
@@ -285,4 +284,4 @@ create_mcp "Puppeteer MCP" \
 create_mcp "Memory MCP" \
     "[\"-y\",\"@anthropic-ai/mcp-server-memory\"]"
 
-info "Seed complete. Run 'bash scripts/seed-market.sh --check' to verify."
+info "Seed complete. Run 'bash hub-server/scripts/seed-market.sh --check' to verify."

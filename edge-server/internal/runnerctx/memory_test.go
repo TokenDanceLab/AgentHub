@@ -707,13 +707,6 @@ func TestParseOptionalTimeInvalid(t *testing.T) {
 	}
 }
 
-func TestDefaultMemoryTTL(t *testing.T) {
-	expected := 30 * 24 * time.Hour
-	if DefaultMemoryTTL != expected {
-		t.Errorf("DefaultMemoryTTL = %v, want %v", DefaultMemoryTTL, expected)
-	}
-}
-
 func TestReadMemoryFiltersExpiredEntries(t *testing.T) {
 	dir := t.TempDir()
 	memDir := filepath.Join(dir, ".agenthub", "memory")

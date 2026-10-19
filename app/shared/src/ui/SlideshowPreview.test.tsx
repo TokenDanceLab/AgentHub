@@ -130,7 +130,7 @@ describe('SlideshowPreview', () => {
     const onClose = vi.fn();
     const { findByRole } = renderSlideshow({ onClose });
     // The shared test i18n instance runs in key-echo mode, so
-    // Real zh copy for the close-preview control (#2154 UIUX lane i18n pass).
+    // Real zh copy for the close-preview control (#2154).
     const closeButton = await findByRole('button', { name: '关闭预览' });
     expect(closeButton).toBeInTheDocument();
   });

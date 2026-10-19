@@ -71,7 +71,7 @@ var (
 	// boundaries or architectural restructuring.
 	// NOTE: \b is an ASCII word boundary — it does NOT match CJK characters
 	// because CJK runes are not \w in Go regex. For CJK prompts, use
-	// crossModuleCJKH instead (checked first, below).
+	// crossModuleCJK instead (checked first, below).
 	crossModuleRE = regexp.MustCompile(
 		`(?i)\b(?:refactor|migrate|restructure|architecture|redesign|overhaul)\b`,
 	)

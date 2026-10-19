@@ -1,6 +1,6 @@
 /* ═══════════════════════════════════════════════════════════════════════
    UNREAD DIVIDER — read watermark between transcript message groups
-   Thin line + "N 条未读" copy (desktop IM path, T8). Optionally shows a
+   Thin line + "N 条未读" copy (desktop IM path). Optionally shows a
    read-through hint ("已读到 #seq") below the label.
    ══════════════════════════════════════════════════════════════════════ */
 

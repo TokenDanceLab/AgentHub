@@ -1,17 +1,12 @@
-// DEPRECATED: the NDJSON stream-json parser (`claude -p --output-format
-// stream-json --verbose`) is superseded by the official claude-agent-acp ACP
-// adapter (claude_acp.go, registry id "claude-acp", third ACP migration
-// switch, per ACP Go migration §6). This adapter is
-// retained as a mature fallback and control: it keeps its full capability set
-// and its brokered approval chain (NewBrokeredPermissionHandler →
-// PermissionDecisionBroker), and claude_code_test.go remains the reference
-// for the legacy parser contract. New feature work must target claude-acp;
-// removal is deferred until claude-acp passes environment verification (see
-// claude_acp.go TODO 真跑验证). Logic intentionally unchanged.
+// Legacy NDJSON stream-json adapter (`claude -p --output-format stream-json
+// --verbose`). The ACP adapter (claude_acp.go, registry id "claude-acp") is the
+// primary path; this adapter remains a fallback with the full capability set
+// and the brokered approval chain (NewBrokeredPermissionHandler →
+// PermissionDecisionBroker). New feature work targets claude-acp.
 //
-// #1760 claude 增量：本文件随 claude 家族归组到子包 claude；仍依赖根包
-// internal/adapters 的共享助手（ResolveModel / 权限处理链 / NDJSON parser 等，
-// 方向与 sdk 子包一致：claude → adapters 单向）。
+// The package depends on shared helpers in the parent internal/adapters
+// package (ResolveModel, permission handling, NDJSON parser); the dependency
+// direction is claude → adapters.
 package claude
 
 import (
@@ -307,8 +302,8 @@ func (a *ClaudeCodeAdapter) appendModelAndPermissionArgs(args []string, ctx RunP
 		args = append(args, "--effort", effort)
 	}
 
-	// Thinking mode (--thinking) replaces deprecated --max-thinking-tokens.
-	// Ref: claude-code-source/src/main.tsx line 976 — --max-thinking-tokens is hidden & deprecated.
+	// Thinking mode (--thinking) replaces deprecated --max-thinking-tokens,
+	// which is hidden & deprecated in the Claude Code CLI.
 	// Accepted values: "enabled", "adaptive", "disabled".
 	if ctx.ThinkingMode != "" {
 		args = append(args, "--thinking", ctx.ThinkingMode)

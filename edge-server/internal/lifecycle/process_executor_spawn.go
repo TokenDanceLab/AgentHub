@@ -13,29 +13,25 @@ func (e *ProcessExecutor) SpawnSubAgent(parentRun store.Run, task adapters.SubAg
 	// This prevents the TOCTOU race where two concurrent goroutines both pass
 	// CanSpawn (seeing count=4) and both subsequently increment, exceeding
 	// MaxChildrenPerAgent=5.
-	var reserveErr error
-	reservePlan := planSpawnSlotReserve(e.agentRegistry != nil)
-	if reservePlan.Try {
-		reserveErr = e.agentRegistry.TryReserveSlot(parentRun.ID, task.Depth)
-	}
-	slotReserved, reject := evaluateSpawnSlotReservation(reservePlan.Try, reserveErr)
-	if rejectPlan := planSpawnSlotReject(reject); rejectPlan.Reject {
-		if rejectPlan.Log {
-			slog.Warn("spawn slot rejected", "parentRunId", parentRun.ID, "taskId", task.TaskID, "depth", task.Depth, "error", reject)
+	slotReserved := false
+	if e.agentRegistry != nil {
+		if reserveErr := e.agentRegistry.TryReserveSlot(parentRun.ID, task.Depth); reserveErr != nil {
+			slog.Warn("spawn slot rejected", "parentRunId", parentRun.ID, "taskId", task.TaskID, "depth", task.Depth, "error", reserveErr)
+			return "", "", reserveErr
 		}
-		return "", "", reject
+		slotReserved = true
 	}
 
 	// Deferred cleanup: release the reserved slot on any error exit path.
 	// On success, the slot is released by sendSubAgentResult when the child
 	// run completes (keeps increment/decrement pair lexically close).
 	defer func() {
-		if planSpawnSlotRelease(err, slotReserved).Release {
+		if err != nil && slotReserved {
 			e.agentRegistry.DecrChildCount(parentRun.ID)
 		}
 	}()
 
-	runID, agentInstanceID = subAgentSpawnIDs(task.TaskID)
+	runID, agentInstanceID = subAgentRunID(task.TaskID), subAgentInstanceID(task.TaskID)
 
 	// Resolve ThreadID: each sub-agent MUST have its own distinct thread so
 	// that its context space is fully isolated from the parent. If the task
@@ -46,7 +42,7 @@ func (e *ProcessExecutor) SpawnSubAgent(parentRun store.Run, task adapters.SubAg
 
 	// Create the run in the store
 	run, createErr := e.store.(store.Writer).CreateRun(runID, parentRun.ProjectID, threadID)
-	if planSubAgentCreateLog(createErr).Log {
+	if createErr != nil {
 		slog.Error("failed to create sub-agent run", "taskId", task.TaskID, "error", createErr)
 		err = createErr
 		return "", "", err
@@ -57,12 +53,11 @@ func (e *ProcessExecutor) SpawnSubAgent(parentRun store.Run, task adapters.SubAg
 	// monitors only the child's tokens, and parent/child results are
 	// independently routed via the message queue.
 	registered := false
-	if planSubAgentRegister(e.agentRegistry != nil).Register {
+	if e.agentRegistry != nil {
 		inst := newSubAgentInstance(parentRun.ID, agentInstanceID, runID, threadID, task, time.Now())
 		regErr := e.agentRegistry.Register(inst)
-		outcome := planSubAgentRegistrationOutcome(regErr)
-		registered = outcome.Registered
-		if outcome.LogFailure {
+		registered = regErr == nil
+		if regErr != nil {
 			slog.Warn("failed to register sub-agent instance in registry", "agentInstanceId", agentInstanceID, "error", regErr)
 		}
 	}
@@ -82,22 +77,19 @@ func (e *ProcessExecutor) SpawnSubAgent(parentRun store.Run, task adapters.SubAg
 	e.mu.Unlock()
 
 	// Start the run
-	if startErr := e.Start(run, runCtx); planSpawnStartLog(startErr).Log {
+	if startErr := e.Start(run, runCtx); startErr != nil {
 		slog.Error("failed to start sub-agent run", "runId", runID, "error", startErr)
-		cleanup := planSpawnStartFailureCleanup(startErr, registered, slotReserved)
-		if cleanup.ClearMapping {
-			e.mu.Lock()
-			delete(e.runToAgent, runID)
-			e.mu.Unlock()
-		}
+		e.mu.Lock()
+		delete(e.runToAgent, runID)
+		e.mu.Unlock()
 
 		// Cleanup on start failure: unregister the agent instance,
 		// mark the run as failed, and release the reserved slot.
 		// Set slotReserved=false BEFORE Unregister to prevent the
 		// deferred DecrChildCount from double-decrementing.
 		// Unregister already decrements childrenCount internally.
-		slotReserved = cleanup.SlotReserved
-		if cleanup.Unregister {
+		if registered {
+			slotReserved = false
 			e.agentRegistry.Unregister(agentInstanceID)
 		}
 		_, _ = e.store.SetRunStatus(runID, "failed")

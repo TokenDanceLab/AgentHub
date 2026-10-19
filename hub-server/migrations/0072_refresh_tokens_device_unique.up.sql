@@ -1,4 +1,4 @@
--- #2154 (database-lane P2-2): UpsertRefreshToken uses
+-- UpsertRefreshToken uses
 -- ON CONFLICT (user_id, device_type, device_id), which PostgreSQL only
 -- accepts against a UNIQUE index/constraint. Migration 0015 created
 -- idx_refresh_tokens_user_device as a plain (non-unique) index, so every

@@ -10,7 +10,7 @@ import (
 // The Load fast path in loadOrInitHubCallbackQueue / nextHubStreamChunkIdx must
 // be observably identical to the plain sync.Map.LoadOrStore form: one state per
 // run, monotonic chunk indices, and no reallocation once the run exists
-// (#2154 perf lane P2-16).
+// (#2154).
 
 func TestLoadOrInitHubCallbackQueueReusesOneStatePerRun(t *testing.T) {
 	runID := "run-fastpath-reuse"

@@ -139,7 +139,7 @@ func longText(n int) string {
 	return strings.Join(b, " ")
 }
 
-// ==================== T2-D14: table-driven enhancements ====================
+// ==================== Table-driven complexity tests ====================
 
 func TestClassifyComplexity_ChineseSimple(t *testing.T) {
 	tests := []struct {

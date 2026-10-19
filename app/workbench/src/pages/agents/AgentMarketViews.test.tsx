@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════════════════════
-   AgentMarketViews — Skill/MCP market error prop wiring (#1821).
+   AgentMarketViews — Skill/MCP market error prop wiring.
 
    AgentMarketParts accepted `skillMarketError`/`mcpMarketError` all along,
    but neither shell passed them, so a failed market query collapsed into a
@@ -30,7 +30,7 @@ function baseProps(overrides: Partial<AgentsPageProps> = {}): AgentsPageProps {
   };
 }
 
-describe('SkillMarketView error state (#1821)', () => {
+describe('SkillMarketView error state', () => {
   it('shows the error empty state when the skill market query failed', () => {
     render(<SkillMarketView {...baseProps({
       skillMarketItems: [],
@@ -55,7 +55,7 @@ describe('SkillMarketView error state (#1821)', () => {
   });
 });
 
-describe('MCPMarketView error state (#1821)', () => {
+describe('MCPMarketView error state', () => {
   it('shows the error empty state when the MCP market query failed', () => {
     render(<MCPMarketView {...baseProps({
       activePane: 'mcpMarket',
@@ -109,10 +109,10 @@ describe('Skill/MCP market install unavailable (#1872)', () => {
   });
 });
 
-/* #2154 P1-1: the three market toolbars share MarketFilterToolbar, and the
+/* #2154: the three market toolbars share MarketFilterToolbar, and the
    shells never pass a search handler — the box looked editable and dropped
    every keystroke. Same gate as the install buttons above (#1872). */
-describe('Market toolbar search gate (#2154 P1-1)', () => {
+describe('Market toolbar search gate (#2154)', () => {
   it('disables the Skill market search box when no search handler is wired', () => {
     render(<SkillMarketView {...baseProps({ skillMarketLoading: false })} />);
 

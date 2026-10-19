@@ -7,31 +7,19 @@ info:
     message deltas, approvals and artifact notifications are delivered through
     WebSocket typed events documented in api/events.md.
 
-    ## Implementation Status (2026-05-29)
+    ## Implementation status
 
-    **Edge Server**: Core endpoints (health/runs/threads/projects/agents/events/permissions)
-    are implemented. `/v1/runners` remains a compatibility surface for runtime/
-    target health; new architecture language should use Agent Runtime, Agent
-    Profile, and Execution Target.
-
-    **Hub Server**: Hub entries marked `x-agenthub-status: implemented` mirror
-    the current Gin router paths in `hub-server/internal/router/router.go`,
-    including `/client/auth`, `/client/contacts`, `/client/sessions`,
-    `/client/messages`, `/client/attachments`, `/client/notifications`,
-    `/edge/*`, and `/web/*`. Deprecated or legacy Hub shapes are retained only
-    when marked `planned`; they are not callable routes.
-    The legacy `/v1/auth`, `/v1/users`, `/v1/contacts` paths are planned for future
-    migration and not currently implemented.
+    Each operation carries `x-agenthub-status: implemented|planned`.
+    Implemented Hub entries mirror `hub-server/internal/router/router.go`;
+    planned entries are not callable routes. New architecture language uses
+    Agent Runtime, Agent Profile, and Execution Target.
 
     ## Hub success envelope code
 
     Hub Server success responses use `{"code":"ok","data":...}` with lowercase
     `ok` (`hub-server/internal/errcode.OK.Code` via `handler.OK`). This is not
     HTTP status text and is not the Edge success shape (Edge returns bare JSON).
-    Some older OpenAPI fragments and client fixtures used uppercase `OK`; the
-    wire value on tip is lowercase `ok`. Shared clients treat success
-    case-insensitively (`isHubSuccessCode`) for fixture compatibility — that is
-    parser tolerance, not a dual wire contract. See `api/conventions.md`.
+    See `api/conventions.md` for the normative client rule.
 
     ## Status tags
     - `x-agenthub-status: implemented` — 已实现，可直接调用
@@ -41,8 +29,8 @@ servers:
     description: Local Edge Server
   - url: http://localhost:8080
     description: Local Hub Server
-  - url: https://hub.example.invalid
-    description: Production Hub Server
+  - url: https://hub.example.com
+    description: Production Hub Server (placeholder)
 tags:
   - name: Foundation
     description: Health, capability and event stream handshake.
@@ -108,7 +96,6 @@ paths:
       tags: [Foundation]
       operationId: getHealth
       summary: Health and run callback capabilities.
-      x-agenthub-phase: P0
       x-agenthub-status: implemented
       x-agenthub-owner: Edge
       responses:
@@ -133,13 +120,13 @@ paths:
       description: >
         Local Edge WebSocket handshake surface. Event envelope and event types are
         documented in api/events.md. When local Edge auth is enabled, browser
-        clients use `access_token` query auth; native clients may use the same
-        local Edge token through Authorization or X-AgentHub-Edge-Token.
-      x-agenthub-phase: P0
+        clients send `access_token.<edge-token>` as a WebSocket subprotocol;
+        native clients may use Authorization or X-AgentHub-Edge-Token. The
+        `access_token` query parameter is rejected to keep tokens out of proxy logs.
       x-agenthub-status: implemented
       x-agenthub-owner: Edge
       security:
-        - edgeWebSocketQueryToken: []
+        - edgeWebSocketProtocol: []
         - edgeBearerAuth: []
         - edgeLocalToken: []
       parameters:
@@ -163,9 +150,11 @@ paths:
       tags: [IMProject]
       operationId: listProjects
       summary: List projects.
-      x-agenthub-phase: P0
       x-agenthub-status: implemented
       x-agenthub-owner: Edge
+      security:
+        - edgeBearerAuth: []
+        - edgeLocalToken: []
       parameters:
         - $ref: "#/components/parameters/PageSize"
         - $ref: "#/components/parameters/PageCursor"
@@ -176,9 +165,11 @@ paths:
       tags: [IMProject]
       operationId: createProject
       summary: Create or register a project.
-      x-agenthub-phase: P0
       x-agenthub-status: implemented
       x-agenthub-owner: Edge
+      security:
+        - edgeBearerAuth: []
+        - edgeLocalToken: []
       requestBody:
         required: false
         content:
@@ -194,9 +185,11 @@ paths:
       tags: [IMProject]
       operationId: getProject
       summary: Get project.
-      x-agenthub-phase: P0
       x-agenthub-status: implemented
       x-agenthub-owner: Edge
+      security:
+        - edgeBearerAuth: []
+        - edgeLocalToken: []
       parameters:
         - $ref: "#/components/parameters/ProjectId"
       responses:
@@ -208,9 +201,11 @@ paths:
       tags: [IMProject]
       operationId: updateProject
       summary: Update project.
-      x-agenthub-phase: P1
       x-agenthub-status: planned
       x-agenthub-owner: Edge
+      security:
+        - edgeBearerAuth: []
+        - edgeLocalToken: []
       parameters:
         - $ref: "#/components/parameters/ProjectId"
       responses:
@@ -220,9 +215,11 @@ paths:
       tags: [IMProject]
       operationId: deleteProject
       summary: Delete or unregister project.
-      x-agenthub-phase: P1
       x-agenthub-status: planned
       x-agenthub-owner: Edge
+      security:
+        - edgeBearerAuth: []
+        - edgeLocalToken: []
       parameters:
         - $ref: "#/components/parameters/ProjectId"
       responses:
@@ -234,9 +231,11 @@ paths:
       tags: [IMProject]
       operationId: getProjectMemory
       summary: Get project memory metadata.
-      x-agenthub-phase: P0
       x-agenthub-status: planned
       x-agenthub-owner: Edge
+      security:
+        - edgeBearerAuth: []
+        - edgeLocalToken: []
       parameters:
         - $ref: "#/components/parameters/ProjectId"
       responses:
@@ -246,9 +245,11 @@ paths:
       tags: [IMProject]
       operationId: updateProjectMemory
       summary: Update project memory metadata.
-      x-agenthub-phase: P1
       x-agenthub-status: planned
       x-agenthub-owner: Edge
+      security:
+        - edgeBearerAuth: []
+        - edgeLocalToken: []
       parameters:
         - $ref: "#/components/parameters/ProjectId"
       responses:
@@ -261,7 +262,6 @@ paths:
       operationId: listConversations
       summary: List conversations.
       x-agenthub-superseded-by: "GET /client/sessions"
-      x-agenthub-phase: P1
       x-agenthub-status: planned
       x-agenthub-owner: Hub
       responses:
@@ -272,7 +272,6 @@ paths:
       operationId: createConversation
       summary: Create conversation.
       x-agenthub-superseded-by: "POST /client/sessions"
-      x-agenthub-phase: P1
       x-agenthub-status: planned
       x-agenthub-owner: Hub
       responses:
@@ -284,7 +283,6 @@ paths:
       tags: [IMProject]
       operationId: getConversation
       summary: Get conversation.
-      x-agenthub-phase: P1
       x-agenthub-status: planned
       x-agenthub-owner: Hub
       parameters:
@@ -296,7 +294,6 @@ paths:
       tags: [IMProject]
       operationId: updateConversation
       summary: Update conversation.
-      x-agenthub-phase: P1
       x-agenthub-status: planned
       x-agenthub-owner: Hub
       parameters:
@@ -310,7 +307,6 @@ paths:
       tags: [IMProject]
       operationId: archiveConversation
       summary: Archive conversation.
-      x-agenthub-phase: P1
       x-agenthub-status: planned
       x-agenthub-owner: Hub
       parameters:
@@ -324,7 +320,6 @@ paths:
       tags: [IMProject]
       operationId: listConversationMembers
       summary: List conversation members.
-      x-agenthub-phase: P1
       x-agenthub-status: planned
       x-agenthub-owner: Hub
       parameters:
@@ -336,7 +331,6 @@ paths:
       tags: [IMProject]
       operationId: addConversationMember
       summary: Add conversation member.
-      x-agenthub-phase: P1
       x-agenthub-status: planned
       x-agenthub-owner: Hub
       parameters:
@@ -350,7 +344,6 @@ paths:
       tags: [IMProject]
       operationId: removeConversationMember
       summary: Remove conversation member.
-      x-agenthub-phase: P1
       x-agenthub-status: planned
       x-agenthub-owner: Hub
       parameters:
@@ -365,9 +358,11 @@ paths:
       tags: [IMProject]
       operationId: listThreads
       summary: List threads.
-      x-agenthub-phase: P0
       x-agenthub-status: implemented
       x-agenthub-owner: Edge
+      security:
+        - edgeBearerAuth: []
+        - edgeLocalToken: []
       parameters:
         - $ref: "#/components/parameters/ProjectIdQuery"
         - $ref: "#/components/parameters/PageSize"
@@ -399,9 +394,11 @@ paths:
       tags: [IMProject]
       operationId: createThread
       summary: Create thread.
-      x-agenthub-phase: P0
       x-agenthub-status: implemented
       x-agenthub-owner: Edge
+      security:
+        - edgeBearerAuth: []
+        - edgeLocalToken: []
       requestBody:
         required: true
         content:
@@ -417,9 +414,11 @@ paths:
       tags: [IMProject]
       operationId: getThread
       summary: Get thread.
-      x-agenthub-phase: P0
       x-agenthub-status: implemented
       x-agenthub-owner: Edge
+      security:
+        - edgeBearerAuth: []
+        - edgeLocalToken: []
       parameters:
         - $ref: "#/components/parameters/ThreadId"
       responses:
@@ -429,9 +428,11 @@ paths:
       tags: [IMProject]
       operationId: updateThread
       summary: Update thread.
-      x-agenthub-phase: P0
       x-agenthub-status: implemented
       x-agenthub-owner: Edge
+      security:
+        - edgeBearerAuth: []
+        - edgeLocalToken: []
       parameters:
         - $ref: "#/components/parameters/ThreadId"
       requestBody:
@@ -447,9 +448,11 @@ paths:
       tags: [IMProject]
       operationId: deleteThread
       summary: Delete thread and associated local run/item records.
-      x-agenthub-phase: P0
       x-agenthub-status: implemented
       x-agenthub-owner: Edge
+      security:
+        - edgeBearerAuth: []
+        - edgeLocalToken: []
       parameters:
         - $ref: "#/components/parameters/ThreadId"
       responses:
@@ -461,9 +464,11 @@ paths:
       tags: [IMProject]
       operationId: archiveThread
       summary: Archive thread.
-      x-agenthub-phase: P0
       x-agenthub-status: implemented
       x-agenthub-owner: Edge
+      security:
+        - edgeBearerAuth: []
+        - edgeLocalToken: []
       parameters:
         - $ref: "#/components/parameters/ThreadId"
       responses:
@@ -475,9 +480,11 @@ paths:
       tags: [IMProject]
       operationId: forkThread
       summary: Fork thread.
-      x-agenthub-phase: P1
       x-agenthub-status: planned
       x-agenthub-owner: Edge
+      security:
+        - edgeBearerAuth: []
+        - edgeLocalToken: []
       parameters:
         - $ref: "#/components/parameters/ThreadId"
       responses:
@@ -489,9 +496,11 @@ paths:
       tags: [IMProject]
       operationId: listThreadItems
       summary: List thread items.
-      x-agenthub-phase: P0
       x-agenthub-status: implemented
       x-agenthub-owner: Edge
+      security:
+        - edgeBearerAuth: []
+        - edgeLocalToken: []
       parameters:
         - $ref: "#/components/parameters/ThreadId"
         - $ref: "#/components/parameters/PageSize"
@@ -506,9 +515,11 @@ paths:
       operationId: listThreadPins
       summary: List pinned thread items.
       description: Returns Edge-local thread pin metadata with each pinned item hydrated when the item still exists.
-      x-agenthub-phase: P0
       x-agenthub-status: implemented
       x-agenthub-owner: Edge
+      security:
+        - edgeBearerAuth: []
+        - edgeLocalToken: []
       parameters:
         - $ref: "#/components/parameters/ThreadId"
       responses:
@@ -524,9 +535,11 @@ paths:
       tags: [IMProject]
       operationId: pinThreadItem
       summary: Pin an item in a thread.
-      x-agenthub-phase: P0
       x-agenthub-status: implemented
       x-agenthub-owner: Edge
+      security:
+        - edgeBearerAuth: []
+        - edgeLocalToken: []
       parameters:
         - $ref: "#/components/parameters/ThreadId"
       requestBody:
@@ -550,9 +563,11 @@ paths:
       tags: [IMProject]
       operationId: deleteThreadPin
       summary: Remove a pinned item from a thread.
-      x-agenthub-phase: P0
       x-agenthub-status: implemented
       x-agenthub-owner: Edge
+      security:
+        - edgeBearerAuth: []
+        - edgeLocalToken: []
       parameters:
         - $ref: "#/components/parameters/ThreadId"
         - name: itemId
@@ -573,9 +588,11 @@ paths:
       tags: [IMProject]
       operationId: createThreadMessage
       summary: Create user message in thread.
-      x-agenthub-phase: P0
       x-agenthub-status: implemented
       x-agenthub-owner: Edge
+      security:
+        - edgeBearerAuth: []
+        - edgeLocalToken: []
       parameters:
         - $ref: "#/components/parameters/ThreadId"
       requestBody:
@@ -601,9 +618,11 @@ paths:
       tags: [IMProject]
       operationId: getItem
       summary: Get item.
-      x-agenthub-phase: P0
       x-agenthub-status: implemented
       x-agenthub-owner: Edge
+      security:
+        - edgeBearerAuth: []
+        - edgeLocalToken: []
       parameters:
         - $ref: "#/components/parameters/ItemId"
       responses:
@@ -615,9 +634,11 @@ paths:
       tags: [ExecutionRunner]
       operationId: listRunners
       summary: List runners.
-      x-agenthub-phase: P0
       x-agenthub-status: implemented
       x-agenthub-owner: Edge
+      security:
+        - edgeBearerAuth: []
+        - edgeLocalToken: []
       responses:
         "200":
           description: Runner list.
@@ -631,9 +652,11 @@ paths:
       tags: [ExecutionRunner]
       operationId: listAgents
       summary: List available agent adapters.
-      x-agenthub-phase: P0
       x-agenthub-status: implemented
       x-agenthub-owner: Edge
+      security:
+        - edgeBearerAuth: []
+        - edgeLocalToken: []
       responses:
         "200":
           description: Agent adapter list.
@@ -647,9 +670,11 @@ paths:
       tags: [ExecutionRunner]
       operationId: getRunner
       summary: Get runner.
-      x-agenthub-phase: P0
       x-agenthub-status: planned
       x-agenthub-owner: Edge
+      security:
+        - edgeBearerAuth: []
+        - edgeLocalToken: []
       parameters:
         - $ref: "#/components/parameters/RunnerId"
       responses:
@@ -661,9 +686,11 @@ paths:
       tags: [ExecutionRunner]
       operationId: pingRunner
       summary: Ping runner.
-      x-agenthub-phase: P0
       x-agenthub-status: planned
       x-agenthub-owner: Edge
+      security:
+        - edgeBearerAuth: []
+        - edgeLocalToken: []
       parameters:
         - $ref: "#/components/parameters/RunnerId"
       responses:
@@ -675,9 +702,11 @@ paths:
       tags: [ExecutionRunner]
       operationId: drainRunner
       summary: Stop assigning new runs to runner.
-      x-agenthub-phase: P2
       x-agenthub-status: planned
       x-agenthub-owner: Edge
+      security:
+        - edgeBearerAuth: []
+        - edgeLocalToken: []
       parameters:
         - $ref: "#/components/parameters/RunnerId"
       responses:
@@ -689,7 +718,6 @@ paths:
       tags: [ExecutionRunner]
       operationId: listRuns
       summary: List AgentRuns.
-      x-agenthub-phase: P0
       x-agenthub-status: implemented
       x-agenthub-owner: Edge
       security:
@@ -707,13 +735,12 @@ paths:
       operationId: startRun
       summary: Start AgentRun.
       description: >
-        Starts a local AgentRun. P0 accepts an empty body for Desktop Shell
+        Starts a local AgentRun. An empty body is accepted for Desktop Shell
         compatibility and falls back to the default local project/thread.
         New callers should pass projectId and threadId explicitly. If the Edge
         process is started with a workspace allowlist, workDir must resolve
         inside one of the allowed roots or the request is rejected before run
         creation.
-      x-agenthub-phase: P0
       x-agenthub-status: implemented
       x-agenthub-owner: Edge
       security:
@@ -783,9 +810,11 @@ paths:
       tags: [ExecutionRunner]
       operationId: getRun
       summary: Get AgentRun.
-      x-agenthub-phase: P0
       x-agenthub-status: implemented
       x-agenthub-owner: Edge
+      security:
+        - edgeBearerAuth: []
+        - edgeLocalToken: []
       parameters:
         - $ref: "#/components/parameters/RunId"
       responses:
@@ -797,23 +826,35 @@ paths:
       tags: [ExecutionRunner]
       operationId: cancelRun
       summary: Cancel AgentRun.
-      x-agenthub-phase: P0
       x-agenthub-status: implemented
       x-agenthub-owner: Edge
+      security:
+        - edgeBearerAuth: []
+        - edgeLocalToken: []
       parameters:
         - $ref: "#/components/parameters/RunId"
       responses:
+        "200":
+          description: Run is already terminal (finished/failed/cancelled/completed_with_issues); current status returned.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Resource"
         "202":
           $ref: "#/components/responses/Accepted"
+        "404":
+          $ref: "#/components/responses/Error"
 
   /v1/runs/{runId}:interrupt:
     post:
       tags: [ExecutionRunner]
       operationId: interruptRun
       summary: Interrupt AgentRun.
-      x-agenthub-phase: P1
       x-agenthub-status: planned
       x-agenthub-owner: Edge
+      security:
+        - edgeBearerAuth: []
+        - edgeLocalToken: []
       parameters:
         - $ref: "#/components/parameters/RunId"
       responses:
@@ -825,9 +866,11 @@ paths:
       tags: [ExecutionRunner]
       operationId: resumeRun
       summary: Resume AgentRun.
-      x-agenthub-phase: P1
       x-agenthub-status: planned
       x-agenthub-owner: Edge
+      security:
+        - edgeBearerAuth: []
+        - edgeLocalToken: []
       parameters:
         - $ref: "#/components/parameters/RunId"
       responses:
@@ -839,9 +882,11 @@ paths:
       tags: [ExecutionRunner]
       operationId: retryRun
       summary: Retry AgentRun.
-      x-agenthub-phase: P1
       x-agenthub-status: planned
       x-agenthub-owner: Edge
+      security:
+        - edgeBearerAuth: []
+        - edgeLocalToken: []
       parameters:
         - $ref: "#/components/parameters/RunId"
       responses:
@@ -853,9 +898,11 @@ paths:
       tags: [ExecutionRunner]
       operationId: listRunItems
       summary: List run items.
-      x-agenthub-phase: P0
       x-agenthub-status: planned
       x-agenthub-owner: Edge
+      security:
+        - edgeBearerAuth: []
+        - edgeLocalToken: []
       parameters:
         - $ref: "#/components/parameters/RunId"
       responses:
@@ -867,9 +914,11 @@ paths:
       tags: [ExecutionRunner]
       operationId: getRunLogs
       summary: Get run logs snapshot.
-      x-agenthub-phase: P0
       x-agenthub-status: planned
       x-agenthub-owner: Edge
+      security:
+        - edgeBearerAuth: []
+        - edgeLocalToken: []
       parameters:
         - $ref: "#/components/parameters/RunId"
       responses:
@@ -882,9 +931,11 @@ paths:
       operationId: getRunDiff
       summary: Get run diff snapshot.
       description: "Read-only Edge-local diff snapshot for a persisted run. Empty runs return `{ runId, files: [] }`."
-      x-agenthub-phase: P0
       x-agenthub-status: implemented
       x-agenthub-owner: Edge
+      security:
+        - edgeBearerAuth: []
+        - edgeLocalToken: []
       parameters:
         - $ref: "#/components/parameters/RunId"
       responses:
@@ -902,9 +953,11 @@ paths:
       tags: [ExecutionRunner]
       operationId: getRunCheckpoint
       summary: Get run checkpoint metadata and inventory.
-      x-agenthub-phase: P0
       x-agenthub-status: implemented
       x-agenthub-owner: Edge
+      security:
+        - edgeBearerAuth: []
+        - edgeLocalToken: []
       parameters:
         - $ref: "#/components/parameters/RunId"
       responses:
@@ -923,9 +976,11 @@ paths:
       tags: [ExecutionRunner]
       operationId: getRunCheckpointFile
       summary: Get a single checkpoint file preview.
-      x-agenthub-phase: P0
       x-agenthub-status: implemented
       x-agenthub-owner: Edge
+      security:
+        - edgeBearerAuth: []
+        - edgeLocalToken: []
       parameters:
         - $ref: "#/components/parameters/RunId"
       responses:
@@ -949,9 +1004,11 @@ paths:
         filesystem. Reads the run's persisted diff, applies the selected hunk,
         and returns the updated diff state. workDir must be within the Edge
         workspace allowlist.
-      x-agenthub-phase: P0
       x-agenthub-status: implemented
       x-agenthub-owner: Edge
+      security:
+        - edgeBearerAuth: []
+        - edgeLocalToken: []
       parameters:
         - $ref: "#/components/parameters/RunId"
       requestBody:
@@ -996,9 +1053,11 @@ paths:
         Applies multiple hunk accept/reject decisions for a finished run in one
         request. Each decision is applied in order; the first failure aborts
         the batch. Returns the per-hunk results and count applied.
-      x-agenthub-phase: P0
       x-agenthub-status: implemented
       x-agenthub-owner: Edge
+      security:
+        - edgeBearerAuth: []
+        - edgeLocalToken: []
       parameters:
         - $ref: "#/components/parameters/RunId"
       requestBody:
@@ -1043,9 +1102,11 @@ paths:
       tags: [ExecutionRunner]
       operationId: listApprovals
       summary: List approval requests.
-      x-agenthub-phase: P0
       x-agenthub-status: planned
       x-agenthub-owner: Edge
+      security:
+        - edgeBearerAuth: []
+        - edgeLocalToken: []
       responses:
         "200":
           $ref: "#/components/responses/List"
@@ -1055,9 +1116,11 @@ paths:
       tags: [ExecutionRunner]
       operationId: getApproval
       summary: Get approval request.
-      x-agenthub-phase: P0
       x-agenthub-status: planned
       x-agenthub-owner: Edge
+      security:
+        - edgeBearerAuth: []
+        - edgeLocalToken: []
       parameters:
         - $ref: "#/components/parameters/ApprovalId"
       responses:
@@ -1069,9 +1132,11 @@ paths:
       tags: [ExecutionRunner]
       operationId: decideApproval
       summary: Decide approval request.
-      x-agenthub-phase: P0
       x-agenthub-status: planned
       x-agenthub-owner: Edge
+      security:
+        - edgeBearerAuth: []
+        - edgeLocalToken: []
       parameters:
         - $ref: "#/components/parameters/ApprovalId"
       responses:
@@ -1084,9 +1149,11 @@ paths:
       operationId: listArtifacts
       summary: List artifacts.
       description: Read-only Edge-local artifact index. Artifact content, apply and discard remain planned.
-      x-agenthub-phase: P0
       x-agenthub-status: implemented
       x-agenthub-owner: Edge
+      security:
+        - edgeBearerAuth: []
+        - edgeLocalToken: []
       parameters:
         - name: runId
           in: query
@@ -1108,9 +1175,11 @@ paths:
       operationId: getArtifact
       summary: Get artifact metadata.
       description: Read-only Edge-local artifact metadata lookup. Artifact content, apply and discard remain planned.
-      x-agenthub-phase: P0
       x-agenthub-status: implemented
       x-agenthub-owner: Edge
+      security:
+        - edgeBearerAuth: []
+        - edgeLocalToken: []
       parameters:
         - $ref: "#/components/parameters/ArtifactId"
       responses:
@@ -1123,9 +1192,11 @@ paths:
       operationId: getArtifactContent
       summary: Get artifact content or redirect.
       description: Planned. Current Edge artifact metadata may include safe contentSource metadata, but this route still lacks an approved workspace resolver, blob key, MIME type, checksum, size cap, and read policy.
-      x-agenthub-phase: P0
       x-agenthub-status: planned
       x-agenthub-owner: Edge
+      security:
+        - edgeBearerAuth: []
+        - edgeLocalToken: []
       parameters:
         - $ref: "#/components/parameters/ArtifactId"
       responses:
@@ -1139,9 +1210,11 @@ paths:
       tags: [ExecutionRunner]
       operationId: applyArtifact
       summary: Apply artifact to target workspace.
-      x-agenthub-phase: P0
       x-agenthub-status: planned
       x-agenthub-owner: Edge
+      security:
+        - edgeBearerAuth: []
+        - edgeLocalToken: []
       parameters:
         - $ref: "#/components/parameters/ArtifactId"
       responses:
@@ -1153,9 +1226,11 @@ paths:
       tags: [ExecutionRunner]
       operationId: discardArtifact
       summary: Discard artifact.
-      x-agenthub-phase: P0
       x-agenthub-status: planned
       x-agenthub-owner: Edge
+      security:
+        - edgeBearerAuth: []
+        - edgeLocalToken: []
       parameters:
         - $ref: "#/components/parameters/ArtifactId"
       responses:
@@ -1168,9 +1243,11 @@ paths:
       operationId: listPreviews
       summary: List previews.
       description: Read-only Edge-local preview index. Previews can be created via POST; stopped previews are retained as terminal metadata.
-      x-agenthub-phase: P0
       x-agenthub-status: implemented
       x-agenthub-owner: Edge
+      security:
+        - edgeBearerAuth: []
+        - edgeLocalToken: []
       parameters:
         - name: runId
           in: query
@@ -1190,9 +1267,11 @@ paths:
       operationId: createPreview
       summary: Start preview.
       description: Fake-runner contract only. Creates Edge-local `starting` preview metadata for a run without launching a dev server, OS process, or browser; fake runner tests may later mark the preview ready or stopped.
-      x-agenthub-phase: P0
       x-agenthub-status: implemented
       x-agenthub-owner: Edge
+      security:
+        - edgeBearerAuth: []
+        - edgeLocalToken: []
       requestBody:
         required: true
         content:
@@ -1209,9 +1288,11 @@ paths:
       operationId: getPreview
       summary: Get preview.
       description: Read-only Edge-local preview metadata lookup. Previews can be created via POST /v1/previews; stopped previews are retained as terminal metadata.
-      x-agenthub-phase: P0
       x-agenthub-status: implemented
       x-agenthub-owner: Edge
+      security:
+        - edgeBearerAuth: []
+        - edgeLocalToken: []
       parameters:
         - $ref: "#/components/parameters/PreviewId"
       responses:
@@ -1223,9 +1304,11 @@ paths:
       tags: [ExecutionRunner]
       operationId: stopPreview
       summary: Stop preview.
-      x-agenthub-phase: P1
       x-agenthub-status: implemented
       x-agenthub-owner: Edge
+      security:
+        - edgeBearerAuth: []
+        - edgeLocalToken: []
       description: Contract-only local metadata transition. This marks an existing Edge preview as stopped and clears the ready URL; it does not stop an OS process or browser.
       parameters:
         - $ref: "#/components/parameters/PreviewId"
@@ -1238,7 +1321,6 @@ paths:
       tags: [ExecutionRunner]
       operationId: getWorkspace
       summary: Get workspace.
-      x-agenthub-phase: P0
       x-agenthub-status: planned
       x-agenthub-owner: Hub
       parameters:
@@ -1252,7 +1334,6 @@ paths:
       tags: [ExecutionRunner]
       operationId: listWorkspaceFiles
       summary: List workspace files.
-      x-agenthub-phase: P0
       x-agenthub-status: planned
       x-agenthub-owner: Hub
       parameters:
@@ -1267,7 +1348,6 @@ paths:
       operationId: readWorkspaceFile
       summary: Read workspace file by path.
       description: File path is passed in the JSON body so slash-containing paths do not become ambiguous URL segments.
-      x-agenthub-phase: P0
       x-agenthub-status: planned
       x-agenthub-owner: Hub
       parameters:
@@ -1281,7 +1361,6 @@ paths:
       tags: [ExecutionRunner]
       operationId: searchWorkspaceFiles
       summary: Search workspace files.
-      x-agenthub-phase: P1
       x-agenthub-status: planned
       x-agenthub-owner: Hub
       parameters:
@@ -1299,6 +1378,9 @@ paths:
       summary: Prometheus metrics.
       x-agenthub-status: implemented
       x-agenthub-owner: Edge
+      security:
+        - edgeBearerAuth: []
+        - edgeLocalToken: []
       responses:
         "200":
           description: Prometheus text format.
@@ -1309,9 +1391,11 @@ paths:
       operationId: getModelCatalog
       summary: List runtime model catalog entries discovered from local provider configuration.
       description: Returns model/catalog metadata only; provider API keys and secret material are redacted by the Edge implementation.
-      x-agenthub-phase: P0
       x-agenthub-status: implemented
       x-agenthub-owner: Edge
+      security:
+        - edgeBearerAuth: []
+        - edgeLocalToken: []
       responses:
         "200":
           description: Model catalog.
@@ -1327,6 +1411,9 @@ paths:
       summary: List orchestrator sub-agent instances.
       x-agenthub-status: implemented
       x-agenthub-owner: Edge
+      security:
+        - edgeBearerAuth: []
+        - edgeLocalToken: []
       parameters:
         - name: runId
           in: query
@@ -1341,9 +1428,11 @@ paths:
       tags: [ExecutionRunner]
       operationId: createAgentInstance
       summary: Register a sub-agent instance.
-      x-agenthub-phase: P1
       x-agenthub-status: planned
       x-agenthub-owner: Edge
+      security:
+        - edgeBearerAuth: []
+        - edgeLocalToken: []
       responses:
         "201":
           $ref: "#/components/responses/Created"
@@ -1353,9 +1442,11 @@ paths:
       tags: [ExecutionRunner]
       operationId: getAgentInstance
       summary: Get one orchestrator sub-agent instance.
-      x-agenthub-phase: P1
       x-agenthub-status: implemented
       x-agenthub-owner: Edge
+      security:
+        - edgeBearerAuth: []
+        - edgeLocalToken: []
       parameters:
         - name: id
           in: path
@@ -1388,6 +1479,9 @@ paths:
         Hub identity fails closed. Local single-tenant mode is unaffected.
       x-agenthub-status: implemented
       x-agenthub-owner: Edge
+      security:
+        - edgeBearerAuth: []
+        - edgeLocalToken: []
       requestBody:
         required: true
         content:
@@ -1450,7 +1544,7 @@ paths:
       operationId: decidePlan
       summary: Approve or reject a pending orchestrator plan.
       description: >
-        Plan confirmation gate (P0 #3). Resolves a pending plan for the given
+        Plan confirmation gate. Resolves a pending plan for the given
         run via the PlanApprovalBroker. The resolved plan_approved /
         plan_rejected event is emitted by the dispatch interceptor once the
         broker decision resolves; this endpoint only records the decision.
@@ -1459,9 +1553,11 @@ paths:
         identically (404), so this endpoint is not a runId existence oracle. A
         caller without a Hub identity fails closed. Local single-tenant mode is
         unaffected.
-      x-agenthub-phase: P0
       x-agenthub-status: implemented
       x-agenthub-owner: Edge
+      security:
+        - edgeBearerAuth: []
+        - edgeLocalToken: []
       requestBody:
         required: true
         content:
@@ -1494,9 +1590,11 @@ paths:
         multi-user mode, plans are filtered to runs owned by the caller and a
         caller without a Hub identity gets an empty list; local single-tenant
         mode sees all rows.
-      x-agenthub-phase: P0
       x-agenthub-status: implemented
       x-agenthub-owner: Edge
+      security:
+        - edgeBearerAuth: []
+        - edgeLocalToken: []
       responses:
         "200":
           $ref: "#/components/responses/List"
@@ -1507,13 +1605,15 @@ paths:
       operationId: getDeliveryJournal
       summary: Read Edge-to-Hub delivery journal for reconciliation.
       description: >
-        Edge-local callback journal snapshot for AH-SR-049 reconciliation. When
+        Edge-local callback journal snapshot for delivery reconciliation. When
         the Edge CallbackClient is not configured, returns 503. Under Hub JWT /
         multi-user mode, entries are filtered to runs owned by the caller;
         local single-tenant mode sees all rows.
-      x-agenthub-phase: P0
       x-agenthub-status: implemented
       x-agenthub-owner: Edge
+      security:
+        - edgeBearerAuth: []
+        - edgeLocalToken: []
       parameters:
         - name: afterSeq
           in: query
@@ -1543,9 +1643,11 @@ paths:
         Returns Edge-local user profiles from the Edge store. This is the
         single-tenant local profile surface; Hub-owned users live under Hub
         Server routes.
-      x-agenthub-phase: P0
       x-agenthub-status: implemented
       x-agenthub-owner: Edge
+      security:
+        - edgeBearerAuth: []
+        - edgeLocalToken: []
       responses:
         "200":
           $ref: "#/components/responses/List"
@@ -1558,9 +1660,11 @@ paths:
       description: >
         Returns the current Edge-local user profile, or 404 when no current
         user is set.
-      x-agenthub-phase: P0
       x-agenthub-status: implemented
       x-agenthub-owner: Edge
+      security:
+        - edgeBearerAuth: []
+        - edgeLocalToken: []
       responses:
         "200":
           $ref: "#/components/responses/Ok"
@@ -1574,12 +1678,14 @@ paths:
       summary: List Edge-local agent profiles.
       description: >
         Edge-local agent profile index. Profiles have no per-user owner
-        binding, so under Hub JWT / multi-user mode this route fails closed
-        (AH-SR-045); local single-tenant mode keeps access. Supports an
+        binding, so under Hub JWT / multi-user mode this route fails closed;
+        local single-tenant mode keeps access. Supports an
         optional adapterId query filter.
-      x-agenthub-phase: P0
       x-agenthub-status: implemented
       x-agenthub-owner: Edge
+      security:
+        - edgeBearerAuth: []
+        - edgeLocalToken: []
       parameters:
         - name: adapterId
           in: query
@@ -1598,11 +1704,13 @@ paths:
         Creates an Edge-local agent profile. Agent profiles are node-level
         shared configuration with no per-user owner binding, so under Hub JWT /
         multi-user mode this route is not writable and fails closed with 404
-        whose body is indistinguishable from a missing resource (AH-SR-045);
+        whose body is indistinguishable from a missing resource;
         local single-tenant mode keeps write access.
-      x-agenthub-phase: P0
       x-agenthub-status: implemented
       x-agenthub-owner: Edge
+      security:
+        - edgeBearerAuth: []
+        - edgeLocalToken: []
       requestBody:
         required: true
         content:
@@ -1644,10 +1752,12 @@ paths:
       summary: Get an Edge-local agent profile.
       description: >
         Edge-local agent profile lookup. Fails closed under Hub JWT /
-        multi-user mode (AH-SR-045).
-      x-agenthub-phase: P0
+        multi-user mode.
       x-agenthub-status: implemented
       x-agenthub-owner: Edge
+      security:
+        - edgeBearerAuth: []
+        - edgeLocalToken: []
       parameters:
         - name: profileId
           in: path
@@ -1667,11 +1777,13 @@ paths:
         Partial update of an Edge-local agent profile by id. Agent profiles are
         node-level shared configuration with no per-user owner binding, so under
         Hub JWT / multi-user mode this route is not writable and fails closed
-        with 404 whose body is indistinguishable from a missing resource
-        (AH-SR-045); local single-tenant mode keeps write access.
-      x-agenthub-phase: P0
+        with 404 whose body is indistinguishable from a missing resource;
+        local single-tenant mode keeps write access.
       x-agenthub-status: implemented
       x-agenthub-owner: Edge
+      security:
+        - edgeBearerAuth: []
+        - edgeLocalToken: []
       parameters:
         - name: profileId
           in: path
@@ -1702,10 +1814,12 @@ paths:
         node-level shared configuration with no per-user owner binding, so
         under Hub JWT / multi-user mode this route is not writable and fails
         closed with 404 whose body is indistinguishable from a missing
-        resource (AH-SR-045); local single-tenant mode keeps write access.
-      x-agenthub-phase: P0
+        resource; local single-tenant mode keeps write access.
       x-agenthub-status: implemented
       x-agenthub-owner: Edge
+      security:
+        - edgeBearerAuth: []
+        - edgeLocalToken: []
       parameters:
         - name: profileId
           in: path
@@ -1727,11 +1841,13 @@ paths:
       summary: Read Edge-local settings.
       description: >
         Edge-local settings have no per-user owner binding; under Hub JWT /
-        multi-user mode this route fails closed (AH-SR-045). Local
+        multi-user mode this route fails closed. Local
         single-tenant mode keeps access.
-      x-agenthub-phase: P0
       x-agenthub-status: implemented
       x-agenthub-owner: Edge
+      security:
+        - edgeBearerAuth: []
+        - edgeLocalToken: []
       responses:
         "200":
           $ref: "#/components/responses/Ok"
@@ -1745,12 +1861,14 @@ paths:
         mistake them for success. Edge-local settings are node-level shared
         configuration with no per-user owner binding, so under Hub JWT /
         multi-user mode this route is not writable and fails closed with 404
-        whose body is indistinguishable from a missing resource (AH-SR-045);
+        whose body is indistinguishable from a missing resource;
         local single-tenant mode keeps write access. The gate runs before the
         request body is decoded.
-      x-agenthub-phase: P0
       x-agenthub-status: implemented
       x-agenthub-owner: Edge
+      security:
+        - edgeBearerAuth: []
+        - edgeLocalToken: []
       requestBody:
         required: true
         content:
@@ -1777,10 +1895,12 @@ paths:
         Read-only Desktop import discovery surface. Scans the local filesystem
         for recent Agent Runtime session summaries; never mutates third-party
         stores. Shared machine surface: fails closed under Hub JWT / multi-user
-        mode (AH-SR-045).
-      x-agenthub-phase: P0
+        mode.
       x-agenthub-status: implemented
       x-agenthub-owner: Edge
+      security:
+        - edgeBearerAuth: []
+        - edgeLocalToken: []
       parameters:
         - name: limit
           in: query
@@ -1813,9 +1933,11 @@ paths:
         Returns whether cc-switch is installed and whether model routing is
         active on this Edge. When cc-switch is not detected the response
         reports installed=false, routingActive=false.
-      x-agenthub-phase: P0
       x-agenthub-status: implemented
       x-agenthub-owner: Edge
+      security:
+        - edgeBearerAuth: []
+        - edgeLocalToken: []
       responses:
         "200":
           $ref: "#/components/responses/Ok"
@@ -1829,9 +1951,11 @@ paths:
         Reads cc-switch provider entries for the given appType (defaults to
         claude). Returns an empty list when cc-switch is not installed or its
         database is not readable.
-      x-agenthub-phase: P0
       x-agenthub-status: implemented
       x-agenthub-owner: Edge
+      security:
+        - edgeBearerAuth: []
+        - edgeLocalToken: []
       parameters:
         - name: appType
           in: query
@@ -1853,11 +1977,14 @@ paths:
       description: >
         Collects a finished run's artifacts, archives them, and SCPs the
         archive to the configured deployment target. The slug becomes the
-        subdomain of the pages domain. The run must be in a terminal state and
-        have at least one artifact.
-      x-agenthub-phase: P0
+        subdomain of the pages domain. The run must be finished, failed, or
+        cancelled — runs that ended with completed_with_issues are refused —
+        and have at least one artifact.
       x-agenthub-status: implemented
       x-agenthub-owner: Edge
+      security:
+        - edgeBearerAuth: []
+        - edgeLocalToken: []
       requestBody:
         required: true
         content:
@@ -1888,9 +2015,11 @@ paths:
       description: >
         Reads AgentHub memory entries for the given workDir / threadId /
         agentId. workDir must be within the Edge workspace allowlist when set.
-      x-agenthub-phase: P0
       x-agenthub-status: implemented
       x-agenthub-owner: Edge
+      security:
+        - edgeBearerAuth: []
+        - edgeLocalToken: []
       parameters:
         - name: workDir
           in: query
@@ -1920,9 +2049,11 @@ paths:
         Writes a single AgentHub memory entry for the given workDir. workDir is
         required and must be within the Edge workspace allowlist. When id is
         omitted one is generated. An empty content body is rejected.
-      x-agenthub-phase: P0
       x-agenthub-status: implemented
       x-agenthub-owner: Edge
+      security:
+        - edgeBearerAuth: []
+        - edgeLocalToken: []
       requestBody:
         required: true
         content:
@@ -2271,7 +2402,7 @@ paths:
       operationId: hubWebSocket
       summary: Hub WebSocket — real-time IM + agent dispatch.
       description: >
-        Main Hub WebSocket route. WSAuthMiddleware validates a Hub-issued HS256
+        Main Hub WebSocket route. AuthMiddleware.WSHandler() validates a Hub-issued HS256
         access token during HTTP upgrade and resolves that token from exactly
         two sources, in priority order: (1) `Authorization: Bearer <token>` for
         native clients that can set headers, (2) the `Sec-WebSocket-Protocol`
@@ -2285,7 +2416,7 @@ paths:
         this contract. TokenDance ID RS256 bearer tokens and TokenDance API
         keys are not Hub WebSocket credentials. The legacy first-frame `auth`
         event is only for tests and compatibility entries that do not install
-        WSAuthMiddleware. See api/events.md for Hub event types.
+        AuthMiddleware.WSHandler(). See api/events.md for Hub event types.
       x-agenthub-status: implemented
       x-agenthub-owner: Hub
       security:
@@ -2843,7 +2974,7 @@ paths:
       x-agenthub-owner: Hub
       security: [{ bearerAuth: [] }]
       parameters:
-        - $ref: "#/components/parameters/UserId"
+        - $ref: "#/components/parameters/ContactUserId"
       responses:
         "204":
           description: Removed.
@@ -2867,7 +2998,7 @@ paths:
       x-agenthub-owner: Hub
       security: [{ bearerAuth: [] }]
       parameters:
-        - $ref: "#/components/parameters/UserId"
+        - $ref: "#/components/parameters/ContactUserId"
       responses:
         "200":
           $ref: "#/components/responses/Ok"
@@ -2891,7 +3022,7 @@ paths:
       x-agenthub-owner: Hub
       security: [{ bearerAuth: [] }]
       parameters:
-        - $ref: "#/components/parameters/UserId"
+        - $ref: "#/components/parameters/ContactUserId"
       responses:
         "200":
           $ref: "#/components/responses/Ok"
@@ -2915,7 +3046,7 @@ paths:
       x-agenthub-owner: Hub
       security: [{ bearerAuth: [] }]
       parameters:
-        - $ref: "#/components/parameters/UserId"
+        - $ref: "#/components/parameters/ContactUserId"
       requestBody:
         required: true
         content:
@@ -5095,7 +5226,7 @@ paths:
       tags: [HubSyncRelay]
       operationId: hubCreateProject
       summary: Create a Hub project workspace.
-      description: Current behavior returns a 200 OK Hub envelope; status-code migration is intentionally out of scope for this slice.
+      description: Returns HTTP 200 with a Hub envelope.
       x-agenthub-status: implemented
       x-agenthub-owner: Hub
       security: [{ bearerAuth: [] }]
@@ -6513,7 +6644,7 @@ paths:
       tags: [HubSyncRelay]
       operationId: hubTeamRunReviewDecision
       x-agenthub-role: team-member
-      summary: Record a human review decision on a team run DAG plan (ADR-008).
+      summary: Record a human review decision on a team run DAG plan.
       description: Requires team member (owner or agent-profile owner installed in the team; not satisfied by global admin alone). Applies the reviewer's approve/discuss/modify decision to the pending review gate and returns the recorded review state.
       x-agenthub-status: implemented
       x-agenthub-owner: Hub
@@ -6551,7 +6682,6 @@ paths:
       operationId: login
       summary: Login.
       x-agenthub-superseded-by: "GET /client/auth/oidc/authorize"
-      x-agenthub-phase: P2
       x-agenthub-owner: Hub
       x-agenthub-status: planned
       responses:
@@ -6564,7 +6694,6 @@ paths:
       operationId: logout
       summary: Logout.
       x-agenthub-superseded-by: "POST /client/auth/logout"
-      x-agenthub-phase: P2
       x-agenthub-owner: Hub
       x-agenthub-status: planned
       responses:
@@ -6577,7 +6706,6 @@ paths:
       operationId: getMe
       summary: Get current user.
       x-agenthub-superseded-by: "GET /client/auth/me"
-      x-agenthub-phase: P2
       x-agenthub-owner: Hub
       x-agenthub-status: planned
       responses:
@@ -6588,7 +6716,6 @@ paths:
       operationId: updateMe
       summary: Update current user.
       x-agenthub-superseded-by: "PUT /client/auth/profile"
-      x-agenthub-phase: P2
       x-agenthub-owner: Hub
       x-agenthub-status: planned
       responses:
@@ -6601,7 +6728,6 @@ paths:
       operationId: listContacts
       summary: List contacts.
       x-agenthub-superseded-by: "GET /client/contacts"
-      x-agenthub-phase: P4
       x-agenthub-owner: Hub
       x-agenthub-status: planned
       responses:
@@ -6614,7 +6740,6 @@ paths:
       operationId: requestContact
       summary: Send contact request.
       x-agenthub-superseded-by: "POST /client/contacts/friend-requests"
-      x-agenthub-phase: P4
       x-agenthub-owner: Hub
       x-agenthub-status: planned
       responses:
@@ -6627,7 +6752,6 @@ paths:
       operationId: acceptContact
       summary: Accept contact request.
       x-agenthub-superseded-by: "POST /client/contacts/friend-requests/{id}/accept"
-      x-agenthub-phase: P4
       x-agenthub-owner: Hub
       x-agenthub-status: planned
       parameters:
@@ -6642,7 +6766,6 @@ paths:
       operationId: deleteContact
       summary: Delete contact.
       x-agenthub-superseded-by: "DELETE /client/contacts/{user_id}"
-      x-agenthub-phase: P4
       x-agenthub-owner: Hub
       x-agenthub-status: planned
       parameters:
@@ -6657,7 +6780,6 @@ paths:
       operationId: listGroups
       summary: List groups.
       x-agenthub-superseded-by: "GET /client/sessions"
-      x-agenthub-phase: P4
       x-agenthub-owner: Hub
       x-agenthub-status: planned
       responses:
@@ -6668,7 +6790,6 @@ paths:
       operationId: createGroup
       summary: Create group.
       x-agenthub-superseded-by: "POST /client/sessions"
-      x-agenthub-phase: P4
       x-agenthub-owner: Hub
       x-agenthub-status: planned
       responses:
@@ -6680,7 +6801,6 @@ paths:
       tags: [HubSyncRelay]
       operationId: getGroup
       summary: Get group.
-      x-agenthub-phase: P4
       x-agenthub-owner: Hub
       x-agenthub-status: planned
       parameters:
@@ -6692,7 +6812,6 @@ paths:
       tags: [HubSyncRelay]
       operationId: updateGroup
       summary: Update group.
-      x-agenthub-phase: P4
       x-agenthub-owner: Hub
       x-agenthub-status: planned
       parameters:
@@ -6707,7 +6826,6 @@ paths:
       operationId: listDevices
       summary: List devices.
       x-agenthub-superseded-by: "GET /web/devices"
-      x-agenthub-phase: P2
       x-agenthub-owner: Hub
       x-agenthub-status: planned
       responses:
@@ -6719,7 +6837,6 @@ paths:
       tags: [HubSyncRelay]
       operationId: registerDevice
       summary: Register device.
-      x-agenthub-phase: P2
       x-agenthub-owner: Hub
       x-agenthub-status: planned
       responses:
@@ -6731,7 +6848,6 @@ paths:
       tags: [HubSyncRelay]
       operationId: deleteDevice
       summary: Delete device.
-      x-agenthub-phase: P2
       x-agenthub-owner: Hub
       x-agenthub-status: planned
       parameters:
@@ -6745,7 +6861,6 @@ paths:
       tags: [HubSyncRelay]
       operationId: listEdges
       summary: List Edge nodes.
-      x-agenthub-phase: P2
       x-agenthub-owner: Hub
       x-agenthub-status: planned
       responses:
@@ -6757,7 +6872,6 @@ paths:
       tags: [HubSyncRelay]
       operationId: registerEdge
       summary: Register Edge node.
-      x-agenthub-phase: P2
       x-agenthub-owner: Hub
       x-agenthub-status: planned
       responses:
@@ -6769,7 +6883,6 @@ paths:
       tags: [HubSyncRelay]
       operationId: getEdge
       summary: Get Edge node.
-      x-agenthub-phase: P2
       x-agenthub-owner: Hub
       x-agenthub-status: planned
       parameters:
@@ -6781,7 +6894,6 @@ paths:
       tags: [HubSyncRelay]
       operationId: updateEdge
       summary: Update Edge node.
-      x-agenthub-phase: P2
       x-agenthub-owner: Hub
       x-agenthub-status: planned
       parameters:
@@ -6795,7 +6907,6 @@ paths:
       tags: [HubSyncRelay]
       operationId: heartbeatEdge
       summary: Send Edge heartbeat.
-      x-agenthub-phase: P2
       x-agenthub-owner: Hub
       x-agenthub-status: planned
       parameters:
@@ -6809,7 +6920,6 @@ paths:
       tags: [HubSyncRelay]
       operationId: uploadSyncEvents
       summary: Upload Edge events.
-      x-agenthub-phase: P2
       x-agenthub-owner: Hub
       x-agenthub-status: planned
       responses:
@@ -6821,7 +6931,6 @@ paths:
       tags: [HubSyncRelay]
       operationId: listSyncEvents
       summary: List sync events.
-      x-agenthub-phase: P2
       x-agenthub-owner: Hub
       x-agenthub-status: planned
       parameters:
@@ -6835,7 +6944,6 @@ paths:
       tags: [HubSyncRelay]
       operationId: ackSync
       summary: Acknowledge sync cursor.
-      x-agenthub-phase: P2
       x-agenthub-owner: Hub
       x-agenthub-status: planned
       responses:
@@ -6847,7 +6955,6 @@ paths:
       tags: [HubSyncRelay]
       operationId: getSyncState
       summary: Get sync state.
-      x-agenthub-phase: P2
       x-agenthub-owner: Hub
       x-agenthub-status: planned
       responses:
@@ -6859,7 +6966,6 @@ paths:
       tags: [HubSyncRelay]
       operationId: createRelayCommand
       summary: Create relay command.
-      x-agenthub-phase: P3
       x-agenthub-owner: Hub
       x-agenthub-status: planned
       responses:
@@ -6871,7 +6977,6 @@ paths:
       tags: [HubSyncRelay]
       operationId: getRelayCommand
       summary: Get relay command.
-      x-agenthub-phase: P3
       x-agenthub-owner: Hub
       x-agenthub-status: planned
       parameters:
@@ -6885,7 +6990,6 @@ paths:
       tags: [HubSyncRelay]
       operationId: ackRelayCommand
       summary: Acknowledge relay command.
-      x-agenthub-phase: P3
       x-agenthub-owner: Hub
       x-agenthub-status: planned
       parameters:
@@ -6899,7 +7003,6 @@ paths:
       tags: [HubSyncRelay]
       operationId: openEdgeRelay
       summary: Open reverse WebSocket relay for Edge.
-      x-agenthub-phase: P3
       x-agenthub-owner: Hub
       x-agenthub-status: planned
       parameters:
@@ -6913,7 +7016,6 @@ paths:
       tags: [HubSyncRelay]
       operationId: listCloudEdges
       summary: List Cloud Edge nodes.
-      x-agenthub-phase: P3
       x-agenthub-owner: Hub
       x-agenthub-status: planned
       responses:
@@ -6923,7 +7025,6 @@ paths:
       tags: [HubSyncRelay]
       operationId: createCloudEdge
       summary: Create Cloud Edge node.
-      x-agenthub-phase: P3
       x-agenthub-owner: Hub
       x-agenthub-status: planned
       responses:
@@ -6935,7 +7036,6 @@ paths:
       tags: [HubSyncRelay]
       operationId: allocateCloudRunner
       summary: Allocate Cloud Runner.
-      x-agenthub-phase: P3
       x-agenthub-owner: Hub
       x-agenthub-status: planned
       responses:
@@ -6947,7 +7047,6 @@ paths:
       tags: [HubSyncRelay]
       operationId: releaseCloudRunner
       summary: Release Cloud Runner.
-      x-agenthub-phase: P3
       x-agenthub-owner: Hub
       x-agenthub-status: planned
       parameters:
@@ -6957,7 +7056,7 @@ paths:
           $ref: "#/components/responses/Accepted"
 
   # ═══════════════════════════════════════════════════════════
-  # Hub Server — additional /web routes (Phase 2–6)
+  # Hub Server — additional /web routes
   # ═══════════════════════════════════════════════════════════
 
   # ── Agent Profiles (CRUD beyond GET list) ──
@@ -7727,13 +7826,14 @@ components:
       description: >
         Header alternative for the optional Local Edge token when Authorization
         is already owned by another caller context.
-    edgeWebSocketQueryToken:
+    edgeWebSocketProtocol:
       type: apiKey
-      in: query
-      name: access_token
+      in: header
+      name: Sec-WebSocket-Protocol
       description: >
         Browser WebSocket transport for the optional Local Edge token on
-        /v1/events. Hub WebSocket uses Hub-issued access tokens separately.
+        /v1/events: one subprotocol entry of the form `access_token.<edge-token>`.
+        Hub WebSocket uses Hub-issued access tokens separately.
   parameters:
     PageSize:
       name: pageSize
@@ -7847,6 +7947,12 @@ components:
         type: string
     UserId:
       name: userId
+      in: path
+      required: true
+      schema:
+        type: string
+    ContactUserId:
+      name: user_id
       in: path
       required: true
       schema:
@@ -8322,7 +8428,7 @@ components:
         seq_id:
           type: integer
           format: int64
-          description: Monotonic sequence ID for ordering and gap detection. Present on all non-auth frames.
+          description: Monotonic sequence ID for ordering and gap detection. Every pushed Hub frame carries one, including auth.ok (seq_id 1); data frames follow from 2.
     HubDevicePresencePayload:
       type: object
       required: [user_id]
@@ -8723,10 +8829,10 @@ components:
       properties:
         projectId:
           type: string
-          description: Project to bind the run to. Defaults to the local project in P0 compatibility mode.
+          description: Project to bind the run to. Defaults to the local project.
         threadId:
           type: string
-          description: Thread to bind the run to. Defaults to the local thread in P0 compatibility mode.
+          description: Thread to bind the run to. Defaults to the local thread.
         deliveryId:
           type: string
           description: Hub delivery_id for dual-channel admission dedup. Empty string bypasses dedup (legacy payload).

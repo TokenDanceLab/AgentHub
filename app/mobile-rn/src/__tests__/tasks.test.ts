@@ -100,7 +100,7 @@ function createTasksFromRuns(runs: MobileRun[]): MobileTaskItem[] {
     id: `task-${run.id}`,
     title: run.title,
     project: projectNameForRun(run),
-    assignee: index === 0 ? 'maintainer' : 'AgentHub',
+    assignee: index === 0 ? 'Demo User' : 'AgentHub',
     creator: 'TokenDance',
     startTime: index === 0 ? '14:02' : '13:40',
     dueDate: index === 0 ? 'Today 18:00' : 'Tomorrow 12:00',
@@ -338,9 +338,9 @@ describe('createTasksFromRuns', () => {
     expect(tasks[2]!.pane).toBe('activity');
   });
 
-  it('first task assignee is maintainer', () => {
+  it('first task assignee is Demo User', () => {
     const tasks = createTasksFromRuns(mobileFixture.runs);
-    expect(tasks[0]!.assignee).toBe('maintainer');
+    expect(tasks[0]!.assignee).toBe('Demo User');
     expect(tasks[1]!.assignee).toBe('AgentHub');
     expect(tasks[2]!.assignee).toBe('AgentHub');
   });

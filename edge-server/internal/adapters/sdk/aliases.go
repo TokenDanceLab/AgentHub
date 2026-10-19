@@ -1,4 +1,4 @@
-// Contract aliases for package sdk（#1760 首个增量）。
+// Contract aliases for package sdk。
 //
 // 合同类型与 BusEvent* 常量的唯一权威（SSOT）在 internal/orchestration；
 // 本文件与 adapters 根包的 contract_aliases.go、兄弟叶子包

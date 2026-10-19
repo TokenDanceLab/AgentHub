@@ -1,4 +1,4 @@
-// Conversation goal derivation (#1998, UX F8).
+// Conversation goal derivation (#1998).
 // Fixtures use the REAL external shapes: tool_call events exactly as the
 // Edge adapters emit them (callId/toolName/input/status) normalized through
 // the shared toolCallBlock mapper — the same pipeline real conversations

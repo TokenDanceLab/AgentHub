@@ -1,6 +1,5 @@
 /**
  * Shared pure helpers for chatview demo transcript fixtures.
- * Peel companion of chatviewFixtures (#1132). Pure only; zero behavior change.
  */
 
 export const T = (offsetMin: number) => {

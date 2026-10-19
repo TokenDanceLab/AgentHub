@@ -156,7 +156,6 @@ describe('Mobile Hub event stream', () => {
       'run.agent.plan_proposed',
       'run.agent.plan_approved',
       'run.agent.plan_rejected',
-      'run.agent.plan_expired',
     ]) {
       socket.emitMessage(JSON.stringify({ type, payload: { should_not_arrive: true } }));
     }

@@ -1,6 +1,6 @@
 # ──────────────────────────────────────────────
 # AgentHub — Production Compose
-# PG/Redis local instances; live facts in private deploy repo.
+# PG/Redis local instances; deployment-specific values are injected via env.
 #
 # 隔离纪律：container_name/网络名与根 docker-compose.yml 相同，
 # 两者同机同时 up 会冲突。同机并行部署必须用 -p 指定独立 project 名。
@@ -56,16 +56,15 @@ services:
         condition: service_healthy
     environment:
       # Local PostgreSQL 16 (127.0.0.1:<port>). PG_PASSWORD required;
-      # remaining defaults align with live (see private deploy repo).
+      # remaining defaults are deployment-neutral.
       # NOTE: PG_HOST default is host-only (no port); port via PG_PORT (default 5433).
-      # Historical default 127.0.0.1:<port> would put port into host, DBConfig.DSN()
-      # does not split host:port, causing DSN host=127.0.0.1:<port> port=5433 failure.
+      # Do not include a port in PG_HOST: DSN() uses PG_PORT separately.
       AGENTHUB_DB_HOST: ${PG_HOST:-127.0.0.1}
       AGENTHUB_DB_PORT: "${PG_PORT:-5433}"
       AGENTHUB_DB_USER: ${PG_USER:-agenthub}
       AGENTHUB_DB_PASSWORD: ${PG_PASSWORD:?请设置 PG_PASSWORD}
       AGENTHUB_DB_NAME: ${PG_DB_NAME:-agenthub}
-      AGENTHUB_DB_SSLMODE: ${PG_SSLMODE:-disable}
+      AGENTHUB_DB_SSLMODE: ${PG_SSLMODE:-require}
       # Redis（本地）
       AGENTHUB_REDIS_HOST: redis
       AGENTHUB_REDIS_PORT: "6379"
@@ -73,7 +72,7 @@ services:
       AGENTHUB_REDIS_DB: "0"
       AGENTHUB_REDIS_POOL_SIZE: "20"
       AGENTHUB_REDIS_MIN_IDLE_CONNS: "5"
-      # Security hardening (2026-08-10, CI7):
+      # Security hardening:
       # - AUTH_FAIL_CLOSED=true: access-token jti blacklist check (Redis-backed)
       #   fails CLOSED on Redis errors so a revoked (logged-out) access JWT
       #   cannot slip back in during a Redis outage.
@@ -87,8 +86,16 @@ services:
       AGENTHUB_JWT_REFRESH_TTL: ${AGENTHUB_JWT_REFRESH_TTL:-720h}
       # Server
       AGENTHUB_SERVER_PORT: "8080"
-      AGENTHUB_SERVER_LOG_LEVEL: ${AGENTHUB_SERVER_LOG_LEVEL:-info}
+      AGENTHUB_LOG_LEVEL: ${AGENTHUB_LOG_LEVEL:-}
+      # Legacy alias: still forwarded so existing .env files keep working.
+      AGENTHUB_SERVER_LOG_LEVEL: ${AGENTHUB_SERVER_LOG_LEVEL:-}
       AGENTHUB_SERVER_ADMIN_PORT: "6060"
+      # Production guard is on by default; override only for a deliberate
+      # non-production deployment.
+      AGENTHUB_ENV: ${AGENTHUB_ENV:-production}
+      # Comma-separated CORS allowlist; empty uses the built-in defaults for the
+      # resolved environment.
+      AGENTHUB_CORS_ORIGINS: ${AGENTHUB_CORS_ORIGINS:-}
       AGENTHUB_UPLOAD_DIR: /app/uploads
       AGENTHUB_UPLOAD_MAX_SIZE: "10485760"
       # TokenDance ID OIDC
@@ -100,8 +107,8 @@ services:
       # - /workbench/auth/tokendance/callback → workbench app/web (BASE_URL=/workbench/)
       # - http://127.0.0.1/callback → desktop Tauri loopback (RFC 8252 port-tolerant)
       # TDID oauth_clients.redirect_uris must match this set.
-      AGENTHUB_TOKENDANCE_ID_REDIRECT_URI: ${AGENTHUB_TOKENDANCE_ID_REDIRECT_URI:-https://hub.example.invalid/api/auth/callback}
-      AGENTHUB_TOKENDANCE_ID_ALLOWED_REDIRECT_URIS: ${AGENTHUB_TOKENDANCE_ID_ALLOWED_REDIRECT_URIS:-https://hub.example.invalid/api/auth/callback,https://hub.example.invalid/workbench/auth/tokendance/callback,http://127.0.0.1/callback}
+      AGENTHUB_TOKENDANCE_ID_REDIRECT_URI: ${AGENTHUB_TOKENDANCE_ID_REDIRECT_URI:-https://hub.example.com/api/auth/callback}
+      AGENTHUB_TOKENDANCE_ID_ALLOWED_REDIRECT_URIS: ${AGENTHUB_TOKENDANCE_ID_ALLOWED_REDIRECT_URIS:-https://hub.example.com/api/auth/callback,https://hub.example.com/workbench/auth/tokendance/callback,http://127.0.0.1/callback}
       # Machine-side code exchange endpoint: override TOKEN_URL/JWKS_URI for
       # server-side OIDC if the public issuer blocks non-JS clients.
       AGENTHUB_TOKENDANCE_ID_TOKEN_URL: ${AGENTHUB_TOKENDANCE_ID_TOKEN_URL:-}

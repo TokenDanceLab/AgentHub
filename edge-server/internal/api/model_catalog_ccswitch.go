@@ -1,8 +1,5 @@
 package api
 
-// Residual pure-helper peel #1133: cc-switch catalog pure helpers extracted
-// from model_catalog.go. Same package api; zero behavior change.
-
 import (
 	"path/filepath"
 	"strings"

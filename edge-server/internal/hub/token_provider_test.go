@@ -51,7 +51,7 @@ func TestTokenProviderAccessTokenAndSetTokens(t *testing.T) {
 }
 
 func TestTokenProviderNextRefreshDelay(t *testing.T) {
-	// exp = now+3m, lead = 2m => refresh in ~1m (#2135 F3).
+	// exp = now+3m, lead = 2m => refresh in ~1m (#2135).
 	soon := time.Now().Add(3 * time.Minute).Unix()
 	p := NewTokenProvider("http://hub", makeTestJWT(soon), "rt", http.DefaultClient)
 	delay := p.nextRefreshDelay()
@@ -112,8 +112,8 @@ func TestTokenProviderAutoRefreshRotatesBeforeExpiry(t *testing.T) {
 
 	// Wait on the client-side rotation itself: the server-side request counter
 	// increments before the client processes the 200 response and swaps the
-	// live token in SetTokens, so polling the counter leaves the same race
-	// window that flaked FLK-001 (fixed in #2017).
+	// live token in SetTokens, so polling the counter leaves a race window
+	// between the server-side increment and the client-side swap.
 	testkit.Eventually(t, 10*time.Second, func() bool {
 		return p.AccessToken() != original
 	}, "rotated token live before expiry", func() string {
@@ -150,8 +150,8 @@ func TestTokenProviderRefreshFailureRetries(t *testing.T) {
 
 	// Wait on the client-side signal that is actually asserted: LastError is
 	// written only after the client processes the 500 response, while the
-	// server-side request counter increments earlier and left a race window
-	// that flaked on slow Windows CI scheduling (FLK-001).
+	// server-side request counter increments earlier and leaves a race window
+	// on slow CI scheduling.
 	testkit.Eventually(t, 5*time.Second, func() bool {
 		return p.LastError() != ""
 	}, "rotation failure recorded in LastError", func() string {

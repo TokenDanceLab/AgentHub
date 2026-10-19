@@ -15,7 +15,7 @@ export interface WorkspaceHeaderProps {
   /** Called when the user clicks the search icon. */
   onOpenSearch?: (() => void) | undefined;
   /**
-   * Split-view controls (#1997, UX F3). Absent when the honesty gate hides
+   * Split-view controls (#1997). Absent when the honesty gate hides
    * the surface (fewer than two conversations) — no split entry renders.
    */
   splitControls?: WorkbenchSplitControls | undefined;

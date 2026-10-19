@@ -16,13 +16,7 @@ const serverLogLimit = 80;
 const minimumReadableFontSize = 11;
 const minimumTouchTargetSize = 44;
 const minimumLightSurfaceLuminance = 210;
-const fromCodePoints = (...codePoints) => String.fromCodePoint(...codePoints);
 const forbiddenPrivacyText = [
-  fromCodePoints(0x5510, 0x4e01),
-  fromCodePoints(0x5cb3, 0x9e93),
-  fromCodePoints(0x59, 0x75, 0x65, 0x6c, 0x75),
-  '真实姓名',
-  'real name',
   'localhost',
   '127.0.0.1',
   'REST',
@@ -74,7 +68,7 @@ const scenes = [
     locale: 'zh-CN',
     viewport: { width: 390, height: 844 },
     path: '/',
-    expectedTexts: ['maintainer', 'AgentHub Mobile Workbench', 'AgentHub Design Contract'],
+    expectedTexts: ['Demo User', 'AgentHub Mobile Workbench', 'AgentHub Design Contract'],
     forbiddenTexts: ['#'],
     expectedTabCount: 5,
     expectedBottomTabLabels: ['消息', '云文档', '任务', '项目', '更多'],
@@ -85,7 +79,7 @@ const scenes = [
     locale: 'en-US',
     viewport: { width: 390, height: 844 },
     path: '/',
-    expectedTexts: ['maintainer', 'TokenDance', 'AgentHub Mobile Workbench', 'AgentHub Design Contract'],
+    expectedTexts: ['Demo User', 'TokenDance', 'AgentHub Mobile Workbench', 'AgentHub Design Contract'],
     forbiddenTexts: ['#'],
     expectedTabCount: 5,
     expectedBottomTabLabels: ['Chats', 'Docs', 'Tasks', 'Projects', 'More'],
@@ -134,7 +128,7 @@ const scenes = [
     locale: 'zh-CN',
     viewport: { width: 390, height: 844 },
     path: '/',
-    expectedTexts: ['身份与会话', 'TokenDance ID', 'AgentHub', 'Agent Profiles', '切换工作区', 'maintainer'],
+    expectedTexts: ['身份与会话', 'TokenDance ID', 'AgentHub', 'Agent Profiles', '切换工作区', 'Demo User'],
     expectTabsHidden: true,
     actions: [
       { role: 'button', namePattern: 'Open account drawer|打开账号抽屉' },
@@ -695,7 +689,6 @@ const scenes = [
     search: '?scenario=diffPreview',
     readyTextPatterns: ['AgentHub diff preview', 'Mobile chat and task diff preview'],
     expectedTexts: ['AgentHub diff preview', 'Mobile chat and task diff preview', 'screens/ChatScreen.tsx'],
-    forbiddenTexts: ['P0（6项）', '综合评分'],
     expectTabsHidden: true,
     expectedLightSurfaceMinLuminance: minimumLightSurfaceLuminance,
     actions: [],

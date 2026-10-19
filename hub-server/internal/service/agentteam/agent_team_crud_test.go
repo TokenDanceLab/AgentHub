@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/DATA-DOG/go-sqlmock"
+	"github.com/agenthub/hub-server/internal/cache"
 	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/model"
 	"github.com/agenthub/hub-server/internal/repository"
@@ -16,7 +17,7 @@ import (
 
 func TestAgentTeamService_CreateTeam(t *testing.T) {
 	db, mock := newMockAgentTeamDB(t)
-	svc := NewAgentTeamService(db, nil, nil)
+	svc := NewAgentTeamService(db, nil, cache.NoOpCache{})
 
 	mock.ExpectExec(`INSERT INTO "agent_teams"`).
 		WillReturnResult(sqlmock.NewResult(1, 1))
@@ -30,7 +31,7 @@ func TestAgentTeamService_CreateTeam(t *testing.T) {
 
 func TestAgentTeamService_CreateTeamEmptyName(t *testing.T) {
 	db, mock := newMockAgentTeamDB(t)
-	svc := NewAgentTeamService(db, nil, nil)
+	svc := NewAgentTeamService(db, nil, cache.NoOpCache{})
 
 	_, err := svc.CreateTeam(context.Background(), "user-1", "", "desc")
 	require.Error(t, err)
@@ -40,7 +41,7 @@ func TestAgentTeamService_CreateTeamEmptyName(t *testing.T) {
 
 func TestAgentTeamService_GetTeam(t *testing.T) {
 	db, mock := newMockAgentTeamDB(t)
-	svc := NewAgentTeamService(db, nil, nil)
+	svc := NewAgentTeamService(db, nil, cache.NoOpCache{})
 
 	rows := sqlmock.NewRows([]string{"id", "owner_id", "name", "description", "avatar_url", "created_at", "updated_at"}).
 		AddRow("team-1", "user-1", "My Team", "desc", "", time.Now(), time.Now())
@@ -55,7 +56,7 @@ func TestAgentTeamService_GetTeam(t *testing.T) {
 
 func TestAgentTeamService_GetTeamWrongOwner(t *testing.T) {
 	db := setupAgentTeamStateSQLite(t)
-	svc := NewAgentTeamService(db, nil, nil)
+	svc := NewAgentTeamService(db, nil, cache.NoOpCache{})
 
 	team := &model.AgentTeam{OwnerID: "user-2", Name: "My Team", Description: "desc"}
 	require.NoError(t, repository.CreateTeam(db, team))
@@ -67,7 +68,7 @@ func TestAgentTeamService_GetTeamWrongOwner(t *testing.T) {
 
 func TestAgentTeamService_GetTeamAllowsAgentProfileOwnerMemberRead(t *testing.T) {
 	db := setupAgentTeamStateSQLite(t)
-	svc := NewAgentTeamService(db, nil, nil)
+	svc := NewAgentTeamService(db, nil, cache.NoOpCache{})
 
 	team := &model.AgentTeam{OwnerID: "owner-user", Name: "Shared Team"}
 	require.NoError(t, repository.CreateTeam(db, team))
@@ -99,7 +100,7 @@ func TestAgentTeamService_GetTeamAllowsAgentProfileOwnerMemberRead(t *testing.T)
 
 func TestAgentTeamService_GetTeamNotFound(t *testing.T) {
 	db, mock := newMockAgentTeamDB(t)
-	svc := NewAgentTeamService(db, nil, nil)
+	svc := NewAgentTeamService(db, nil, cache.NoOpCache{})
 
 	mock.ExpectQuery(`SELECT * FROM "agent_teams"`).
 		WillReturnError(gorm.ErrRecordNotFound)
@@ -112,7 +113,7 @@ func TestAgentTeamService_GetTeamNotFound(t *testing.T) {
 
 func TestAgentTeamService_ListTeams(t *testing.T) {
 	db := setupAgentTeamStateSQLite(t)
-	svc := NewAgentTeamService(db, nil, nil)
+	svc := NewAgentTeamService(db, nil, cache.NoOpCache{})
 
 	require.NoError(t, repository.CreateTeam(db, &model.AgentTeam{OwnerID: "user-1", Name: "Team 1"}))
 	require.NoError(t, repository.CreateTeam(db, &model.AgentTeam{OwnerID: "user-1", Name: "Team 2"}))
@@ -124,7 +125,7 @@ func TestAgentTeamService_ListTeams(t *testing.T) {
 
 func TestAgentTeamService_ListTeamsIncludesReadableMemberTeamsWithoutLeaking(t *testing.T) {
 	db := setupAgentTeamStateSQLite(t)
-	svc := NewAgentTeamService(db, nil, nil)
+	svc := NewAgentTeamService(db, nil, cache.NoOpCache{})
 
 	ownedTeam := &model.AgentTeam{OwnerID: "member-user", Name: "Owned Team"}
 	require.NoError(t, repository.CreateTeam(db, ownedTeam))
@@ -170,7 +171,7 @@ func TestAgentTeamService_ListTeamsIncludesReadableMemberTeamsWithoutLeaking(t *
 
 func TestAgentTeamService_UpdateTeam(t *testing.T) {
 	db, mock := newMockAgentTeamDB(t)
-	svc := NewAgentTeamService(db, nil, nil)
+	svc := NewAgentTeamService(db, nil, cache.NoOpCache{})
 
 	// Get team first
 	rows := sqlmock.NewRows([]string{"id", "owner_id", "name", "description", "avatar_url", "created_at", "updated_at"}).
@@ -189,7 +190,7 @@ func TestAgentTeamService_UpdateTeam(t *testing.T) {
 
 func TestAgentTeamService_UpdateTeamWrongOwner(t *testing.T) {
 	db, mock := newMockAgentTeamDB(t)
-	svc := NewAgentTeamService(db, nil, nil)
+	svc := NewAgentTeamService(db, nil, cache.NoOpCache{})
 
 	rows := sqlmock.NewRows([]string{"id", "owner_id", "name", "description", "avatar_url", "created_at", "updated_at"}).
 		AddRow("team-1", "user-2", "Old Name", "", "", time.Now(), time.Now())
@@ -204,7 +205,7 @@ func TestAgentTeamService_UpdateTeamWrongOwner(t *testing.T) {
 
 func TestAgentTeamService_DeleteTeam(t *testing.T) {
 	db, mock := newMockAgentTeamDB(t)
-	svc := NewAgentTeamService(db, nil, nil)
+	svc := NewAgentTeamService(db, nil, cache.NoOpCache{})
 
 	// Get team first
 	rows := sqlmock.NewRows([]string{"id", "owner_id", "name", "description", "avatar_url", "created_at", "updated_at"}).
@@ -216,7 +217,7 @@ func TestAgentTeamService_DeleteTeam(t *testing.T) {
 	mock.ExpectQuery(`SELECT * FROM "agent_team_runs" WHERE team_id`).
 		WillReturnRows(sqlmock.NewRows([]string{"id", "team_id", "session_id", "trigger_user_id", "trigger_message", "mode", "status", "created_at", "updated_at"}))
 
-	// Transaction: batch-delete members in one statement (#2102 F10) + delete team.
+	// Transaction: batch-delete members in one statement (#2102) + delete team.
 	mock.ExpectBegin()
 	mock.ExpectExec(`DELETE FROM "agent_team_members" WHERE team_id`).
 		WillReturnResult(sqlmock.NewResult(0, 0))
@@ -231,7 +232,7 @@ func TestAgentTeamService_DeleteTeam(t *testing.T) {
 
 func TestAgentTeamService_DeleteTeamWithRuns(t *testing.T) {
 	db, mock := newMockAgentTeamDB(t)
-	svc := NewAgentTeamService(db, nil, nil)
+	svc := NewAgentTeamService(db, nil, cache.NoOpCache{})
 
 	// Get team first
 	rows := sqlmock.NewRows([]string{"id", "owner_id", "name", "description", "avatar_url", "created_at", "updated_at"}).
@@ -252,7 +253,7 @@ func TestAgentTeamService_DeleteTeamWithRuns(t *testing.T) {
 
 func TestAgentTeamService_GetTeamWithMembers(t *testing.T) {
 	db, mock := newMockAgentTeamDB(t)
-	svc := NewAgentTeamService(db, nil, nil)
+	svc := NewAgentTeamService(db, nil, cache.NoOpCache{})
 
 	// Get team
 	teamRows := sqlmock.NewRows([]string{"id", "owner_id", "name", "description", "avatar_url", "created_at", "updated_at"}).

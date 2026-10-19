@@ -23,8 +23,7 @@ import (
 	"github.com/agenthub/edge-server/internal/store"
 )
 
-// ── 测试桩：自根包测试文件随 opencode 家族下沉的副本（#1760 codex/opencode
-// 增量）──
+// ── 测试桩：自根包测试文件
 // fakeACPAgent / sessionUpdateLine / recordingEmitter / emitterAll /
 // containsString 与根包 acp_client_test.go、event_emitter_test.go、
 // adapter_test.go 中的同名声明的行为保持一致，改动需两侧同步。
@@ -171,8 +170,7 @@ func TestOpenCodeACPAdapterMetadata(t *testing.T) {
 }
 
 // TestOpenCodeACPAdapterMetadataIsNotEmpty 校验 opencode 家族内置适配器均有非空
-// metadata（根包那条 TestAdapterMetadataIsNotEmpty 的 opencode 行随家族迁入，
-// #1760 codex/opencode 增量；根包用例本身也已随归组拆散，不是活代码）。
+// metadata。
 // 名字对齐 OpenCodeACPAdapter：批处理时代的 OpenCodeAdapter 已随 ACP 收敛删除，
 // 继续叫那个名字等于点名一个仓库里不存在的类型（#2246）。
 func TestOpenCodeACPAdapterMetadataIsNotEmpty(t *testing.T) {
@@ -195,12 +193,10 @@ func TestOpenCodeACPAdapterMetadataIsNotEmpty(t *testing.T) {
 	}
 }
 
-// TestOpenCodeACPAdapterCapabilitiesUpgrade asserts the ACP switch payoff: the
-// adapter carries the ACP permission chain (PermissionHooks: true) where the
-// legacy `opencode run --format json` batch hop it replaced had none — that
-// hop's permission.asked events were advisory-only (nonInteractive: true, no
-// broker round-trip). The batch adapter is gone from the tree (deleted by the
-// ACP convergence), so this is a historical contrast, not a live one (#2246).
+// TestOpenCodeACPAdapterCapabilitiesUpgrade asserts the ACP capability surface:
+// Streaming plus ToolCalls, FileChanges, PermissionHooks, ThinkingVisible and
+// MultiTurn. PermissionHooks is the permission chain the adapter must keep
+// enabled (#2246).
 func TestOpenCodeACPAdapterCapabilitiesUpgrade(t *testing.T) {
 	acp := NewOpenCodeACPAdapter("")
 	if !acp.Capabilities().Streaming {

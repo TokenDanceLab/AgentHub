@@ -1,17 +1,10 @@
 // Package runnerctx provides shared types for passing run-level context
 // between the API handler, lifecycle executor, and agent adapters.
 //
-// This file holds ContextBudget, token estimation and the preflight budget
-// checks, plus compaction as a budget predicate only (ShouldCompact /
-// CompactionThreshold). The residual pure-helper peel #1141 did move two groups
-// out of it, both zero-behavior-change moves: the message type, sanitization
-// and context-preface functions into one sibling file, and the history
-// compaction/summary heuristics into another. Only the first survives — the
-// compaction module was never wired to anything and was later deleted as dead
-// code — so this package has one companion file today instead of the two that
-// peel created. No sibling is named here on purpose: the earlier revision of
-// this comment named both, and one of those two names outlived its file. The
-// package directory is the only file list that stays true (#2246).
+// This file holds ContextBudget, token estimation, preflight budget checks, and
+// the ShouldCompact/CompactionThreshold predicate. Message types and
+// sanitization live in context_budget_message.go.
+
 package runnerctx
 
 import (

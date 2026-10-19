@@ -213,6 +213,7 @@ describe('e2e data-mode contract', () => {
     expect(classifyE2ERequest('http://localhost:8080/client/auth/me')).toBe('hub');
     expect(classifyE2ERequest('http://127.0.0.1:3210/v1/runs')).toBe('local-edge');
     expect(classifyE2ERequest('https://id.example.invalid/oauth/authorize')).toBe('tokendance-id');
+    expect(classifyE2ERequest('https://api.hub.example.invalid/health')).toBe('hub');
     expect(classifyE2ERequest('https://api.example.invalid/v1/chat/completions')).toBe('gateway');
     expect(classifyE2ERequest('http://127.0.0.1:5174/')).toBe('app');
   });

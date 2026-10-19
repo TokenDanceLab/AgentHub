@@ -1,9 +1,5 @@
 package runnerctx
 
-// Residual pure-helper peel #1141: message type, sanitization, and context
-// preface helpers extracted from context_budget.go. Same package runnerctx;
-// zero behavior change.
-
 import (
 	"log/slog"
 	"strings"

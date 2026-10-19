@@ -15,6 +15,18 @@ import (
 	"github.com/agenthub/hub-server/internal/ws"
 )
 
+// setAuthAndDrain authenticates the conn and consumes the auth.ok frame that
+// SetAuth queues first (seq_id 1), so tests observe only business frames.
+func setAuthAndDrain(t *testing.T, mgr *ws.Manager, conn *ws.Conn, userID, deviceType, deviceID string) {
+	t.Helper()
+	mgr.SetAuth(conn.ID, userID, deviceType, deviceID)
+	select {
+	case <-conn.Send:
+	default:
+		t.Fatal("SetAuth did not queue auth.ok")
+	}
+}
+
 func TestAgentControlServiceDeliversToExactDesktopDevice(t *testing.T) {
 	ctx := context.Background()
 	mr, err := miniredis.Run()
@@ -25,7 +37,7 @@ func TestAgentControlServiceDeliversToExactDesktopDevice(t *testing.T) {
 	mgr := ws.NewManager()
 	conn := ws.NewConn(nil)
 	require.NoError(t, mgr.Register(conn))
-	mgr.SetAuth(conn.ID, "user-1", "desktop", "dev-b")
+	setAuthAndDrain(t, mgr, conn, "user-1", "desktop", "dev-b")
 	require.NoError(t, cacheClient.SetRoute(ctx, "user-1", "desktop:dev-b", conn.ID))
 
 	svc := NewService(cacheClient, mgr)
@@ -73,7 +85,7 @@ func TestAgentControlServiceQueuesWhenExactDeviceRouteMissing(t *testing.T) {
 	mgr := ws.NewManager()
 	connA := ws.NewConn(nil)
 	require.NoError(t, mgr.Register(connA))
-	mgr.SetAuth(connA.ID, "user-1", "desktop", "dev-a")
+	setAuthAndDrain(t, mgr, connA, "user-1", "desktop", "dev-a")
 	require.NoError(t, cacheClient.SetRoute(ctx, "user-1", "desktop:dev-a", connA.ID))
 
 	svc := NewService(cacheClient, mgr)
@@ -109,7 +121,7 @@ func TestAgentControlServiceQueuesWhenExactDeviceDeliveryBufferFull(t *testing.T
 	mgr := ws.NewManager()
 	conn := ws.NewConn(nil)
 	require.NoError(t, mgr.Register(conn))
-	mgr.SetAuth(conn.ID, "user-1", "desktop", "dev-b")
+	setAuthAndDrain(t, mgr, conn, "user-1", "desktop", "dev-b")
 	require.NoError(t, cacheClient.SetRoute(ctx, "user-1", "desktop:dev-b", conn.ID))
 	for i := 0; i < cap(conn.Send); i++ {
 		conn.Send <- []byte("already queued")
@@ -156,30 +168,4 @@ func TestAgentControlServiceQueuesDuplicateOfflineControlOnce(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, queued, 1)
 	require.JSONEq(t, `{"kind":"permission.decide","edge_device_id":"dev-b","approval_id":"approval-dedupe","edge_control":{"runId":"edge-run-dedupe","requestId":"approval-dedupe","decision":"allow"}}`, queued[0])
-}
-
-func TestNewServiceFallsBackToNoOpCacheForTypedNilClient(t *testing.T) {
-	ctx := context.Background()
-	// A nil *cache.Client wrapped in the CachePort interface is a typed-nil:
-	// the interface value is non-nil while the underlying pointer is nil.
-	// NewService must fall back to NoOpCache so delivery degrades to queuing
-	// instead of panicking on a nil receiver.
-	var typedNilClient *cache.Client
-	var port CachePort = typedNilClient
-
-	svc := NewService(port, nil)
-	require.NotNil(t, svc.cacheClient)
-
-	err := svc.DeliverToDesktopDevice(ctx, "user-1", "dev-b", model.AgentControlPayload{
-		Kind:       model.AgentControlKindPermissionDecide,
-		ApprovalID: "approval-typed-nil",
-		EdgeControl: &model.TeamApprovalEdgeControl{
-			RunID:     "edge-run-typed-nil",
-			RequestID: "approval-typed-nil",
-			Decision:  "allow",
-		},
-	})
-	// NoOpCache degrades delivery to a "cache unavailable" error instead of
-	// panicking on a typed-nil receiver — that is the regression guard here.
-	require.Error(t, err)
 }

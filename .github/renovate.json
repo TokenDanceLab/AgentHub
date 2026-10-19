@@ -2,7 +2,7 @@
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": ["config:recommended", ":dependencyDashboard"],
   "timezone": "Asia/Shanghai",
-  "description": "TokenDance AgentHub Renovate config. CI5 lane pilot: npm patch + gomod managers first. Patch auto-merges only after the checks workflow is green; minor is a weekly review PR; major is a standalone review PR. Expo major and Storybook major are excluded (migration owned by separate lanes).",
+  "description": "TokenDance AgentHub Renovate config: npm patch + gomod managers first. Patch auto-merges only after the checks workflow is green; minor is a weekly review PR; major is a standalone review PR. Expo and Storybook majors are excluded.",
   "enabledManagers": [
     "npm",
     "gomod",
@@ -41,13 +41,13 @@
       "automerge": false
     },
     {
-      "description": "Exclude Expo major bumps — mobile ecosystem major migration is owned by the mobile lane, not Renovate.",
+      "description": "Exclude Expo major bumps — mobile ecosystem majors are managed manually.",
       "matchPackagePatterns": ["^expo", "^expo-"],
       "matchUpdateTypes": ["major"],
       "enabled": false
     },
     {
-      "description": "Exclude Storybook major bumps — 8.x to 10.x migration is deferred and owned separately.",
+      "description": "Exclude Storybook major bumps — 8.x to 10.x migration is deferred.",
       "matchPackageNames": ["storybook", "@storybook/*"],
       "matchUpdateTypes": ["major"],
       "enabled": false

@@ -1,7 +1,7 @@
 package store
 
 // seed_data.go contains all demo data constants for the AgentHub Desktop demo experience.
-// Data matches the frontend's workbenchDemo.ts, workbenchDemoData.ts, and teamrunDemo.ts
+// Data matches the frontend's workbenchDemo.ts and teamrunDemo.ts
 // so the app reads equivalent content through the real Edge API instead of hardcoded JS objects.
 
 const (
@@ -69,14 +69,14 @@ type seedPinDef struct {
 // ─── All 10 demo threads ────────────────────────────────────────────────
 
 var seedThreads = []seedThreadDef{
-	// 1. Builder — B0 SQLite 迁移 (richest thread, matching builderTranscript)
+	// 1. Builder — SQLite 迁移 (richest thread, matching builderTranscript)
 	{
 		ID:          "builder",
 		Title:       "Builder",
 		Kind:        "direct",
 		AvatarColor: "#5e8dcc",
 		Items: []seedItemDef{
-			{ID: "builder-user-1", Type: "user_message", Role: "user", SenderID: "user-maintainer", SenderName: "maintainer", Content: "帮我给 AgentHub Desktop 做 B0 SQLite 迁移方案。要先看现有消息模型和索引路径，输出迁移 SQL、回滚点和需要验证的 UI 历史消息块。"},
+			{ID: "builder-user-1", Type: "user_message", Role: "user", SenderID: "user-demo", SenderName: "Demo User", Content: "帮我给 AgentHub Desktop 做 SQLite 迁移方案。要先看现有消息模型和索引路径，输出迁移 SQL、回滚点和需要验证的 UI 历史消息块。"},
 			{ID: "builder-msg-1", Type: "agent_message", Role: "assistant", SenderName: "Builder", Content: "收到，我会先做运行隔离和代码定位。这次任务会按真实执行流推进：建立 worktree、加载调试和验证 skill、读取消息块类型、搜索 SQLite/FTS 入口，再生成迁移草案。", RunID: "run-builder-1"},
 			{ID: "builder-msg-2", Type: "agent_message", Role: "assistant", SenderName: "Builder", Content: "找到迁移边界。消息正文、工具调用、文件变更、审批、上下文使用和子 Agent 事件需要保留 block kind。搜索只走 text/code/status/citation 的摘要字段，其他结构保持 JSON。", RunID: "run-builder-1"},
 			{ID: "builder-msg-3", Type: "approval", Role: "assistant", SenderName: "Builder", Content: "部署/写入审批：生成迁移 SQL 和导航 hook 更新，需要写入工作区文件。", RunID: "run-builder-1"},
@@ -128,13 +128,13 @@ var seedThreads = []seedThreadDef{
  }`,
 				},
 				{
-					Path:   "B0-SQLITE-RISKS.md",
+					Path:   "SQLITE-RISKS.md",
 					Status: "added",
-					Diff: `diff --git a/B0-SQLITE-RISKS.md b/B0-SQLITE-RISKS.md
+					Diff: `diff --git a/SQLITE-RISKS.md b/SQLITE-RISKS.md
 --- /dev/null
-+++ b/B0-SQLITE-RISKS.md
++++ b/SQLITE-RISKS.md
 @@ -0,0 +1,6 @@
-+# B0 SQLite 风险
++# SQLite 风险
 +
 +- 回滚脚本必须覆盖索引表与迁移状态。
 +- FTS5 字段只保存可搜索摘要。
@@ -145,7 +145,7 @@ var seedThreads = []seedThreadDef{
 				{ID: "artifact-builder-1", Kind: "markdown", Path: "sqlite-migration-plan.md", SizeBytes: 512},
 				{ID: "artifact-builder-2", Kind: "file", Path: "migrations/0007_chat_threads.sql", SizeBytes: 256},
 				{ID: "artifact-builder-3", Kind: "file", Path: "hooks/useThreadNavigation.ts", SizeBytes: 192},
-				{ID: "artifact-builder-4", Kind: "markdown", Path: "B0-SQLITE-RISKS.md", SizeBytes: 148},
+				{ID: "artifact-builder-4", Kind: "markdown", Path: "SQLITE-RISKS.md", SizeBytes: 148},
 			},
 			Previews: []seedPreviewDef{
 				{ID: "preview-builder-1", URL: "http://127.0.0.1:5176/desktop/", Status: "ready"},
@@ -160,9 +160,9 @@ var seedThreads = []seedThreadDef{
 		Kind:        "group",
 		AvatarColor: "linear-gradient(135deg, var(--role-orchestrator), var(--role-builder))",
 		Items: []seedItemDef{
-			{ID: "collab-user-1", Type: "user_message", Role: "user", SenderID: "user-maintainer", SenderName: "maintainer", Content: "Builder，先把项目群消息闭环的 shared fixture contract 梳理出来。"},
+			{ID: "collab-user-1", Type: "user_message", Role: "user", SenderID: "user-demo", SenderName: "Demo User", Content: "Builder，先把项目群消息闭环的 shared fixture contract 梳理出来。"},
 			{ID: "collab-msg-1", Type: "agent_message", Role: "assistant", SenderName: "Builder", Content: "Reviewer，我会把 Hub message metadata 映射到 transcript，你复核 queued/assigned 可见性。", RunID: "run-collab-1"},
-			{ID: "collab-user-2", Type: "user_message", Role: "user", SenderID: "user-maintainer", SenderName: "maintainer", Content: "@Reviewer 检查 Agent-to-Agent / 项目群 / @Agent 消息线，不启动真实长连接。"},
+			{ID: "collab-user-2", Type: "user_message", Role: "user", SenderID: "user-demo", SenderName: "Demo User", Content: "@Reviewer 检查 Agent-to-Agent / 项目群 / @Agent 消息线，不启动真实长连接。"},
 			{ID: "collab-msg-2", Type: "agent_message", Role: "system", SenderName: "Orchestrator", Content: "task-a2a-review 已进入项目群 @Agent 队列，等待 Reviewer 接手。"},
 			{ID: "collab-msg-3", Type: "agent_message", Role: "assistant", SenderName: "Builder", Content: "路由给 Reviewer 做 focused coverage，Builder 继续补 fixture contract。", RunID: "run-collab-1"},
 			{ID: "collab-msg-4", Type: "agent_message", Role: "assistant", SenderName: "Reviewer", Content: "Reviewer 已完成 task-a2a-review，消息同步链进入 done。", RunID: "run-collab-1"},
@@ -171,7 +171,7 @@ var seedThreads = []seedThreadDef{
 			ID:     "run-collab-1",
 			Status: "finished",
 			Artifacts: []seedArtifactDef{
-				{ID: "artifact-collab-1", Kind: "markdown", Path: "docs/contracts/project-group-fixture.md", SizeBytes: 1024},
+				{ID: "artifact-collab-1", Kind: "markdown", Path: "docs/guides/project-groups.md", SizeBytes: 1024},
 				{ID: "artifact-collab-2", Kind: "file", Path: "tests/project-group-fixture.test.ts", SizeBytes: 768},
 			},
 		},
@@ -185,7 +185,7 @@ var seedThreads = []seedThreadDef{
 		AvatarColor: "linear-gradient(135deg, var(--role-orchestrator), var(--role-reviewer))",
 		AvatarLabel: "T",
 		Items: []seedItemDef{
-			{ID: "teamrun-user-1", Type: "user_message", Role: "user", SenderID: "user-maintainer", SenderName: "maintainer", Content: "打开 TeamRun fixture，只做 UI evidence capture，不登录、不跑真实 CLI/model。"},
+			{ID: "teamrun-user-1", Type: "user_message", Role: "user", SenderID: "user-demo", SenderName: "Demo User", Content: "打开 TeamRun fixture，只做 UI evidence capture，不登录、不跑真实 CLI/model。"},
 			{ID: "teamrun-msg-1", Type: "agent_message", Role: "assistant", SenderName: "Orchestrator", Content: "TeamRun Console fixture state 已载入。teamrun-fixture-001 已完成，包含 supervisor 到 worker 的可回放路由、任务和事件列表。", RunID: "run-teamrun-1"},
 			{ID: "teamrun-msg-2", Type: "agent_message", Role: "assistant", SenderName: "Orchestrator", Content: "TeamRun route: agent.dispatch → run.agent.route_decision → team.route.decided → agent.dispatch → run.agent.result → team.run.completed。所有事件均为 fixture 记录，无真实运行。", RunID: "run-teamrun-1"},
 			{ID: "teamrun-msg-3", Type: "agent_message", Role: "assistant", SenderName: "Orchestrator", Content: "Worker fixture task completed: 返回 fixture 实现结果，无真实 CLI/model 进程启动。UI evidence 覆盖 transcript、right inspector files、route decision、task list 和 event list。", RunID: "run-teamrun-1"},
@@ -226,7 +226,7 @@ var seedThreads = []seedThreadDef{
 		Kind:        "direct",
 		AvatarColor: "#2b8a9e",
 		Items: []seedItemDef{
-			{ID: "deployer-user-1", Type: "user_message", Role: "user", SenderID: "user-maintainer", SenderName: "maintainer", Content: "把 B0 迁移方案的静态预览发布到本地 dev server。"},
+			{ID: "deployer-user-1", Type: "user_message", Role: "user", SenderID: "user-demo", SenderName: "Demo User", Content: "把迁移方案的静态预览发布到本地 dev server。"},
 			{ID: "deployer-msg-1", Type: "agent_message", Role: "assistant", SenderName: "Deployer", Content: "静态预览已启动在 http://127.0.0.1:5176/desktop/，包含迁移 SQL diff、导航 hook 变更和风险说明。你可以在右侧栏浏览器 tab 里检查。", RunID: "run-deployer-1"},
 			{ID: "deployer-msg-2", Type: "agent_message", Role: "assistant", SenderName: "Deployer", Content: "预览健康检查通过。构建产物 12 个文件、总大小 340KB。FTS5 虚表查询在 100ms 内返回。", RunID: "run-deployer-1"},
 		},
@@ -249,7 +249,7 @@ var seedThreads = []seedThreadDef{
 		Kind:        "direct",
 		AvatarColor: "#0071BC",
 		Items: []seedItemDef{
-			{ID: "orch-user-1", Type: "user_message", Role: "user", SenderID: "user-maintainer", SenderName: "maintainer", Content: "把 B0 迁移任务拆成子任务分派给 Builder、Reviewer、Deployer。"},
+			{ID: "orch-user-1", Type: "user_message", Role: "user", SenderID: "user-demo", SenderName: "Demo User", Content: "把迁移任务拆成子任务分派给 Builder、Reviewer、Deployer。"},
 			{ID: "orch-msg-1", Type: "agent_message", Role: "assistant", SenderName: "Orchestrator", Content: "已分派 4 个子任务：\n1. Builder — 梳理消息模型 + 输出迁移 SQL（进行中）\n2. Reviewer — 复核 schema 风险（等待中）\n3. Researcher — 调研 FTS5 性能基线（等待中）\n4. Deployer — 预览发布（阻塞，等 Builder 完成）", RunID: "run-orch-1"},
 			{ID: "orch-msg-2", Type: "agent_message", Role: "assistant", SenderName: "Orchestrator", Content: "Builder 子任务状态：代码定位完成，正在生成迁移草案。预计 5 分钟内完成。Reviewer 已提前开始并行复核。", RunID: "run-orch-1"},
 		},
@@ -257,7 +257,7 @@ var seedThreads = []seedThreadDef{
 			ID:     "run-orch-1",
 			Status: "finished",
 			Artifacts: []seedArtifactDef{
-				{ID: "artifact-orch-1", Kind: "markdown", Path: "docs/tasks/b0-migration-taskboard.md", SizeBytes: 640},
+				{ID: "artifact-orch-1", Kind: "markdown", Path: "docs/tasks/example-taskboard.md", SizeBytes: 640},
 			},
 		},
 	},
@@ -269,7 +269,7 @@ var seedThreads = []seedThreadDef{
 		Kind:        "direct",
 		AvatarColor: "#409467",
 		Items: []seedItemDef{
-			{ID: "reviewer-user-1", Type: "user_message", Role: "user", SenderID: "user-maintainer", SenderName: "maintainer", Content: "审查 B0 SQLite 迁移方案，检查回滚安全和历史消息兼容性。"},
+			{ID: "reviewer-user-1", Type: "user_message", Role: "user", SenderID: "user-demo", SenderName: "Demo User", Content: "审查 SQLite 迁移方案，检查回滚安全和历史消息兼容性。"},
 			{ID: "reviewer-msg-1", Type: "agent_message", Role: "assistant", SenderName: "Reviewer", Content: "审查完成，0 个阻塞项。\n\n通过项：\n- 迁移 SQL 可重复执行（IF NOT EXISTS 保护）\n- FTS5 虚表不写原始消息体，只存摘要\n- 回滚脚本覆盖索引表 + 迁移状态\n\n建议（非阻塞）：\n- 补充 idx_chat_threads_updated 在高频写入下的 perf 基线\n- 导航 hook 增加 debounce 避免快速切换时闪烁", RunID: "run-reviewer-1"},
 		},
 		Run: &seedRunDef{
@@ -277,45 +277,45 @@ var seedThreads = []seedThreadDef{
 			Status: "finished",
 			Diffs: []seedDiffDef{
 				{
-					Path:   "docs/review/b0-sqlite-review.md",
+					Path:   "docs/review/example-storage-review.md",
 					Status: "added",
-					Diff: `diff --git a/docs/review/b0-sqlite-review.md b/docs/review/b0-sqlite-review.md
+					Diff: `diff --git a/docs/review/example-storage-review.md b/docs/review/example-storage-review.md
 --- /dev/null
-+++ b/docs/review/b0-sqlite-review.md
++++ b/docs/review/example-storage-review.md
 @@ -0,0 +1,4 @@
-+# B0 SQLite 迁移审查
++# SQLite 迁移审查
 +
 +- 0 个阻塞项
 +- 2 个建议（非阻塞）`,
 				},
 			},
 			Artifacts: []seedArtifactDef{
-				{ID: "artifact-reviewer-1", Kind: "markdown", Path: "docs/review/b0-sqlite-review.md", SizeBytes: 320},
+				{ID: "artifact-reviewer-1", Kind: "markdown", Path: "docs/review/example-storage-review.md", SizeBytes: 320},
 			},
 		},
 	},
 
-	// 7. contributor-a — 人类协作者
+	// 7. Alice — 人类协作者
 	{
-		ID:          "contributor-a",
-		Title:       "contributor-a",
+		ID:          "alice",
+		Title:       "Alice",
 		Kind:        "direct",
 		AvatarColor: "#2f8f73",
 		Items: []seedItemDef{
-			{ID: "contributor-a-user-1", Type: "user_message", Role: "user", SenderID: "user-maintainer", SenderName: "maintainer", Content: "我看下项目页和私聊入口，确认侧栏对话列表能正确显示。"},
-			{ID: "contributor-a-msg-1", Type: "agent_message", Role: "assistant", SenderName: "contributor-a", Content: "好的，你检查一下项目页的「进入工作区」按钮和侧栏私聊入口是否都正常跳转。有问题随时说。"},
+			{ID: "alice-user-1", Type: "user_message", Role: "user", SenderID: "user-demo", SenderName: "Demo User", Content: "我看下项目页和私聊入口，确认侧栏对话列表能正确显示。"},
+			{ID: "alice-msg-1", Type: "agent_message", Role: "assistant", SenderName: "Alice", Content: "好的，你检查一下项目页的「进入工作区」按钮和侧栏私聊入口是否都正常跳转。有问题随时说。"},
 		},
 	},
 
-	// 8. contributor-b — 人类协作者
+	// 8. Bob — 人类协作者
 	{
-		ID:          "contributor-b",
-		Title:       "contributor-b",
+		ID:          "bob",
+		Title:       "Bob",
 		Kind:        "direct",
 		AvatarColor: "#8f6b2f",
 		Items: []seedItemDef{
-			{ID: "contributor-b-user-1", Type: "user_message", Role: "user", SenderID: "user-maintainer", SenderName: "maintainer", Content: "云文档列表可以再收紧一点，现在展示字段太多了。"},
-			{ID: "contributor-b-msg-1", Type: "agent_message", Role: "assistant", SenderName: "contributor-b", Content: "收到，我来精简文档列表展示字段。只保留标题、状态和更新时间，其他详细信息移到详情页。"},
+			{ID: "bob-user-1", Type: "user_message", Role: "user", SenderID: "user-demo", SenderName: "Demo User", Content: "云文档列表可以再收紧一点，现在展示字段太多了。"},
+			{ID: "bob-msg-1", Type: "agent_message", Role: "assistant", SenderName: "Bob", Content: "收到，我来精简文档列表展示字段。只保留标题、状态和更新时间，其他详细信息移到详情页。"},
 		},
 	},
 
@@ -327,16 +327,16 @@ var seedThreads = []seedThreadDef{
 		AvatarColor: "var(--surface-highest)",
 		AvatarLabel: "P",
 		Items: []seedItemDef{
-			{ID: "ai-user-1", Type: "user_message", Role: "user", SenderID: "user-maintainer", SenderName: "maintainer", Content: "AI 游戏项目的深度研究团队 5 人已经到位，可以开始了。"},
-			{ID: "ai-msg-1", Type: "agent_message", Role: "assistant", SenderName: "Orchestrator", Content: "AI 游戏项目已创建。团队成员：maintainer（负责人）、Builder（开发）、Reviewer（审查）、Researcher（调研）、Deployer（发布）。", RunID: "run-ai-1"},
+			{ID: "ai-user-1", Type: "user_message", Role: "user", SenderID: "user-demo", SenderName: "Demo User", Content: "AI 游戏项目的深度研究团队 5 人已经到位，可以开始了。"},
+			{ID: "ai-msg-1", Type: "agent_message", Role: "assistant", SenderName: "Orchestrator", Content: "AI 游戏项目已创建。团队成员：Demo User（负责人）、Builder（开发）、Reviewer（审查）、Researcher（调研）、Deployer（发布）。", RunID: "run-ai-1"},
 			{ID: "ai-msg-2", Type: "agent_message", Role: "assistant", SenderName: "Researcher", Content: "Researcher 已完成竞品调研报告，覆盖 8 款主流 AI 游戏引擎。建议采用 RL + LLM hybrid 方案。", RunID: "run-ai-1"},
 		},
 		Run: &seedRunDef{
 			ID:     "run-ai-1",
 			Status: "finished",
 			Artifacts: []seedArtifactDef{
-				{ID: "artifact-ai-1", Kind: "markdown", Path: "docs/research/ai-game-competition-report.md", SizeBytes: 4096},
-				{ID: "artifact-ai-2", Kind: "file", Path: "docs/research/ai-game-engine-comparison.csv", SizeBytes: 2048},
+				{ID: "artifact-ai-1", Kind: "markdown", Path: "docs/research/example-report.md", SizeBytes: 4096},
+				{ID: "artifact-ai-2", Kind: "file", Path: "docs/research/example-comparison.csv", SizeBytes: 2048},
 			},
 		},
 	},
@@ -349,7 +349,7 @@ var seedThreads = []seedThreadDef{
 		AvatarColor: "var(--surface-highest)",
 		AvatarLabel: "W",
 		Items: []seedItemDef{
-			{ID: "docs-user-1", Type: "user_message", Role: "user", SenderID: "user-maintainer", SenderName: "maintainer", Content: "文档重构项目启动。目标：统一中英文文档结构，补充缺失的 API 文档。"},
+			{ID: "docs-user-1", Type: "user_message", Role: "user", SenderID: "user-demo", SenderName: "Demo User", Content: "文档重构项目启动。目标：统一中英文文档结构，补充缺失的 API 文档。"},
 			{ID: "docs-msg-1", Type: "agent_message", Role: "assistant", SenderName: "Builder", Content: "文档重构已完成。变更摘要：\n- 新增 12 篇 API 文档\n- 统一中英文标题层级\n- 补充 4 个缺失的 error code 说明\n- 更新 README 中的快速开始指南", RunID: "run-docs-1"},
 			{ID: "docs-msg-2", Type: "agent_message", Role: "assistant", SenderName: "Builder", Content: "所有文档已同步到 docs/ 目录。i18n parity 验证通过，中英文结构一致。", RunID: "run-docs-1"},
 		},
@@ -358,11 +358,11 @@ var seedThreads = []seedThreadDef{
 			Status: "finished",
 			Diffs: []seedDiffDef{
 				{
-					Path:   "docs/api/README.md",
+					Path:   "docs/reference/api-example.md",
 					Status: "modified",
-					Diff: `diff --git a/docs/api/README.md b/docs/api/README.md
---- a/docs/api/README.md
-+++ b/docs/api/README.md
+					Diff: `diff --git a/docs/reference/api-example.md b/docs/reference/api-example.md
+--- a/docs/reference/api-example.md
++++ b/docs/reference/api-example.md
 @@ -1,2 +1,6 @@
  # API Documentation
 -Coming soon.
@@ -373,7 +373,7 @@ var seedThreads = []seedThreadDef{
 				},
 			},
 			Artifacts: []seedArtifactDef{
-				{ID: "artifact-docs-1", Kind: "markdown", Path: "docs/api/README.md", SizeBytes: 256},
+				{ID: "artifact-docs-1", Kind: "markdown", Path: "docs/reference/api-example.md", SizeBytes: 256},
 			},
 		},
 	},
@@ -381,26 +381,26 @@ var seedThreads = []seedThreadDef{
 
 // seedPins defines pinned messages across demo threads.
 var seedPins = []seedPinDef{
-	{ThreadID: "builder", ItemID: "builder-msg-1", PinnedBy: "maintainer"},
+	{ThreadID: "builder", ItemID: "builder-msg-1", PinnedBy: "Demo User"},
 }
 
 // ─── Seed user profiles ─────────────────────────────────────────────────
 
 var seedUserProfiles = []UserProfile{
 	{
-		ID:          "user-maintainer",
-		DisplayName: "maintainer",
-		AvatarURL:   "https://avatars.githubusercontent.com/u/101502465?v=4",
+		ID:          "user-demo",
+		DisplayName: "Demo User",
+		AvatarURL:   "",
 		Status:      "owner",
 	},
 	{
-		ID:          "user-contributor-a",
-		DisplayName: "contributor-a-Cheung",
-		AvatarURL:   "https://avatars.githubusercontent.com/u/221092178?v=4",
+		ID:          "user-alice",
+		DisplayName: "Alice",
+		AvatarURL:   "",
 	},
 	{
-		ID:          "user-contributor-b",
-		DisplayName: "contributor-b",
+		ID:          "user-bob",
+		DisplayName: "Bob",
 		AvatarURL:   "",
 	},
 	{

@@ -13,11 +13,11 @@ import { isImageAttachment } from './unifiedComposerHelpers';
 import type { AttachmentUploadState } from './unifiedComposerHelpers';
 
 /* ═══════════════════════════════════════════════════════════════════════
-   Composer attachment bar + chip — residual extract for Phase 30 #706.
+   Composer attachment bar and chip (#706).
 
    CSS remains on shared AgentHubWorkbench.module.css.
    exactOptionalPropertyTypes-safe spreads for uploadProgress.
-   In-chip previews (fable UIUX gap #10): image object-URL thumbnail
+   In-chip previews: image object-URL thumbnail
    (30×30, revoked on unmount), registry file icon for media, and a
    CodePreviewCard (maxLines=3) for text/code files.
    ═══════════════════════════════════════════════════════════════════════ */

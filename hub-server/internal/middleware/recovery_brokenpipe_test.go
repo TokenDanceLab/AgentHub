@@ -34,7 +34,7 @@ func opErr(inner error) *net.OpError {
 }
 
 // TestIsBrokenPipe_Structural covers the errno-driven recognition that replaced
-// the string matching in isBrokenPipe (#2244 slice 2). Every case in the first
+// the string matching in isBrokenPipe (#2244). Every case in the first
 // group is decided by errors.Is unwrapping down to a syscall.Errno, not by the
 // English rendering of it — which is why the wrapped, bare, and text-free
 // shapes below were all false before the change.

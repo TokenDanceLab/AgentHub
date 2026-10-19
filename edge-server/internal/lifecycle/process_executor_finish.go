@@ -9,26 +9,24 @@ import (
 )
 
 func (e *ProcessExecutor) finish(runID string) {
-	// Pure cleanup plan; map deletes stay here. Do not rework #867 handoff.
+	// Map deletes stay here.
 	e.mu.Lock()
-	_, hasCancelDone := e.cancelDone[runID]
-	_, hasRunOutput := e.runOutputs[runID]
 	_, isDeferred := e.pendingParentFinish[runID]
 	e.mu.Unlock()
-	plan := planFinishCleanup(e.agentRegistry != nil, hasCancelDone, hasRunOutput)
+	hasRegistry := e.agentRegistry != nil
 	// Cascade: when a parent agent finishes, disconnect descendant registry
 	// nodes and Cancel their process runIDs (Codex AgentTree shutdown).
 	// ShutdownCascade accepts parent runID even when no agent is registered
-	// under that ID — children are keyed ParentID=parentRunID (#1001).
-	// Preserve #867 terminalFinish, #987 hubOutputs, #988 Cancel grace path.
+	// under that ID — children are keyed by ParentID=parentRunID.
+	// Preserve terminal finish, hub output, and cancel grace behavior.
 	//
 	// Orchestration deferral: a parent whose terminal finish is parked
-	// (pendingParentFinish) must NOT cascade-cancel its children — they are
+	// pendingParentFinish must NOT cascade-cancel its children — they are
 	// still running and will finalize the parent via FinalizeParentRun.
 	// Only cascade when the parent is finishing for real (normal terminal,
 	// cancel, or fault paths), never when its finish is deferred.
-	if plan.Cascade && !isDeferred {
-		// Pure filter keeps #1001 self/empty skip; Cancel side-effects stay here.
+	if hasRegistry && !isDeferred {
+		// The filter drops empty and self IDs; Cancel side-effects stay here.
 		for _, childRunID := range filterCascadeCancelChildren(runID, e.agentRegistry.ShutdownCascade(runID)) {
 			e.Cancel(childRunID)
 		}
@@ -47,12 +45,12 @@ func (e *ProcessExecutor) finish(runID string) {
 	delete(e.hubOutputs, runID)
 	delete(e.workDirs, runID)
 	delete(e.surfacers, runID)
-	if done, ok := e.cancelDone[runID]; shouldApplyTrackedClose(plan.CloseCancelDone, ok) {
+	if done, ok := e.cancelDone[runID]; ok {
 		close(done)
 		delete(e.cancelDone, runID)
 	}
-	if s, ok := e.runOutputs[runID]; shouldApplyTrackedClose(plan.CloseRunOutput, ok) {
-		if err := s.Close(); planRunOutputCloseLog(err).Log {
+	if s, ok := e.runOutputs[runID]; ok {
+		if err := s.Close(); err != nil {
 			slog.Warn("process: failed to close output store", "runId", runID, "error", err)
 		}
 		delete(e.runOutputs, runID)
@@ -66,9 +64,7 @@ func (e *ProcessExecutor) finish(runID string) {
 	// Closing the queue channel unblocks a consumer stuck on range, letting
 	// it drain and exit cleanly.
 	if stateAny, ok := hubCallbackQueues.LoadAndDelete(runID); ok {
-		if state, ok := stateAny.(*hubCallbackQueueState); ok {
-			state.close()
-		}
+		stateAny.(*hubCallbackQueueState).close()
 	}
 	hubStreamChunkSeq.Delete(runID)
 }
@@ -127,14 +123,14 @@ func (e *ProcessExecutor) FinalizeParentRun(parentRunID string) {
 	// subprocess already exited; only the status transition and callbacks
 	// remain). The parent is not itself a sub-agent, so no sendSubAgentResult.
 	finished, published := e.store.SetRunStatusIf(run.ID, deferred.finalStatus, "started")
-	if planPublishStatus(published).Publish {
+	if published {
 		e.bus.Publish("run.finished", runScope(finished), RunResponse(finished))
 		e.fireHubDone(run.ID, RunResponse(finished))
 	}
 	e.checkPersistError(run.ID)
 	slog.Info("process: parent finalized after all sub-agents completed", "runId", run.ID, "finalStatus", deferred.finalStatus)
 	// finish() now runs the cascade and cleanup. Children are terminal at
-	// this point, so Cancel side-effects no-op on them (cancelPrecheck).
+	// this point, so Cancel side-effects no-op on them.
 	e.finish(run.ID)
 }
 
@@ -150,14 +146,14 @@ func (e *ProcessExecutor) surfaceRunArtifacts(runID string) {
 	// Only surface for successfully finished runs with a writable store.
 	current, runFound := e.store.GetRun(runID)
 	writer, hasWriter := asStoreWriter(e.store)
-	plan := planSurfaceArtifacts(snapshot, runFound, current.Status, hasWriter)
-	if plan.SkipWriterLog {
+	if snapshot == nil || !runFound || current.Status != "finished" {
+		return
+	}
+	if !hasWriter {
 		slog.Debug("surfacing: store does not implement Writer, skipping", "runId", runID)
 		return
 	}
-	if plan.Proceed {
-		adapters.SurfaceAndEmit(e.bus, writer, snapshot, current)
-	}
+	adapters.SurfaceAndEmit(e.bus, writer, snapshot, current)
 }
 
 // sendSubAgentResult delivers a result message from a completed sub-agent run
@@ -168,22 +164,18 @@ func (e *ProcessExecutor) sendSubAgentResult(runID, status string, payload any) 
 	agentID, mappingFound := e.runToAgent[runID]
 	e.mu.Unlock()
 
-	var inst *agents.AgentInstance
-	if planSubAgentInstanceLookup(e.agentRegistry != nil, mappingFound).Lookup {
-		inst, _ = e.agentRegistry.Get(agentID)
-	}
-	parentID := parentIDFromAgentInstance(inst)
-	plan := planSubAgentResultDelivery(
-		e.agentRegistry != nil, e.messageQueue != nil, mappingFound, inst != nil, parentID, status, e.resultAgg != nil,
-	)
-	if !plan.Deliver {
+	if e.agentRegistry == nil || e.messageQueue == nil || !mappingFound {
 		return
 	}
-
-	if plan.UpdateRegistry {
+	inst, _ := e.agentRegistry.Get(agentID)
+	if inst == nil || inst.ParentID == "" {
+		return
+	}
+	parentID := inst.ParentID
+	if regStatus, update := subAgentRegistryTerminalStatus(status); update {
 		// completed_with_issues remains MsgTypeResult; registry must go StatusCompleted
 		// so the parent orchestrator does not wait forever on evidence-gate issues.
-		e.agentRegistry.SetStatus(agentID, plan.RegistryStatus, "")
+		e.agentRegistry.SetStatus(agentID, regStatus, "")
 	}
 
 	// Pure outbound prep: sanitize + queue message + aggregator value.
@@ -199,7 +191,7 @@ func (e *ProcessExecutor) sendSubAgentResult(runID, status string, payload any) 
 	// synthesis when all children of the parent complete (or timeout).
 	// Reference: AionUi Team Mode Mailbox — persisted sub-agent results.
 	// Reference: LibreChat — structured subagent result return.
-	if plan.StoreAgg {
+	if e.resultAgg != nil {
 		e.resultAgg.StoreSubAgentResult(inst.ParentID, aggResult)
 	}
 

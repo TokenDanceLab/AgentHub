@@ -16,8 +16,8 @@ import type { AgentsPageProps, MarketCategory } from './types';
 /* ═══════════════════════════════════════════════════════════════════════
    Market cluster views — Agent 市场 / Skill 市场 / MCP 市场.
 
-   Extracted from AgentsPage as Phase 16 strangler slice #552.
-   Residual thin: presentational subpanels live in AgentMarketParts (#649).
+   Extracted from AgentsPage (#552).
+   Helper module: presentational subpanels live in AgentMarketParts (#649).
    CSS remains on shared AgentsPage.module.css.
    ═══════════════════════════════════════════════════════════════════════ */
 

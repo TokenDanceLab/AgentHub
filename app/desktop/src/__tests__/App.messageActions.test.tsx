@@ -1,4 +1,4 @@
-// #2154 P1-A: Desktop already owns the Hub pin/unpin/recall mutations
+// #2154: Desktop already owns the Hub pin/unpin/recall mutations
 // (useDesktopWorkbenchModel → DesktopChatActions), but App.tsx never forwarded
 // them into the shared workbench deps. The context menu gate only checked
 // `Boolean(sessionId)`, so Desktop rendered pin/unpin/recall entries whose

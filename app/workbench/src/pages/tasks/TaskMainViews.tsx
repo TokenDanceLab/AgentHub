@@ -2,7 +2,7 @@
    Tasks main pane cluster — head, stats, view tabs, toolbar, selection,
    and task table.
 
-   Extracted from TasksPage as Phase 20 residual thin #596.
+   Extracted from TasksPage (#596).
    CSS remains on shared TasksPage.module.css.
    ═══════════════════════════════════════════════════════════════════════ */
 
@@ -156,7 +156,7 @@ export function TaskMain({
     setRovingViewId(target?.dataset.mode ?? null);
   }, []);
 
-  // ── Infinite-scroll sentinel (T14 pattern; wired to the mock data-layer
+  // ── Infinite-scroll sentinel (wired to the mock data-layer
   //    cursor pagination, #1510) ──
   const sentinelRef = useRef<HTMLDivElement>(null);
   const onLoadMoreRef = useRef(onLoadMore);

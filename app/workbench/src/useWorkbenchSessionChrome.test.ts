@@ -622,12 +622,12 @@ describe('useWorkbenchSessionChrome', () => {
     expect(result.current.settingsService?.initialized).toBe(true);
     expect(result.current.settingsService?.readAll().inspectorVisible).toBe(false);
     expect(collapseListener).toHaveBeenCalledTimes(1);
-    // #2154 P2-6: the payload tells the layout which direction was requested.
+    // #2154: the payload tells the layout which direction was requested.
     expect((collapseListener.mock.calls[0]?.[0] as CustomEvent).detail).toEqual({ collapse: true });
     window.removeEventListener(INSPECTOR_DEFAULT_COLLAPSE_EVENT, collapseListener);
   });
 
-  it('asks the layout to expand again when inspectorVisible is true (#2154 P2-6)', async () => {
+  it('asks the layout to expand again when inspectorVisible is true (#2154)', async () => {
     const collapseListener = vi.fn();
     window.addEventListener(INSPECTOR_DEFAULT_COLLAPSE_EVENT, collapseListener);
     const readSettings = vi.fn().mockResolvedValue({ inspectorVisible: 'true' });
@@ -703,11 +703,11 @@ describe('useWorkbenchSessionChrome', () => {
       url: 'https://preview.example/focus',
     });
     expect(showWorkbenchToast).toHaveBeenCalledWith('toast.deployPreviewOpened');
-    // #2154 P2-15: the success copy must not be paired with the warning copy.
+    // #2154: the success copy must not be paired with the warning copy.
     expect(showWorkbenchToast).not.toHaveBeenCalledWith('toast.deployPreviewUnavailable');
   });
 
-  it('warns instead of claiming success when the run has no preview URL (#2154 P2-15)', () => {
+  it('warns instead of claiming success when the run has no preview URL (#2154)', () => {
     const { result, openInspector, showWorkbenchToast } = renderSessionChrome({
       transcript: [{
         id: 'deploy-no-url',
@@ -731,7 +731,7 @@ describe('useWorkbenchSessionChrome', () => {
     expect(openInspector).toHaveBeenCalledTimes(1);
   });
 
-  it('warns for an unknown deploy block id instead of reporting success (#2154 P2-15)', () => {
+  it('warns for an unknown deploy block id instead of reporting success (#2154)', () => {
     const { result, showWorkbenchToast } = renderSessionChrome({ transcript: [] });
 
     act(() => {

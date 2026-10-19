@@ -9,7 +9,7 @@ import (
 
 // UpsertRefreshToken atomically creates or updates a refresh token keyed by
 // (user_id, device_type, device_id). Uses a single INSERT … ON CONFLICT statement
-// to avoid TOCTOU races when the same device logs in concurrently (#2102 F12).
+// to avoid TOCTOU races when the same device logs in concurrently (#2102).
 //
 // After upsert, rt is populated with the actual database row (including the
 // stable ID on update). Callers should not rely on rt.ID before this call.
@@ -48,7 +48,7 @@ func FindRefreshTokenByHash(db *gorm.DB, hash string) (*model.RefreshToken, erro
 // live to revoked and reports whether THIS caller won the claim
 // (RowsAffected > 0). Concurrent presentations of the same hash race on this
 // conditional UPDATE: exactly one winner proceeds with rotation; losers get
-// false and must reject as reuse (#2154 database/security lanes). The claim
+// false and must reject the presentation as token reuse (#2154). The claim
 // precedes RevokeRefreshTokensByUserDevice/UpsertRefreshToken so the
 // rotation window has no check-then-write gap.
 func ClaimRefreshTokenForRotation(db *gorm.DB, tokenHash string) (bool, error) {

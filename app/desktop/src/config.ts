@@ -7,6 +7,8 @@
 //   - localStorage key "agenthub_edge_url" (persisted across restarts)
 // Priority: query param > localStorage > env var > default
 
+import { version as packageVersion } from '../package.json';
+
 const defaultEdgeHost = '127.0.0.1:3210';
 
 function resolveEdgeUrl(): string {
@@ -64,12 +66,14 @@ function envOrDev(key: string, devDefault: string): string {
 
 // Dev defaults point at the local dev stack, matching web/src/config.ts;
 // production deployments must set VITE_HUB_URL / VITE_HUB_WS_URL explicitly.
+// The packaged CSP (tauri.conf.json, index.html, vite.config.ts) pins
+// connect-src to *.example.invalid plus loopback: a build pointed at any
+// other Hub origin must update all three allowlists too.
 export const HUB_URL = envOrDev('VITE_HUB_URL', 'http://127.0.0.1:8080');
 export const HUB_WS_URL = envOrDev('VITE_HUB_WS_URL', 'ws://127.0.0.1:8080/client/ws');
 
 export const HEALTH_POLL_MS = 30_000;
-export const RUNNERS_POLL_MS = 30_000;
-// Injected at build time from desktop/package.json (vite define); the
-// fallback keeps vitest (no define) working and matches the current version.
+// Injected at build time from desktop/package.json by vite.config.ts; the
+// package import keeps vitest, which does not run the Vite define pass, aligned.
 declare const __APP_VERSION__: string | undefined;
-export const APP_VERSION = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '0.6.1';
+export const APP_VERSION = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : packageVersion;

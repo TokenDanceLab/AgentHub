@@ -168,7 +168,7 @@ describe('web Hub auth token auto-login', () => {
                   owner_id: '00000000-0000-0000-0000-00000000b103',
                   name: 'Packaged Desktop Edge',
                   target_type: 'local_edge',
-                  workspace_allowlist: '["<WORKSPACE>"]',
+                  workspace_allowlist: '["/workspace"]',
                   trust_level: 'local',
                   health_state: 'healthy',
                   is_online: true,
@@ -208,7 +208,7 @@ describe('web Hub auth token auto-login', () => {
       target_type: 'local_edge',
       health_state: 'healthy',
       is_online: true,
-      workspace_allowlist: ['<WORKSPACE>'],
+      workspace_allowlist: ['/workspace'],
     });
 
     const requestedUrlText = requestedUrls.join('\n');

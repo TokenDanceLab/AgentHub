@@ -1,9 +1,9 @@
 -- 0061_audit_rechain_trigger_fix.up.sql
--- Fix P0: migration 0058 re-chains audit_events via UPDATE, but migration 0040
+-- Migration 0058 re-chains audit_events via UPDATE, but migration 0040
 -- installs a BEFORE UPDATE trigger (trg_audit_events_no_update) that raises an
 -- exception on any UPDATE. 0040 is applied before 0058 (40 < 58), so 0058's
 -- re-chain DO block cannot run on a real PostgreSQL database — the migration
--- upgrade/downgrade is double-broken (a deploy bomb).
+-- upgrade/downgrade cannot complete.
 --
 -- Per the migration-immutability rule, 0040 and 0058 are NOT modified. This
 -- migration (0061) re-runs the content-hash re-chain with the 0040 triggers

@@ -1,11 +1,9 @@
 /* ═══════════════════════════════════════════════════════════════════════
-   DocsNav — frozen-input gate + no fabricated library/badge (#2154 P1-1,
-   P2-2b).
+   DocsNav — frozen-input gate + no fabricated library/badge.
 
    Three honesty claims are pinned here:
    1. the search box is disabled (with a reason) until a handler is wired;
-   2. the "我的文档库" caption + shortcut list only render with real data, so
-      repository-internal document names are never injected by default;
+   2. the "我的文档库" caption + shortcut list only render with real data;
    3. the 离线 nav row carries no permanent "下载中..." badge.
    ═══════════════════════════════════════════════════════════════════════ */
 
@@ -30,7 +28,7 @@ function baseProps(overrides: Partial<Parameters<typeof DocsNav>[0]> = {}) {
   };
 }
 
-describe('DocsNav search gate (#2154 P1-1)', () => {
+describe('DocsNav search gate (#2154)', () => {
   it('disables the search input and states why when no handler is wired', () => {
     render(<DocsNav {...baseProps()} />);
 
@@ -50,7 +48,7 @@ describe('DocsNav search gate (#2154 P1-1)', () => {
   });
 });
 
-describe('DocsNav shortcut block (#2154 P2-2b)', () => {
+describe('DocsNav shortcut block', () => {
   it('renders neither the caption nor shortcuts when there is no data', () => {
     render(<DocsNav {...baseProps({ shortcuts: [] })} />);
 
@@ -67,7 +65,7 @@ describe('DocsNav shortcut block (#2154 P2-2b)', () => {
   });
 });
 
-describe('DocsNav offline row (#2154 P2-2b)', () => {
+describe('DocsNav offline row', () => {
   it('carries no permanent "下载中..." badge in the default nav items', () => {
     const download = DEFAULT_NAV_ITEMS.find((item) => item.id === 'download');
     expect(download).toBeDefined();

@@ -23,8 +23,7 @@ import (
 	"github.com/agenthub/edge-server/internal/store"
 )
 
-// ── 测试桩：自根包测试文件随 codex 家族下沉的副本（#1760 codex/opencode
-// 增量）──
+// ── 测试桩：自根包测试文件
 // fakeACPAgent / sessionUpdateLine / recordingEmitter / emitterAll /
 // containsString 与根包 acp_client_test.go、event_emitter_test.go、
 // adapter_test.go 中的同名声明的行为保持一致，改动需两侧同步。
@@ -171,8 +170,7 @@ func TestCodexACPadapterMetadata(t *testing.T) {
 }
 
 // TestCodexAdapterMetadataIsNotEmpty 校验 codex 家族内置适配器均有非空
-// metadata（根包 TestAdapterMetadataIsNotEmpty 的 codex 行随家族迁入，
-// #1760 codex/opencode 增量）。
+// metadata。
 func TestCodexAdapterMetadataIsNotEmpty(t *testing.T) {
 	adapters := []struct {
 		name     string

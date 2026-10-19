@@ -506,7 +506,7 @@ func TestDialContextResolveFailure(t *testing.T) {
 }
 
 // TestDialTimeoutDefaultAndConfigurable proves that DialTimeout defaults to 5s
-// when zero and honors an explicit override (#2064 item ⑤).
+// when zero and honors an explicit override (#2064).
 func TestDialTimeoutDefaultAndConfigurable(t *testing.T) {
 	// Default: DialTimeout should be 5s.
 	c, err := New(Config{})

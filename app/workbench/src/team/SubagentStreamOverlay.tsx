@@ -1,7 +1,7 @@
-// SubagentStreamOverlay — #1406 Phase 2 / #1478 Phase C
+// SubagentStreamOverlay — #1406 / #1478
 // Fixed-position corner stack of subagent stream chips/cards.
 // Consumes SubagentStreamStore via useSyncExternalStore.
-// No WS/REST protocol changes — pure consumer of existing frames + Phase A store.
+// No WS/REST protocol changes — pure consumer of existing frames + the shared store.
 
 import React, {
   useCallback,
@@ -242,7 +242,7 @@ function SubagentStreamChip({ entry, defaultExpanded, onOpenSession }: SubagentS
           ) : null}
           <Icon name={expanded ? 'expand_more' : 'expand_less'} size={16} />
         </button>
-        {/* Drill-down: open the full-session dialog (#1406 follow-up) */}
+        {/* Drill-down: open the full-session dialog (#1406) */}
         <Tooltip label={t('subagentStream.openSession')}>
           <button
             type="button"
@@ -255,7 +255,7 @@ function SubagentStreamChip({ entry, defaultExpanded, onOpenSession }: SubagentS
         </Tooltip>
       </div>
 
-      {/* ── Expanded transcript (#1406 Phase 3) ── */}
+      {/* ── Expanded transcript (#1406) ── */}
       {expanded ? (
         <SubagentTranscript
           events={entry.events}

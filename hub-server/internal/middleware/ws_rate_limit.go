@@ -21,8 +21,8 @@ import (
 // per minute with a burst equal to the same value.
 //
 // A process-wide default instance (wsIPRL) is used by the production router via
-// WSIPRateLimit(). Tests must construct an isolated instance with
-// NewWSIPRateLimiter and pass it to WSIPRateLimitWithLimiter so that the shared
+// WSIPRateLimit(). In-package tests construct an isolated instance with
+// newWSIPRateLimiter and pass it to WSIPRateLimitWithLimiter so that the shared
 // token buckets do not leak state across test runs (see -count=N).
 type wsIPLimiter struct {
 	mu       sync.Mutex
@@ -64,15 +64,6 @@ func newWSIPRateLimiter() *wsIPLimiter {
 	}
 	safego.SafeGo("ws_rate_limit.cleanup", l.cleanup)
 	return l
-}
-
-// NewWSIPRateLimiter is the exported constructor for tests and other isolated
-// callers. It returns a fresh limiter with its own cleanup goroutine; the
-// caller MUST call Stop() (e.g. via t.Cleanup) to release it.
-//
-//nolint:revive // intentional: test constructor returns the concrete type so tests can drive it directly.
-func NewWSIPRateLimiter() *wsIPLimiter {
-	return newWSIPRateLimiter()
 }
 
 // getLimiter returns (or creates) the rate.Limiter for the given IP.
@@ -222,6 +213,13 @@ func (l *WSUserConnLimiter) Acquire(userID, connID string) {
 	}
 
 	l.conns[userID] = conns
+}
+
+// Count returns the number of registered connections for a user.
+func (l *WSUserConnLimiter) Count(userID string) int {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return len(l.conns[userID])
 }
 
 // Release removes a connection from the user's active set. Idempotent.

@@ -5,7 +5,7 @@
  * desktop/web shells share one palette. CSS values live in
  * `styles/presets-folder-colors.css` under `[data-folder-accent=...]`.
  *
- * Design intent (agenthub-uiux-gap-analysis #M): each workspace folder may
+ * Design intent: each workspace folder may
  * carry an accent key; the active folder's accent drives `--td-accent` (and
  * soft/foreground/ring variants) for chrome/border/badge tinting. Unset folders
  * fall back to `--primary` (no visual regression).

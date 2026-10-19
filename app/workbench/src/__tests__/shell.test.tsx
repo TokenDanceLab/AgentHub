@@ -16,7 +16,7 @@ import {
 import {
   workbenchAgents as agents,
   workbenchTranscript as transcript,
-} from '../workbenchTestFixtures';
+} from './fixtures/workbenchTestFixtures';
 
 installWorkbenchTestHooks();
 
@@ -42,11 +42,10 @@ describe('AgentHubWorkbench', () => {
     expect(screen.getByRole('complementary', { name: '会话侧边栏' })).toBeInTheDocument();
     expect(screen.getByRole('main', { name: '工作区' })).toHaveAttribute('data-surface', 'desktop');
     expect(screen.getByRole('complementary', { name: '右侧窗口' })).toBeInTheDocument();
-    /* #1821: the workspace header tab row (消息/云文档/新建频道) was dead chrome —
-       no shell callback could switch views — and was removed. */
+    /* The workspace header has no tab row; views switch through the rail. */
     expect(screen.queryByRole('tablist', { name: '工作区标签页' })).not.toBeInTheDocument();
     expect(screen.queryByRole('tab', { name: '云文档' })).not.toBeInTheDocument();
-    /* P76: default primary card is overview only. */
+    /* Default primary card is overview only. */
     const inspectorTablist = screen.getByRole('tablist', { name: '右侧工作区' });
     expect(within(inspectorTablist).getByRole('tab', { name: /概览/ })).toHaveAttribute('aria-selected', 'true');
     expect(within(inspectorTablist).queryByRole('tab', { name: /浏览器/ })).not.toBeInTheDocument();
@@ -67,7 +66,7 @@ describe('AgentHubWorkbench', () => {
     expect(screen.queryByRole('button', { name: 'Deploy' })).not.toBeInTheDocument();
     expect(screen.queryByTestId('composer-attachment-input')).not.toBeInTheDocument();
     const transcriptRegion = screen.getByRole('region', { name: '会话记录' });
-    expect(within(transcriptRegion).getByText('全面参考 tokendance-design/desktop')).toBeInTheDocument();
+    expect(within(transcriptRegion).getByText('全面参考当前工作台规范')).toBeInTheDocument();
     expect(within(transcriptRegion).getAllByText('Read desktop/index.html').length).toBeGreaterThan(0);
     expect(within(transcriptRegion).queryByText('Hub replay for desktop run')).not.toBeInTheDocument();
     expect(within(transcriptRegion).queryByText('Source: Hub replay')).not.toBeInTheDocument();

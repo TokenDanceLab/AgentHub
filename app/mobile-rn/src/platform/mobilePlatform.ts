@@ -88,8 +88,11 @@ export function createMobilePlatform(options: MobilePlatformOptions): AgentHubPl
         try {
           const snapshot = await hubClient.getMobileSnapshot();
           return mapFixtureToConversations(snapshot);
-        } catch {
-          return mapFixtureToConversations(mobileFixture);
+        } catch (error) {
+          // Live mode must not masquerade as fixture data when the Hub is down.
+          // eslint-disable-next-line no-console -- surface Hub outage without replacing data with fixtures
+          console.error('[AgentHub Mobile] Hub snapshot failed', error);
+          return [];
         }
       },
     },

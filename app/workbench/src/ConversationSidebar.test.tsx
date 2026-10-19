@@ -316,8 +316,8 @@ describe('ConversationSidebar new-conversation entry (#1819)', () => {
 });
 
 
-/* ── F1 live status dots ────────────────────────────────────────────── */
-describe('ConversationSidebar live status dots (F1)', () => {
+/* ── Live status dots ────────────────────────────────────────────── */
+describe('ConversationSidebar live status dots', () => {
   it('renders a dot per mapped conversation with the status semantics, none elsewhere', () => {
     renderSidebar({
       conversations: [
@@ -351,7 +351,7 @@ describe('ConversationSidebar live status dots (F1)', () => {
 function makeQueueTask(overrides: Partial<TaskItem> = {}): TaskItem {
   return {
     id: 'sqlite-plan',
-    title: 'B0 SQLite 迁移方案',
+    title: 'SQLite 迁移方案',
     project: '前端重构任务',
     assignee: 'Builder',
     startTime: '今天 14:49',
@@ -385,7 +385,7 @@ describe('ConversationSidebar task queue group (#1963)', () => {
 
     const header = screen.getByRole('button', { name: /Task queue/ });
     expect(header).toHaveAttribute('aria-expanded', 'true');
-    expect(screen.getByText('B0 SQLite 迁移方案')).toBeInTheDocument();
+    expect(screen.getByText('SQLite 迁移方案')).toBeInTheDocument();
     expect(screen.getByText('云文档内嵌子页对齐')).toBeInTheDocument();
   });
 
@@ -405,18 +405,18 @@ describe('ConversationSidebar task queue group (#1963)', () => {
     const header = screen.getByRole('button', { name: /Task queue/ });
     fireEvent.click(header);
     expect(header).toHaveAttribute('aria-expanded', 'false');
-    expect(screen.queryByText('B0 SQLite 迁移方案')).not.toBeInTheDocument();
+    expect(screen.queryByText('SQLite 迁移方案')).not.toBeInTheDocument();
 
     fireEvent.click(header);
     expect(header).toHaveAttribute('aria-expanded', 'true');
-    expect(screen.getByText('B0 SQLite 迁移方案')).toBeInTheDocument();
+    expect(screen.getByText('SQLite 迁移方案')).toBeInTheDocument();
   });
 
   it('queues a conversation→task deep link when a queue entry is clicked', () => {
     publishWorkbenchTaskQueue([makeQueueTask()]);
     renderSidebar();
 
-    fireEvent.click(screen.getByText('B0 SQLite 迁移方案').closest('button')!);
+    fireEvent.click(screen.getByText('SQLite 迁移方案').closest('button')!);
 
     const { pending } = getWorkbenchTaskDeepLinkSnapshot();
     expect(pending?.type).toBe('open');
@@ -432,7 +432,7 @@ describe('ConversationSidebar task queue group (#1963)', () => {
     renderSidebar();
 
     const chip = screen.getByRole('button', { name: /Back to task/ });
-    expect(within(chip).getByText('B0 SQLite 迁移方案')).toBeInTheDocument();
+    expect(within(chip).getByText('SQLite 迁移方案')).toBeInTheDocument();
 
     fireEvent.click(chip);
     const { pending } = getWorkbenchTaskDeepLinkSnapshot();

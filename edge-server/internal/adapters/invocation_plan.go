@@ -72,8 +72,7 @@ func BuildCLIInvocationPlanFromCommand(adapter AgentAdapter, ctx RunProcessConte
 		}
 	}
 	flags, configKeys, positionalCount := summarizeCLIInvocationArgs(args)
-	// firstNonEmpty 随 sdk_fixture_mapper 家族迁入 adapters/sdk（#1760
-	// mapper 增量）；此处仅剩单个调用点，行为等价地内联（取首个非空白值）。
+	// firstNonEmpty 只有一个调用点，直接内联（取首个非空白值）。
 	projectedWorkDir := workDir
 	if strings.TrimSpace(projectedWorkDir) == "" {
 		projectedWorkDir = ctx.WorkDir
@@ -174,7 +173,7 @@ func summarizeCLIInvocationArgs(args []string) ([]string, []string, int) {
 
 // EnvNamesOnly extracts the variable names from "KEY=VALUE" entries, deduped
 // and order-preserved. Exported so the sdk subpackage can reuse the SSOT
-// path-name/plan helpers from the root package (#1760 mapper 增量).
+// path-name/plan helpers from the root package.
 func EnvNamesOnly(env []string) []string {
 	names := make([]string, 0, len(env))
 	for _, kv := range env {
@@ -189,7 +188,7 @@ func EnvNamesOnly(env []string) []string {
 }
 
 // CommandNameOnly returns the basename of a command path (backslashes
-// normalized). Exported for the sdk subpackage (#1760 mapper 增量).
+// normalized). Exported for the sdk subpackage.
 func CommandNameOnly(value string) string {
 	cleaned := strings.TrimSpace(strings.ReplaceAll(value, "\\", "/"))
 	if cleaned == "" {
@@ -200,7 +199,7 @@ func CommandNameOnly(value string) string {
 
 // InvocationPathNameOnly reduces a workspace path to its basename when
 // absolute, otherwise strips "./" prefixes (plan redaction). Exported for
-// the sdk subpackage (#1760 mapper 增量).
+// the sdk subpackage.
 func InvocationPathNameOnly(value string) string {
 	cleaned := strings.TrimSpace(strings.ReplaceAll(value, "\\", "/"))
 	if cleaned == "" {

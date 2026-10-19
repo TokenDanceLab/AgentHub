@@ -1,6 +1,5 @@
 /**
  * Workbench demo agents and conversation base fixtures.
- * Peel companion of workbenchDemo (#1131). Pure only; zero behavior change.
  */
 
 import type { WorkbenchAgent, WorkbenchConversation } from '../platform';
@@ -16,7 +15,7 @@ export const demoConversationsBase: WorkbenchConversation[] = [
     id: 'builder',
     title: 'Builder',
     kind: 'direct',
-    subtitle: '正在整理 B0 SQLite 迁移方案',
+    subtitle: '正在整理 SQLite 迁移方案',
     runtimeLabel: 'Claude Code',
     threadLabel: '前端实现',
     updatedLabel: '14:49',
@@ -74,16 +73,16 @@ export const demoConversationsBase: WorkbenchConversation[] = [
     avatarColor: ROLE_REVIEWER,
   },
   {
-    id: 'contributor-a',
-    title: 'contributor-a',
+    id: 'alice',
+    title: 'Alice',
     kind: 'direct',
     subtitle: '我看下项目页和私聊入口',
     updatedLabel: '11:32',
     avatarColor: '#2f8f73',
   },
   {
-    id: 'contributor-b',
-    title: 'contributor-b',
+    id: 'bob',
+    title: 'Bob',
     kind: 'direct',
     subtitle: '云文档列表可以再收紧一点',
     updatedLabel: '10:18',
@@ -99,7 +98,7 @@ export const demoConversationsBase: WorkbenchConversation[] = [
     avatarLabel: 'P',
     avatarColor: 'var(--surface-highest)',
     avatarTextColor: 'var(--td-ink-subtle)',
-    members: ['maintainer', 'Builder', 'Reviewer', 'contributor-a', 'contributor-b'],
+    members: ['Demo User', 'Builder', 'Reviewer', 'Alice', 'Bob'],
   },
   {
     id: 'project-docs',

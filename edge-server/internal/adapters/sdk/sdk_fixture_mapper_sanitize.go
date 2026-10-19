@@ -7,8 +7,6 @@ import (
 	"strings"
 )
 
-// Residual pure-helper peel #1122: sanitize / normalize helpers for SDK fixture mapping.
-
 func normalizeSDKFixtureType(value string) string {
 	normalized := strings.TrimSpace(strings.ToLower(value))
 	normalized = strings.ReplaceAll(normalized, ".", "_")

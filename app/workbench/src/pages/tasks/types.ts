@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════════════════════
-   Tasks page public types — extracted for Phase 18 strangler slice #571.
+   Tasks page public types (#571).
    ═══════════════════════════════════════════════════════════════════════ */
 
 import type { WorkbenchProfileSource } from '../../profileRegistry';
@@ -162,7 +162,7 @@ export interface TasksPageProps {
   onToolbarGroup?: (() => void) | undefined;
   onToolbarFieldConfig?: (() => void) | undefined;
 
-  // ── Infinite scroll (T14 pattern; mock data-layer cursor pagination, #1510) ──
+  // ── Infinite scroll (mock data-layer cursor pagination, #1510) ──
   /** Whether more tasks are available via pagination (pageCursor). */
   hasMore?: boolean | undefined;
   /** Whether a load-more page fetch is in flight. */

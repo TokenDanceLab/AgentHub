@@ -6,8 +6,6 @@ import (
 	"time"
 )
 
-// Residual pure-helper peel #1134: server, database, and Redis config sections.
-
 type ServerConfig struct {
 	Port         int    `mapstructure:"port"`
 	LogLevel     string `mapstructure:"log_level"`

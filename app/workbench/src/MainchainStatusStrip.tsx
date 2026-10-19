@@ -5,15 +5,15 @@ import styles from './AgentHubWorkbench.module.css';
 import { connectionStatusLabel, type ConnectionStatusKind } from './GlobalRail';
 import type { MainchainSummary } from './mainchain';
 import type { WorkbenchAttentionCounts } from './workbenchAttentionModel';
-// #2154 P3-3: shared token formatter (same units as the usage board and the
+// #2154: shared token formatter (same units as the usage board and the
 // inspector overview) instead of the page-local formatTokenCount.
 import { formatTokens } from '@shared/context/breakdown';
 
 /**
- * Workbench global bottom status bar (#1994, UX F5).
+ * Workbench global bottom status bar (#1994).
  *
- * Global segments render on every rail page: Hub connection state, the F6
- * attention chips (running / awaiting approval) and the F14 live usage chip.
+ * Global segments render on every rail page: Hub connection state, the
+ * attention chips (running / awaiting approval) and the live usage chip.
  * Conversation-scoped segments (evidence chain nodes + evidence export)
  * render only when the frame enables `showConversationChain` (chat page with
  * showMainchainStatus), so demo surfaces keep the chain and real surfaces
@@ -27,7 +27,7 @@ export interface MainchainStatusStripProps {
   onExportEvidence?: (() => void) | undefined;
   showConversationChain?: boolean | undefined;
   /**
-   * Global attention counts (F6). Absent when the shell provides no
+   * Global attention counts. Absent when the shell provides no
    * run/approval inventory — the chips stay hidden.
    */
   attention?: WorkbenchAttentionCounts | undefined;
@@ -36,7 +36,7 @@ export interface MainchainStatusStripProps {
   /** Click-through for the awaiting-approval chip (frame-owned, #1994). */
   onOpenApprovalQueue?: (() => void) | undefined;
   /**
-   * Live total of recorded usage-board tokens (#1990, F14). Absent when the
+   * Live total of recorded usage-board tokens (#1990). Absent when the
    * shell has no Hub usage data — the chip stays honestly hidden then.
    */
   usageTokenTotal?: number | undefined;
@@ -111,7 +111,7 @@ export function MainchainStatusStrip({
               scopeHint,
             ),
           })}
-          {/* #1990 (UX F14): live usage total from the usage board's real
+          {/* #1990: live usage total from the usage board's real
               token_usage_total counters; click through to the Usage page.
               Absent total = chip hidden (honest, never a fake 0). */}
           {usageTokenTotal !== undefined && renderAttentionChip({

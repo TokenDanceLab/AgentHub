@@ -72,10 +72,8 @@ type WorkspaceThreadMessage struct {
 }
 
 // Service exposes Web-owned project CRUD backed by Hub workspaces.
-// DB-only (no bus/cache ports — none exist). Pure thread-message content +
-// name/description normalize helpers remain in service/im (#628/#639/#651);
-// this package is the second IM typed-service extract (#673) after
-// messagereaction (#662).
+// DB-only. Thread-message content and name/description normalize helpers live
+// in service/im.
 type Service struct {
 	db *gorm.DB
 }
@@ -247,7 +245,11 @@ func (s *Service) CreateThreadMessage(ctx context.Context, projectID, threadID, 
 	}
 	clientMsgID := strings.TrimSpace(req.ClientMsgID)
 	if clientMsgID == "" {
-		clientMsgID = uuidv7.Must()
+		id, err := uuidv7.New()
+		if err != nil {
+			return nil, err
+		}
+		clientMsgID = id
 	}
 
 	msg := &model.Message{

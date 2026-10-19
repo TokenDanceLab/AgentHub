@@ -6,10 +6,10 @@ import type {
 } from './types';
 
 /* ═══════════════════════════════════════════════════════════════════════
-   AgentOpsHelpers — pure residual slices from AgentOpsParts (#684).
+   AgentOpsHelpers — pure helpers for AgentOpsParts (#684).
 
    Policy/tool/cc-switch/model/audit labels and formatters only.
-   No React / no intentional UX change. exactOptionalPropertyTypes-safe.
+   No React. exactOptionalPropertyTypes-safe.
    ═══════════════════════════════════════════════════════════════════════ */
 
 /** Policy matrix icon: high-risk rules use policy, others tools. */

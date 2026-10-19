@@ -26,7 +26,7 @@ import {
  * Builds an OidcError for an upstream exchange failure. When the thrown
  * transport error carries a backend OIDC code (AppError.code from the Hub
  * envelope), the single bridge table oidcBackendCodeToI18nCode maps it to the
- * i18n suffix (#2123 P1-2); unknown shapes fall back to the generic code.
+ * i18n suffix (#2123); unknown shapes fall back to the generic code.
  */
 function oidcErrorFromExchangeFailure(err: unknown, detail: string): OidcError {
   const backendCode = (err as { code?: unknown } | null | undefined)?.code;

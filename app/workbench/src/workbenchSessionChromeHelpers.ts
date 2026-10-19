@@ -34,13 +34,12 @@ import type { KeyboardEventLike } from '@shared/utils/keyboardUtils';
 import { getResolvedBinding } from '@shared/utils/keyboardShortcuts';
 
 /* ═══════════════════════════════════════════════════════════════════════
-   workbenchSessionChromeHelpers — pure residual slices from
+   workbenchSessionChromeHelpers — pure helpers for
    useWorkbenchSessionChrome (#674).
 
    Public option/return types, local-CLI fallback, conversation id
    resolution, mention mapping, inspector transcript projections, export
-   payload builders, and residual effect planners. No React hooks /
-   no intentional UX change.
+   payload builders, and effect planners. No React hooks.
    exactOptionalPropertyTypes: only assign `?: T` fields when defined.
    ═══════════════════════════════════════════════════════════════════════ */
 
@@ -141,7 +140,7 @@ export interface WorkbenchSessionChrome {
 
 export const LOCAL_CLI_DISCOVERY_FALLBACK: LocalCliDiscoveryManifest = {
   mode: 'no-spend-discovery',
-  readinessManifest: '.tmp/evidence/p0-edge-cli-real-readiness.json',
+  readinessManifest: 'docs/governance/README.md',
   readinessScript: 'scripts/verify/verify-edge-cli-real-readiness.py',
   generatedAt: null,
   items: [

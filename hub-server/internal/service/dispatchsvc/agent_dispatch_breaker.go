@@ -29,10 +29,7 @@ const (
 // A successful probe closes the breaker; a failed probe reopens it.
 //
 // The breaker is per-Edge-endpoint (dispatchToEdgeHTTP targets the single
-// configured Edge URL for unbound tasks). A nil breaker (partial test
-// constructions via struct literals) allows all traffic — only NewDispatchService
-// wires a real breaker so production is protected while pure dispatch tests
-// that build &DispatchService{} stay unaffected.
+// configured Edge URL for unbound tasks). The zero value is closed.
 type edgeCircuitBreaker struct {
 	mu            sync.Mutex
 	state         edgeCircuitState
@@ -52,9 +49,6 @@ type edgeCircuitBreaker struct {
 //
 //	in-flight probe resolves via RecordSuccess/RecordFailure.
 func (b *edgeCircuitBreaker) Allow() bool {
-	if b == nil {
-		return true
-	}
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	switch b.state {
@@ -81,9 +75,6 @@ func (b *edgeCircuitBreaker) Allow() bool {
 // RecordSuccess closes the breaker and resets the failure count after a
 // successful dispatch or a successful half-open probe.
 func (b *edgeCircuitBreaker) RecordSuccess() {
-	if b == nil {
-		return
-	}
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	b.failures = 0
@@ -95,9 +86,6 @@ func (b *edgeCircuitBreaker) RecordSuccess() {
 // reopens the breaker for another openDuration window; in closed it counts
 // toward the threshold and opens when threshold is reached.
 func (b *edgeCircuitBreaker) RecordFailure() {
-	if b == nil {
-		return
-	}
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	b.probeInFlight = false
@@ -118,9 +106,6 @@ func (b *edgeCircuitBreaker) RecordFailure() {
 
 // State returns the current breaker state (test/diagnostic helper).
 func (b *edgeCircuitBreaker) State() edgeCircuitState {
-	if b == nil {
-		return edgeBreakerClosed
-	}
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	if b.state == edgeBreakerOpen && time.Now().After(b.openUntil) {

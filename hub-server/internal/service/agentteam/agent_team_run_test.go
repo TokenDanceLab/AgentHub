@@ -14,12 +14,13 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/agenthub/hub-server/internal/bus"
+	"github.com/agenthub/hub-server/internal/cache"
 	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/model"
 	"github.com/agenthub/hub-server/internal/repository"
 )
 
-// Read-fanout tests for GetTeamRunState (#2154 P2-11).
+// Read-fanout tests for GetTeamRunState (#2154).
 //
 // The six reads used to be strictly serial (2-10 ms of stacked round trips on
 // the endpoint the team-run UI polls every 1-3 s). They are now two errgroup
@@ -165,7 +166,7 @@ func (b *readBarrier) register(t *testing.T, db *gorm.DB) {
 func TestGetTeamRunState_RunsIndependentReadsConcurrently(t *testing.T) {
 	db := setupAgentTeamStateSQLite(t)
 	teamID, runID := seedTeamRunStateFixture(t, db)
-	svc := NewAgentTeamService(db, nil, nil)
+	svc := NewAgentTeamService(db, nil, cache.NoOpCache{})
 
 	barrier := newReadBarrier(destTeamMembers, destAssignments)
 	barrier.register(t, db)
@@ -175,7 +176,7 @@ func TestGetTeamRunState_RunsIndependentReadsConcurrently(t *testing.T) {
 
 	state, err := svc.GetTeamRunState(ctx, "user-1", teamID, runID)
 	require.NoError(t, err,
-		"a context error here means the members/assignments reads did not overlap (#2154 P2-11)")
+		"a context error here means the members/assignments reads did not overlap (#2154)")
 	require.NotNil(t, state)
 	require.Len(t, state.Members, 2)
 	require.Len(t, state.Assignments, 1)
@@ -184,7 +185,7 @@ func TestGetTeamRunState_RunsIndependentReadsConcurrently(t *testing.T) {
 func TestGetTeamRunState_SecondLayerReadsConcurrently(t *testing.T) {
 	db := setupAgentTeamStateSQLite(t)
 	teamID, runID := seedTeamRunStateFixture(t, db)
-	svc := NewAgentTeamService(db, nil, nil)
+	svc := NewAgentTeamService(db, nil, cache.NoOpCache{})
 
 	barrier := newReadBarrier(destPendingTasks, destAgentRunEvent)
 	barrier.register(t, db)
@@ -194,7 +195,7 @@ func TestGetTeamRunState_SecondLayerReadsConcurrently(t *testing.T) {
 
 	state, err := svc.GetTeamRunState(ctx, "user-1", teamID, runID)
 	require.NoError(t, err,
-		"a context error here means pendingTaskSnapshot/runEvents did not overlap (#2154 P2-11)")
+		"a context error here means pendingTaskSnapshot/runEvents did not overlap (#2154)")
 	require.NotNil(t, state)
 }
 
@@ -264,7 +265,7 @@ func TestGetTeamRunState_PreservesSerialErrorPriority(t *testing.T) {
 			db := setupAgentTeamStateSQLite(t)
 			teamID, runID := seedTeamRunStateFixture(t, db)
 			failReadsOn(t, db, tt.failures)
-			svc := NewAgentTeamService(db, nil, nil)
+			svc := NewAgentTeamService(db, nil, cache.NoOpCache{})
 
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer cancel()
@@ -288,7 +289,7 @@ func teamID2User(_ string) string { return "user-1" }
 func TestGetTeamRunState_PropagatesRequestCancellation(t *testing.T) {
 	db := setupAgentTeamStateSQLite(t)
 	teamID, runID := seedTeamRunStateFixture(t, db)
-	svc := NewAgentTeamService(db, nil, nil)
+	svc := NewAgentTeamService(db, nil, cache.NoOpCache{})
 
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel() // already canceled before the call
@@ -302,7 +303,7 @@ func TestGetTeamRunState_PropagatesRequestCancellation(t *testing.T) {
 func TestGetTeamRunState_ProjectionUnchangedByParallelReads(t *testing.T) {
 	db := setupAgentTeamStateSQLite(t)
 	teamID, runID := seedTeamRunStateFixture(t, db)
-	svc := NewAgentTeamService(db, nil, nil)
+	svc := NewAgentTeamService(db, nil, cache.NoOpCache{})
 
 	state, err := svc.GetTeamRunState(context.Background(), "user-1", teamID, runID)
 	require.NoError(t, err)
@@ -320,7 +321,7 @@ func TestGetTeamRunState_ProjectionUnchangedByParallelReads(t *testing.T) {
 
 func TestAgentTeamService_GetTeamRun(t *testing.T) {
 	db, mock := newMockAgentTeamDB(t)
-	svc := NewAgentTeamService(db, nil, nil)
+	svc := NewAgentTeamService(db, nil, cache.NoOpCache{})
 
 	// Get team
 	teamRows := sqlmock.NewRows([]string{"id", "owner_id", "name", "description", "avatar_url", "created_at", "updated_at"}).
@@ -342,7 +343,7 @@ func TestAgentTeamService_GetTeamRun(t *testing.T) {
 
 func TestAgentTeamService_GetTeamRunWrongTeam(t *testing.T) {
 	db, mock := newMockAgentTeamDB(t)
-	svc := NewAgentTeamService(db, nil, nil)
+	svc := NewAgentTeamService(db, nil, cache.NoOpCache{})
 
 	// Get team
 	teamRows := sqlmock.NewRows([]string{"id", "owner_id", "name", "description", "avatar_url", "created_at", "updated_at"}).
@@ -364,7 +365,7 @@ func TestAgentTeamService_GetTeamRunWrongTeam(t *testing.T) {
 
 func TestAgentTeamService_ListTeamRuns(t *testing.T) {
 	db, mock := newMockAgentTeamDB(t)
-	svc := NewAgentTeamService(db, nil, nil)
+	svc := NewAgentTeamService(db, nil, cache.NoOpCache{})
 
 	// Get team
 	teamRows := sqlmock.NewRows([]string{"id", "owner_id", "name", "description", "avatar_url", "created_at", "updated_at"}).
@@ -389,7 +390,7 @@ func TestAgentTeamService_ListTeamRuns(t *testing.T) {
 
 func TestAgentTeamService_StartTeamRun_TeamNotFound(t *testing.T) {
 	db, mock := newMockAgentTeamDB(t)
-	svc := NewAgentTeamService(db, nil, nil)
+	svc := NewAgentTeamService(db, nil, cache.NoOpCache{})
 
 	mock.ExpectQuery(`SELECT * FROM "agent_teams"`).
 		WillReturnError(gorm.ErrRecordNotFound)
@@ -402,7 +403,7 @@ func TestAgentTeamService_StartTeamRun_TeamNotFound(t *testing.T) {
 
 func TestAgentTeamService_StartTeamRun_EmptyMembers(t *testing.T) {
 	db, mock := newMockAgentTeamDB(t)
-	svc := NewAgentTeamService(db, nil, nil)
+	svc := NewAgentTeamService(db, nil, cache.NoOpCache{})
 
 	// Get team
 	teamRows := sqlmock.NewRows([]string{"id", "owner_id", "name", "description", "avatar_url", "created_at", "updated_at"}).
@@ -423,7 +424,7 @@ func TestAgentTeamService_StartTeamRun_EmptyMembers(t *testing.T) {
 func TestAgentTeamService_StartTeamRun_Success(t *testing.T) {
 	db, mock := newMockAgentTeamDB(t)
 	agentSvc := &mockAgentTeamAgentSvc{}
-	svc := NewAgentTeamService(db, agentSvc, nil)
+	svc := NewAgentTeamService(db, agentSvc, cache.NoOpCache{})
 	eventBus, err := bus.New()
 	if err != nil {
 		t.Fatal(err)
@@ -522,7 +523,7 @@ func TestAgentTeamService_StartTeamRun_Success(t *testing.T) {
 func TestAgentTeamService_StartTeamRunPassesTargetIDToSupervisor(t *testing.T) {
 	db, mock := newMockAgentTeamDB(t)
 	agentSvc := &mockAgentTeamAgentSvc{}
-	svc := NewAgentTeamService(db, agentSvc, nil)
+	svc := NewAgentTeamService(db, agentSvc, cache.NoOpCache{})
 
 	now := time.Now()
 	agentProfileID := "agent-1"
@@ -577,7 +578,7 @@ func TestAgentTeamService_StartTeamRunPassesTargetIDToSupervisor(t *testing.T) {
 
 func TestAgentTeamService_GetTeamRunStateReplaysEvents(t *testing.T) {
 	db := setupAgentTeamStateSQLite(t)
-	svc := NewAgentTeamService(db, nil, nil)
+	svc := NewAgentTeamService(db, nil, cache.NoOpCache{})
 
 	team := &model.AgentTeam{OwnerID: "user-1", Name: "State Team"}
 	require.NoError(t, repository.CreateTeam(db, team))
@@ -653,7 +654,7 @@ func TestAgentTeamService_GetTeamRunStateReplaysEvents(t *testing.T) {
 
 func TestAgentTeamService_ListTeamTasksIsOwnerScoped(t *testing.T) {
 	db := setupAgentTeamStateSQLite(t)
-	svc := NewAgentTeamService(db, nil, nil)
+	svc := NewAgentTeamService(db, nil, cache.NoOpCache{})
 	team, _, executor, run := seedAgentTeamRun(t, db)
 	require.NoError(t, repository.CreateTeamTask(db, &model.AgentTeamTask{
 		TeamRunID:        run.ID,
@@ -677,7 +678,7 @@ func TestAgentTeamService_ListTeamTasksIsOwnerScoped(t *testing.T) {
 
 func TestAgentTeamService_GetTeamRunStateProjectsDependenciesAndBudget(t *testing.T) {
 	db := setupAgentTeamStateSQLite(t)
-	svc := NewAgentTeamService(db, nil, nil)
+	svc := NewAgentTeamService(db, nil, cache.NoOpCache{})
 	team, _, executor, run := seedAgentTeamRun(t, db)
 	reviewerProfileID := "profile-reviewer"
 	reviewer := &model.AgentTeamMember{
@@ -840,7 +841,7 @@ func TestAgentTeamService_GetTeamRunStateProjectsDependenciesAndBudget(t *testin
 
 func TestAgentTeamService_ListTeamEventsIsOwnerScoped(t *testing.T) {
 	db := setupAgentTeamStateSQLite(t)
-	svc := NewAgentTeamService(db, nil, nil)
+	svc := NewAgentTeamService(db, nil, cache.NoOpCache{})
 	team, _, _, run := seedAgentTeamRun(t, db)
 	require.NoError(t, repository.AppendTeamEvent(db, &model.AgentTeamEvent{
 		TeamRunID: run.ID,
@@ -862,7 +863,7 @@ func TestAgentTeamService_ListTeamEventsIsOwnerScoped(t *testing.T) {
 
 func TestAgentTeamService_GetTeamRunStateKeepsTerminalAssignmentOverPendingProjection(t *testing.T) {
 	db := setupAgentTeamStateSQLite(t)
-	svc := NewAgentTeamService(db, nil, nil)
+	svc := NewAgentTeamService(db, nil, cache.NoOpCache{})
 	team, supervisor, executor, run := seedAgentTeamRun(t, db)
 	pendingID := "pending-task-terminal-1"
 	assignment := &model.AgentTeamAssignment{

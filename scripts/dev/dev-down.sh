@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ───────────────────────────────────────────────
 # AgentHub Docker Compose — 停止开发环境
-# （Python 实现，原 ps1 已迁移；本文件是兼容 launcher）
+# （兼容 launcher；实现见 dev-down.py）
 # ───────────────────────────────────────────────
 # 用法:
 #   ./scripts/dev/dev-down.sh           # 停止服务，保留数据卷

@@ -98,7 +98,7 @@ export function useWorkbenchSessionChrome({
   // (default hidden). Re-runs on every snapshot change, so toggling 右侧概览 off
   // in Settings collapses the inspector immediately.
   //
-  // #2154 P2-6: the switch is now symmetric — turning it back on dispatches the
+  // #2154: the switch is now symmetric — turning it back on dispatches the
   // same event with `collapse: false`. Whether that actually expands is decided
   // by the layout hook, which only undoes a collapse this setting caused, so a
   // manually collapsed inspector (and the persisted last-session state) still
@@ -172,7 +172,7 @@ export function useWorkbenchSessionChrome({
     onActiveConversationChange?.(conversationId);
   }
 
-  // Perf #21 residual: `evidence` / `mainchainSummary` feed ConversationHost
+  // Compatibility: `evidence` / `mainchainSummary` feed ConversationHost
   // (MainchainStatusStrip) and the evidence-export callback. Memoized so their
   // identity survives shell re-renders (keystrokes etc.) — transcript /
   // runtimeEvidence / composerExecutionTargets / workbenchStatus are
@@ -212,7 +212,7 @@ export function useWorkbenchSessionChrome({
 
   useEffect(() => {
     // Flush current composer state as a draft for the outgoing session
-    // before resetting so the draft is available on switch-back (CF20).
+    // before resetting so the draft is available on switch-back.
     // #1822: serialize attachments (ref'd ones) + reply/quote context too —
     // the old text+mentions-only save dropped them on conversation switch.
     if (composer.text || composer.mentions.length > 0 || composer.attachments.length > 0 ||
@@ -364,7 +364,7 @@ export function useWorkbenchSessionChrome({
         sequence: browserFocusSequenceRef.current,
         url: deployBlock.url,
       });
-      // #2154 P2-15: the success toast belongs to the branch that really
+      // #2154: the success toast belongs to the branch that really
       // requested a preview. It used to fire unconditionally, so a run without
       // a deployable URL showed "opened deploy preview" next to a blank pane.
       showWorkbenchToastRef.current(t('toast.deployPreviewOpened'));
@@ -380,7 +380,7 @@ export function useWorkbenchSessionChrome({
   // only when the underlying data changes) and platform / workbenchStatus /
   // runtimeEvidence / t are shell-stable, so the callback survives shell
   // re-renders and the ConversationHost / MainchainStatusStrip memo gates
-  // hold (perf #21 residual).
+  // hold (compatibility).
   const exportMainchainEvidence = useCallback((): void => {
     if (!mainchainSummary.exportEnabled) {
       showWorkbenchToastRef.current(t('toast.noEvidence'));

@@ -26,6 +26,134 @@ func drainSeqs(t *testing.T, c *Conn, n int) []int64 {
 	return seqs
 }
 
+// TestSetAuthQueuesAuthOKAsFirstFrame pins the observable contract: once
+// SetAuth returns, auth.ok is the first queued frame (seq_id 1) and an
+// immediate fanout starts at seq_id 2.
+func TestSetAuthQueuesAuthOKAsFirstFrame(t *testing.T) {
+	m := NewManager()
+	c := &Conn{Send: make(chan []byte, 8)}
+	require.NoError(t, m.Register(c))
+
+	m.SetAuth(c.ID, "user-auth-ok", "web", "dev-1")
+	fanout := m.PushToUser("user-auth-ok", NewFrame(TypeMessageNew, nil))
+	require.Equal(t, 1, fanout.Queued)
+
+	data := <-c.Send
+	first, err := ParseFrame(data)
+	require.NoError(t, err)
+	require.Equal(t, TypeAuthOK, first.Type)
+	require.Equal(t, int64(1), first.SeqID)
+
+	data = <-c.Send
+	second, err := ParseFrame(data)
+	require.NoError(t, err)
+	require.Equal(t, int64(2), second.SeqID)
+}
+
+// TestSetAuthQueuesAuthOKBeforeRouteReplay covers the replay path: a replay
+// pushed from OnRouteSet cannot take seq_id 1.
+func TestSetAuthQueuesAuthOKBeforeRouteReplay(t *testing.T) {
+	m := NewManager()
+	c := &Conn{Send: make(chan []byte, 8)}
+	require.NoError(t, m.Register(c))
+
+	m.OnRouteSet = func(_userID, _deviceType, _deviceID, connID, _oldConnID string, _wasOffline bool) {
+		require.True(t, m.PushToConn(connID, NewFrame(TypeMessageNew, nil)).Queued)
+	}
+	m.SetAuth(c.ID, "user-replay", "web", "dev-1")
+
+	// Wire order, not just seq values: auth.ok must precede the replay frame.
+	first, err := ParseFrame(<-c.Send)
+	require.NoError(t, err)
+	require.Equal(t, TypeAuthOK, first.Type)
+	require.Equal(t, int64(1), first.SeqID)
+	second, err := ParseFrame(<-c.Send)
+	require.NoError(t, err)
+	require.Equal(t, TypeMessageNew, second.Type)
+	require.Equal(t, int64(2), second.SeqID)
+}
+
+// TestSetAuthQueuesAuthOKBeforeFanoutDuringRouteSet covers the concurrent
+// fanout case: OnRouteSet fires after the connection is published to byUser
+// and before SetAuth returns, so a fanout triggered there must still observe
+// auth.ok at seq_id 1. Moving the auth.ok enqueue after the publication (or
+// after m.mu.Unlock) lets the route-set fanout take seq_id 1.
+func TestSetAuthQueuesAuthOKBeforeFanoutDuringRouteSet(t *testing.T) {
+	m := NewManager()
+	c := &Conn{Send: make(chan []byte, 8)}
+	require.NoError(t, m.Register(c))
+
+	m.OnRouteSet = func(userID, _deviceType, _deviceID, connID, _oldConnID string, _wasOffline bool) {
+		require.Equal(t, 1, m.PushToUser(userID, NewFrame(TypeMessageNew, nil)).Queued)
+		require.True(t, m.PushToConn(connID, NewFrame(TypeMessageNew, nil)).Queued)
+	}
+	require.True(t, m.SetAuth(c.ID, "user-race", "web", "dev-1"))
+
+	first, err := ParseFrame(<-c.Send)
+	require.NoError(t, err)
+	require.Equal(t, TypeAuthOK, first.Type)
+	require.Equal(t, int64(1), first.SeqID)
+	for want := int64(2); want <= 3; want++ {
+		frame, err := ParseFrame(<-c.Send)
+		require.NoError(t, err)
+		require.Equal(t, TypeMessageNew, frame.Type)
+		require.Equal(t, want, frame.SeqID)
+	}
+}
+
+// TestSetAuthKeepsAuthOKFirstUnderConcurrentFanout hammers PushToUser while
+// SetAuth runs. auth.ok is enqueued under m.mu before the connection is
+// published, so no fanout can take seq_id 1; moving the enqueue after
+// m.mu.Unlock opens a window for these writers to win the sendMu race.
+//
+// PushToConn is deliberately absent: a connection that is registered but not
+// yet authenticated is addressable by id, so it can legally take seq_id 1
+// before SetAuth. That is unreachable in production (ids are not public until
+// auth succeeds) and would make this test flaky under -race.
+func TestSetAuthKeepsAuthOKFirstUnderConcurrentFanout(t *testing.T) {
+	const rounds = 100
+	for round := 0; round < rounds; round++ {
+		m := NewManager()
+		c := &Conn{Send: make(chan []byte, 128)}
+		require.NoError(t, m.Register(c))
+
+		start := make(chan struct{})
+		var wg sync.WaitGroup
+		for g := 0; g < 4; g++ {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				<-start
+				for i := 0; i < 8; i++ {
+					m.PushToUser("user-race", NewFrame(TypeMessageNew, nil))
+				}
+			}()
+		}
+		close(start)
+		require.True(t, m.SetAuth(c.ID, "user-race", "web", "dev-1"))
+		wg.Wait()
+
+		first, err := ParseFrame(<-c.Send)
+		require.NoError(t, err)
+		require.Equal(t, TypeAuthOK, first.Type, "round %d: a fanout frame took seq_id 1", round)
+		require.Equal(t, int64(1), first.SeqID, "round %d", round)
+	}
+}
+
+// TestSetAuthFailsClosedWhenAuthOKCannotBeQueued pins the !res.Queued branch:
+// a full send buffer must reject authentication and remove the connection
+// instead of publishing an authenticated connection without auth.ok.
+func TestSetAuthFailsClosedWhenAuthOKCannotBeQueued(t *testing.T) {
+	m := NewManager()
+	c := &Conn{Send: make(chan []byte, 1)}
+	c.Send <- []byte("occupied")
+	require.NoError(t, m.Register(c))
+
+	require.False(t, m.SetAuth(c.ID, "user-buffer-full", "web", "dev-1"))
+	require.Equal(t, 0, m.Count())
+	require.True(t, c.closed.Load())
+}
+
 // TestPushToConnAssignsMonotonicSeqPerConn verifies that frames pushed to the
 // same connection carry a strictly increasing seq_id starting at 1, and that
 // counters of different connections are independent (#1361).

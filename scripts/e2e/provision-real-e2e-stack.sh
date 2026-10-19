@@ -2,16 +2,16 @@
 # ─────────────────────────────────────────────────────────────
 # AgentHub 真实 OIDC E2E 账号供给（本机全栈 dev 栈；幂等，可重复运行）
 #
-# 职责（对应 issue #1839 B2 片）：
+# 职责：
 #   1. 确保 TokenDance ID 中注册了 hub 侧正在使用的 OAuth client
-#      （client_id/secret 与 start.sh 注入 hub 的完全一致；供 OIDC
+#      （client_id/secret 与启动器注入 hub 的完全一致；供 OIDC
 #      Authorization Code + PKCE 交换使用）。
 #   2. 注册/复用一枚随机测试账号（真实注册 API），并验证可登录。
 #   3. 凭据写入 tests/artifacts/real-e2e-account.env（gitignored，
 #      chmod 600），供 playwright real 配置与 spec 读取。
 #
 # 隐私：本脚本不持有、不打印任何 secret 字面量。client secret 只
-# 经环境变量或运行期从 start.sh 提取（内存内使用），绝不写入仓库。
+# 经环境变量或运行期从启动器提取（内存内使用），绝不写入仓库。
 #
 # 用法：
 #   bash provision-real-e2e-stack.sh
@@ -21,11 +21,11 @@
 #   AGENTHUB_E2E_ID_BASE_URL    TokenDance ID 地址（默认 http://127.0.0.1:3000）
 #   AGENTHUB_E2E_HUB_BASE_URL   hub 地址（默认 http://127.0.0.1:8080）
 #   AGENTHUB_E2E_WEB_BASE_URL   web 地址（默认 http://127.0.0.1:5174）
-#   AGENTHUB_E2E_ID_DB          ID 的 sqlite 文件（默认 /var/lib/tokendance-id/tokendance.db）
+#   AGENTHUB_E2E_ID_DB          ID 的 sqlite 文件（必填，无默认值）
 #   AGENTHUB_E2E_START_SH       提取 hub OIDC client 凭据的启动脚本（**无默认值**：仓库里不写
 #                               任何人的本机路径；未设置时必须改用 AGENTHUB_E2E_ID_CLIENT_ID/SECRET 直供）
 #   AGENTHUB_E2E_ID_CLIENT_ID / AGENTHUB_E2E_ID_CLIENT_SECRET
-#                               优先直接给出 client 凭据（绕过 start.sh 提取）
+#                               优先直接给出 client 凭据（绕过启动器提取）
 #   AGENTHUB_E2E_USER_EMAIL / AGENTHUB_E2E_USER_PASSWORD
 #                               复用既有主账号（否则随机生成并注册）
 #   AGENTHUB_E2E_PARTNER_EMAIL / AGENTHUB_E2E_PARTNER_PASSWORD
@@ -37,7 +37,7 @@ set -euo pipefail
 ID_BASE_URL="${AGENTHUB_E2E_ID_BASE_URL:-http://127.0.0.1:3000}"
 HUB_BASE_URL="${AGENTHUB_E2E_HUB_BASE_URL:-http://127.0.0.1:8080}"
 WEB_BASE_URL="${AGENTHUB_E2E_WEB_BASE_URL:-http://127.0.0.1:5174}"
-ID_DB="${AGENTHUB_E2E_ID_DB:-/var/lib/tokendance-id/tokendance.db}"
+ID_DB="${AGENTHUB_E2E_ID_DB:-}"
 START_SH="${AGENTHUB_E2E_START_SH:-}"
 
 # 仓库根（本文件位于 scripts/e2e/ 下两级）
@@ -78,16 +78,9 @@ if [ -n "${AGENTHUB_E2E_ID_CLIENT_ID:-}" ] && [ -n "${AGENTHUB_E2E_ID_CLIENT_SEC
   CLIENT_ID="$AGENTHUB_E2E_ID_CLIENT_ID"
   CLIENT_SECRET="$AGENTHUB_E2E_ID_CLIENT_SECRET"
 elif [ -f "$START_SH" ]; then
-  # start.sh 的 export 行允许含 shell 展开。本机实测两行：
-  #   export AGENTHUB_TOKENDANCE_ID_CLIENT_SECRET="${AGENTHUB_OIDC_CLIENT_SECRET}"
-  #   export AGENTHUB_JWT_SECRET=$(awk -F= "/^AGENTHUB_JWT_SECRET=/{print \$2}" .env)
-  # 启动器（bash start.sh，或 restart-hub.sh 里 eval start.sh 的 export 块）注入 hub 的
-  # 是**求值后**的值；旧实现用 grep|cut|tr 取字面文本，于是把命令文本本身
-  # （"${AGENTHUB_OIDC_CLIENT_SECRET}"，30 字符）bcrypt 进 ID 的 oauth_clients.secret_hash，
-  # 而 hub 发的是求值后的 35 字符真值 ⇒ POST /oidc/token 恒 400 invalid_grant
-  # （ID 侧日志：code 正常签发、token 端点 ~346ms 后 400），真 OIDC 登录与整条
-  # L3 real lane 结构性不可用。修法：在子 shell 里按启动器同一语义求值
-  # source/export 行后读有效值——只取这两类行，start.sh 的启动命令一行都不执行。
+  # 启动器通过 export/source 行注入 Hub 凭据。只对这两类行按启动器同一语义
+  # 求值，不执行启动命令；否则未展开的表达式会被写进 ID 的
+  # oauth_clients.secret_hash，而 Hub 发的是求值后的值，token 交换会恒失败。
   resolved_creds="$(
     cd "$(dirname "$START_SH")" 2>/dev/null || true
     set -a
@@ -96,12 +89,11 @@ elif [ -f "$START_SH" ]; then
   )"
   CLIENT_ID="$(printf '%s' "$resolved_creds" | sed -n 1p)"
   CLIENT_SECRET="$(printf '%s' "$resolved_creds" | sed -n 2p)"
-  # fail-closed：求值后仍残留未展开的 shell 语法，说明解析口径又漂了。此时宁可
-  # 立刻 die，也绝不把命令文本当凭据 seed 进 ID 库——那只会把错误推迟成
-  # 运行期静默 invalid_grant（本次事故的原始形态）。
+  # fail-closed：求值后仍残留未展开的 shell 语法，说明解析口径不一致。此时
+  # 立即退出，绝不把命令文本当凭据 seed 进 ID 库。
   case "$CLIENT_ID$CLIENT_SECRET" in
     *'${'*|*'$('*|*'`'*)
-      die "start.sh credential resolution left unexpanded shell syntax (got a value containing \${ / \$( / backtick); pass AGENTHUB_E2E_ID_CLIENT_ID/SECRET explicitly"
+      die "launcher credential resolution left unexpanded shell syntax (got a value containing \${ / \$( / backtick); pass AGENTHUB_E2E_ID_CLIENT_ID/SECRET explicitly"
       ;;
   esac
 else
@@ -118,10 +110,11 @@ ok "TokenDance ID healthy"
 info "waiting for hub ($HUB_BASE_URL/health)"
 wait_http "$HUB_BASE_URL/health" 20 2 || die "hub not healthy at $HUB_BASE_URL"
 ok "hub healthy"
-[ -f "$ID_DB" ] || die "ID sqlite db not found at $ID_DB"
+[ -n "$ID_DB" ] || die "set AGENTHUB_E2E_ID_DB to the OIDC provider sqlite file"
+[ -f "$ID_DB" ] || die "OIDC provider sqlite db not found at $ID_DB"
 
 # ── 阶段 3：hub 所用 OAuth client 注册（幂等）────────────────
-# hub 侧 client_id/secret 由 start.sh 固定注入，ID API 只能服务端生成
+# hub 侧 client_id/secret 由启动器固定注入，ID API 只能服务端生成
 # client_id（无法指定），因此此处直接 seed 进 ID 的 sqlite：redirect_uris
 # 覆盖 hub 回调与 web 回调，is_trusted=0 以走真实 consent 页。
 info "ensuring hub OAuth client in ID database"
@@ -166,7 +159,7 @@ if [ "$AUTHZ_HTTP" = "200" ] && grep -q 'authorization_url' "$AUTHZ_PROBE_FILE" 
   ok "hub accepts web redirect_uri ($WEB_REDIRECT_URI)"
 else
   rm -f "$AUTHZ_PROBE_FILE"
-  die "hub authorize rejected web redirect_uri (HTTP ${AUTHZ_HTTP:-n/a}). hub 需以包含 $WEB_REDIRECT_URI 的 AGENTHUB_TOKENDANCE_ID_ALLOWED_REDIRECT_URIS 重启（start.sh 白名单缺 /workbench 变体；勿改 start.sh，运行期扩展环境变量后重启 hub 即可）"
+  die "hub authorize rejected web redirect_uri (HTTP ${AUTHZ_HTTP:-n/a}). hub 需以包含 $WEB_REDIRECT_URI 的 AGENTHUB_TOKENDANCE_ID_ALLOWED_REDIRECT_URIS 重启"
 fi
 
 # ── 阶段 4：测试账号供给（主账号 + 陪聊账号）─────────────────
@@ -229,6 +222,8 @@ AGENTHUB_E2E_USER_PASSWORD=$USER_PASSWORD
 AGENTHUB_E2E_PARTNER_EMAIL=$PARTNER_EMAIL
 AGENTHUB_E2E_PARTNER_PASSWORD=$PARTNER_PASSWORD
 EOF
+# 不落盘 Hub 签名密钥：chat-real.spec.ts 的 mintTestJWT 优先读取
+# AGENTHUB_JWT_SECRET 环境变量，凭据文件只保留测试账号。
 chmod 600 "$ACCOUNT_ENV"
 ok "test credentials written to $ACCOUNT_ENV (chmod 600, gitignored)"
 

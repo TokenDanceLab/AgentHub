@@ -11,7 +11,7 @@ const targets: DevicesPageTarget[] = [
     isOnline: true,
     trustLevel: 'local',
     endpoint: '127.0.0.1:8443',
-    workspaceRoot: '/home/operator/projects/agenthub',
+    workspaceRoot: '~/projects/agenthub',
     lastSeenAt: '2026-08-23T08:30:00.000Z',
   },
   {
@@ -30,7 +30,7 @@ const targets: DevicesPageTarget[] = [
     healthState: 'mismatch',
     isOnline: false,
     trustLevel: 'remote',
-    endpoint: 'beta.internal:22',
+    endpoint: 'beta.example.com:22',
   },
 ];
 

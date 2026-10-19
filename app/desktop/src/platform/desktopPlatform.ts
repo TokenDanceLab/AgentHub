@@ -8,7 +8,6 @@ import {
   workbenchDemoRuntimeStore,
 } from '@shared/demo';
 import {
-  createMockTerminalPort,
   registerAttachmentImageUrlResolver,
   registerAttachmentMediaUrlResolver,
   type AgentHubPlatform,
@@ -128,17 +127,9 @@ interface DesktopPlatform extends AgentHubPlatform {
 }
 
 export function createDesktopPlatform(options: DesktopPlatformOptions = {}): DesktopPlatform {
-  // #2154 P1-7: the Desktop terminal host is still the in-memory mock from
-  // #1193 — write() only appends to an array and never produces output, and the
-  // dock has no close affordance, so declaring the capability rendered a
-  // permanently "host port connected" panel that could never do anything.
-  // Declare it false (same as webPlatform) until a real Tauri PTY adapter
-  // exists. createMockTerminalPort stays importable for tests/dev surfaces but
-  // is no longer injected into the production platform. The renderer has no raw
+  // No real Tauri PTY adapter exists yet; declare the capability false so the
+  // terminal dock is not advertised with a mock host. The renderer has no raw
   // process access either way.
-  const localTerminal: boolean = false;
-  const terminal = localTerminal ? createMockTerminalPort() : undefined;
-
   // #1938: let the shared transcript reach the desktop attachment-image
   // resolver without prop threading through workbench glue.
   registerAttachmentImageUrlResolver(resolveDesktopAttachmentImageUrl);
@@ -151,11 +142,11 @@ export function createDesktopPlatform(options: DesktopPlatformOptions = {}): Des
       localEdge: true,
       localFiles: true,
       browserPreview: true,
-      // #2154 P1-7: no real PTY / Tauri host adapter yet (#1174 foundation +
+      // #2154: no real PTY / Tauri host adapter yet (#1174 foundation +
       // #1193 mock only). Declared false so the terminal dock stays hidden
       // instead of advertising a mock host as connected; UI gates on this flag
       // plus the presence of a port.
-      localTerminal,
+      localTerminal: false,
       // Desktop Local Edge backs approval flows, runtime evidence content,
       // and a local sandbox boundary. Remote execution stays un-declared
       // until a cloud/remote target is wired through the Desktop host.
@@ -232,8 +223,6 @@ export function createDesktopPlatform(options: DesktopPlatformOptions = {}): Des
       file: fetchRunCheckpointFile,
     },
     settings: createDesktopSettingsAdapter(),
-    // exactOptionalPropertyTypes: omit key when undefined rather than assign undefined.
-    ...(terminal ? { terminal } : {}),
     runs: {
       async submitComposerIntent(intent: ComposerIntent): Promise<ComposerSubmitResult> {
         if (options.submitRun && (!options.activeProjectId || !options.activeThreadId)) {

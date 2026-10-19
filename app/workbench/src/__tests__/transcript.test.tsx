@@ -20,7 +20,7 @@ import { AgentHubWorkbench } from '../AgentHubWorkbench';
 import {
   workbenchAgents as agents,
   workbenchTranscript as transcript,
-} from '../workbenchTestFixtures';
+} from './fixtures/workbenchTestFixtures';
 
 installWorkbenchTestHooks();
 
@@ -42,7 +42,7 @@ describe('AgentHubWorkbench', () => {
       {
         id: 'user-1',
         kind: 'text',
-        author: { id: 'user', name: 'maintainer', role: 'human' },
+        author: { id: 'user', name: 'Demo User', role: 'human' },
         createdAt: '2026-06-11T09:30:00.000Z',
         text: '检查当前 DesktopUI',
       },
@@ -92,21 +92,21 @@ describe('AgentHubWorkbench', () => {
       {
         id: 'user-1',
         kind: 'text',
-        author: { id: 'user', name: 'maintainer', role: 'human' },
+        author: { id: 'user', name: 'Demo User', role: 'human' },
         text: '第一条连续消息',
         createdAt: '2026-06-07T12:00:00.000Z',
       },
       {
         id: 'user-2',
         kind: 'text',
-        author: { id: 'user', name: 'maintainer', role: 'human' },
+        author: { id: 'user', name: 'Demo User', role: 'human' },
         text: '第二条连续消息',
         createdAt: '2026-06-07T12:03:00.000Z',
       },
       {
         id: 'user-3',
         kind: 'text',
-        author: { id: 'user', name: 'maintainer', role: 'human' },
+        author: { id: 'user', name: 'Demo User', role: 'human' },
         text: '超过分组窗口后的消息',
         createdAt: '2026-06-07T12:10:00.000Z',
       },

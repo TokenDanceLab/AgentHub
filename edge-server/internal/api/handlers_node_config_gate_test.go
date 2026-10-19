@@ -12,14 +12,14 @@ import (
 	"github.com/agenthub/edge-server/internal/store"
 )
 
-// Node-level shared configuration write gate (#2250 wave lane A):
+// Node-level shared configuration write gate (#2250):
 //
 //	POST   /v1/agent-profiles              — create an agent profile
 //	PATCH  /v1/agent-profiles/{profileId}  — mutate systemPrompt/allowedTools/mcpConfig/permissionMode
 //	DELETE /v1/agent-profiles/{profileId}  — remove a profile every local run resolves through
 //	PATCH  /v1/settings                     — patch node settings (persisted, survives restart)
 //
-// The read side of these surfaces has been fail-closed since AH-SR-045 (#878):
+// The read side of these surfaces has been fail-closed since #878:
 // GetAgentProfiles / GetAgentProfile / GetSettings / GetRuntimeSessions all call
 // denyRemoteHubSharedConfig, so a Hub multi-user caller cannot read them. The
 // write side had no gate at all, i.e. the very same caller could not see an
@@ -52,7 +52,7 @@ func newNodeConfigMultiUserHandler() *Handler {
 }
 
 // seedNodeConfigProfile creates a node-level agent profile the way the Edge
-// itself does (no owner binding — that is the point of this slice).
+// itself does (no owner binding — that is the point of a node-level profile).
 func seedNodeConfigProfile(t *testing.T, h *Handler, id, name string) store.AgentProfile {
 	t.Helper()
 	profile, err := ensureStore(h).CreateAgentProfile(store.AgentProfile{
@@ -176,7 +176,7 @@ func nodeConfigErrorObject(t *testing.T, body string) map[string]any {
 
 // assertNodeConfigDenied pins the exact denial shape of the shared-config gate:
 // 404 + errcode.ErrNotFound + message "not found" — the shape the read gates
-// have emitted since AH-SR-045. A distinct code or a "forbidden"/"shared config"
+// have always emitted. A distinct code or a "forbidden"/"shared config"
 // message would tell an unauthorized caller that the profileId or the settings
 // surface exists, i.e. turn the endpoint into an existence oracle.
 func assertNodeConfigDenied(t *testing.T, rec *httptest.ResponseRecorder, what string) {
@@ -358,7 +358,7 @@ func TestNodeConfigGateWriteAndReadDenialsAreByteIdentical(t *testing.T) {
 	stubNodeConfigRuntimeSessions(t)
 
 	// The read gate is the reference shape: it has been in production since
-	// AH-SR-045, so every write denial must reproduce it exactly.
+	// #878, so every write denial must reproduce it exactly.
 	readRec := doNodeConfigGetAgentProfile(h, "profile_oracle", "user-a")
 
 	bodies := map[string]string{
@@ -369,7 +369,7 @@ func TestNodeConfigGateWriteAndReadDenialsAreByteIdentical(t *testing.T) {
 		"DELETE /v1/agent-profiles/profile_oracle": stripTraceID(doNodeConfigDeleteAgentProfile(h, "profile_oracle", "user-a").Body.String()),
 		"DELETE /v1/agent-profiles/profile_ghost":  stripTraceID(doNodeConfigDeleteAgentProfile(h, "profile_ghost", "user-a").Body.String()),
 		"PATCH /v1/settings":                       stripTraceID(doNodeConfigPatchSettings(h, "user-a", `{"theme":"dark"}`).Body.String()),
-		// read paths (the pre-existing gate shape, AH-SR-045)
+		// read paths (the pre-existing gate shape)
 		"GET /v1/agent-profiles":                stripTraceID(doNodeConfigGetAgentProfiles(h, "user-a").Body.String()),
 		"GET /v1/agent-profiles/profile_oracle": stripTraceID(doNodeConfigGetAgentProfile(h, "profile_oracle", "user-a").Body.String()),
 		"GET /v1/agent-profiles/profile_ghost":  stripTraceID(doNodeConfigGetAgentProfile(h, "profile_ghost", "user-a").Body.String()),
@@ -396,7 +396,7 @@ func TestNodeConfigGateWriteAndReadDenialsAreByteIdentical(t *testing.T) {
 // Class 2 — empty principal under Hub JWT fails closed on all eight handlers
 // ---------------------------------------------------------------------------
 
-// TestNodeConfigGateFailsClosedWithoutHubIdentity mirrors AH-SR-045 for the whole
+// TestNodeConfigGateFailsClosedWithoutHubIdentity covers the whole
 // surface: multi-user mode + no Hub identity = empty principal = nothing readable
 // and nothing writable.
 func TestNodeConfigGateFailsClosedWithoutHubIdentity(t *testing.T) {
@@ -452,8 +452,8 @@ func TestNodeConfigGateFailsClosedWithoutHubIdentity(t *testing.T) {
 // Gate position — denial happens before the request body is decoded
 // ---------------------------------------------------------------------------
 
-// TestNodeConfigGateDeniesBeforeDecodingBody pins the gate position mandated for
-// this slice: method check → gate → decodeOptionalJSON. An unauthorized caller
+// TestNodeConfigGateDeniesBeforeDecodingBody pins the gate position:
+// method check → gate → decodeOptionalJSON. An unauthorized caller
 // must not be able to make the Edge parse a body at all (decodeOptionalJSON is the
 // shared 1MB limit point, #2154), so a malformed body must yield the same 404 and
 // never a 400 that would prove the handler ran.

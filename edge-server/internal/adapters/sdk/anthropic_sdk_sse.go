@@ -12,9 +12,6 @@ import (
 	"github.com/agenthub/edge-server/internal/adapters"
 )
 
-// Residual pure-helper peel #1142: Anthropic SSE stream parse + event dispatch.
-// Grouped into package sdk (#1760); ParseStream continues to call parseSSEStream.
-
 // anthropicSSEState accumulates cross-event state while parsing an SSE stream.
 type anthropicSSEState struct {
 	currentContentType string

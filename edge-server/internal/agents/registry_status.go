@@ -1,9 +1,5 @@
 package agents
 
-// Residual pure-helper peel #1154: status/run binding and per-parent child
-// count mutators extracted from registry.go. Same package agents; zero
-// behavior change.
-
 import "time"
 
 // SetStatus updates an agent's status and bumps LastSeen.
@@ -36,26 +32,6 @@ func (r *Registry) SetRunID(id, runID string) bool {
 	inst.RunID = runID
 	inst.LastSeen = time.Now()
 	return true
-}
-
-// SetLastSeenNow updates the LastSeen timestamp for the given agent instance.
-func (r *Registry) SetLastSeenNow(id string) bool {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	inst, ok := r.agents[id]
-	if !ok {
-		return false
-	}
-	inst.LastSeen = time.Now()
-	return true
-}
-
-// IncrChildCount increments the active child count for the given parent.
-// It must only be called after a child agent is successfully registered.
-func (r *Registry) IncrChildCount(parentID string) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	r.childrenCount[parentID]++
 }
 
 // DecrChildCount decrements the active child count for the given parent.

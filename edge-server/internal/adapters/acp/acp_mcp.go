@@ -1,11 +1,11 @@
-// MCP config wiring for the ACP session (#1743, follow-up of #1404).
+// MCP config wiring for the ACP session.
 //
 // The run profile carries MCP server definitions as a --mcp-config-style
 // JSON string ({"mcpServers": {name: {...}}}); this file converts them into
 // the acp-go-sdk session/new McpServer union entries. The conversion is
 // pure and fail-closed: any entry that cannot be represented on the ACP
-// wire fails the whole parse so runACPSession can surface the #1740
-// degradation event instead of silently dropping servers.
+// wire fails the whole parse so runACPSession can surface the degradation
+// event instead of silently dropping servers.
 package acp
 
 import (
@@ -22,7 +22,7 @@ import (
 // session/new McpServer entries. Empty input yields an empty (non-nil)
 // slice — session/new requires the mcpServers field to be present. Any
 // unrepresentable entry (unparseable JSON, unknown transport, missing
-// command/url) fails the whole parse; the caller keeps the #1740 degraded
+// command/url) fails the whole parse; the caller keeps the visible degraded
 // event on that path.
 func parseACPMcpServers(configJSON string) ([]acp.McpServer, error) {
 	if strings.TrimSpace(configJSON) == "" {

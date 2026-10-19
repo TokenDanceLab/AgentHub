@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/agenthub/hub-server/internal/model"
-	"github.com/agenthub/hub-server/internal/service/dispatch"
 	"github.com/agenthub/hub-server/internal/service/dispatchsvc"
 )
 
@@ -17,7 +16,7 @@ import (
 // dispatchService returns the composed DispatchService, lazily constructing one
 // from Service deps when tests use struct literals without NewService.
 func (s *Service) dispatchService() *dispatchsvc.DispatchService {
-	if dispatch.ComposedDispatchReady(s.dispatch != nil) {
+	if s.dispatch != nil {
 		return s.dispatch
 	}
 	return dispatchsvc.NewDispatchService(s.db, s.bus, wsManagerAdapter{manager: s.mgr}, s.cacheClient, relayServiceAdapter{relay: s.relay}, s.deliveryOutboxService(), s.edgeCfg, s.edgeClient, s.jwtSecret)

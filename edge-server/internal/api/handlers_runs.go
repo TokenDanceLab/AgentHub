@@ -61,7 +61,7 @@ type runRequest struct {
 	CallbackOwner           string                               `json:"callbackOwner"`
 	HubTaskID               string                               `json:"hubTaskId"`          // Edge-to-Hub direct callback task ID
 	TraceID                 string                               `json:"trace_id,omitempty"` // Hub dispatch trace correlation id
-	DeliveryID              string                               `json:"deliveryId"`         // Hub delivery_id for dual-channel dedup (#2101 G2)
+	DeliveryID              string                               `json:"deliveryId"`         // Hub delivery_id for dual-channel dedup (#2101)
 	Messages                []runnerctx.Message                  `json:"messages,omitempty"`
 	PinnedMessages          []runnerctx.Message                  `json:"pinnedMessages,omitempty"`
 }
@@ -127,8 +127,8 @@ func (h *Handler) applyProfileDefaults(req *runRequest) {
 	}
 }
 
-// validateCapabilityRequest enforces the dual-token capability policy
-// (AH-SR-046): when a Hub user identity is present on the request, PostRuns
+// validateCapabilityRequest enforces the dual-token capability policy: when a
+// Hub user identity is present on the request, PostRuns
 // requires BOTH that identity (middleware) AND a per-run capability token
 // that binds user/device/target/project. Pure local-auth (no Hub identity)
 // remains allowed without capability when HubJWTSecret is empty. If Hub
@@ -184,10 +184,6 @@ func (h *Handler) validateCapabilityRequest(r *http.Request, req *runRequest) *e
 	}
 	return nil
 }
-
-// validateRunCreateState previously performed pre-create validation here; the
-// shared run-creation core (internal/runcontrol.Create) now owns the entire
-// validation + creation + executor sequence for both REST and MCP.
 
 // publishRunPromptItem stores the run prompt as a user_message item and
 // publishes message.created / item.created events. Failure is non-fatal.
@@ -318,17 +314,10 @@ func (h *Handler) PostRuns(w http.ResponseWriter, r *http.Request) {
 		req.SessionID = runtimeSessionIDForThread(req.ThreadID)
 	}
 
-	// Dual-token auth (AH-SR-046): see validateCapabilityRequest for the full
-	// policy. The status comes from the error rather than from this call site,
-	// because the policy has two different failure kinds: a missing or invalid
-	// capability token is 403 capability_token_invalid (the client's fault),
-	// while a Hub identity present alongside an empty/misconfigured HubJWTSecret
-	// is 503 not_configured (the operator's fault — validateCapabilityRequest
-	// fails closed rather than soft-skipping). This site used to hand-copy 403
-	// for both and the comment claimed "Failures are always 403", so a server
-	// misconfiguration was reported to the client as an authorization failure:
-	// status said "do not retry, your credentials are wrong" while the code said
-	// "not_configured" (#2245).
+	// Dual-token auth: see validateCapabilityRequest for the full policy. The
+	// returned error carries the status: capability-token failures are
+	// 403 capability_token_invalid; a Hub identity with an empty/misconfigured
+	// HubJWTSecret is 503 not_configured (validateCapabilityRequest fails closed).
 	if err := h.validateCapabilityRequest(r, &req); err != nil {
 		errcode.Write(w, err)
 		return
@@ -354,8 +343,8 @@ func (h *Handler) PostRuns(w http.ResponseWriter, r *http.Request) {
 		resume := true
 		req.Continue = &resume
 	}
-	// WorkDir normalization previously happened inside validateRunCreateState;
-	// the shared core also trims, this keeps the context builder consistent.
+	// WorkDir is trimmed here for the context builder; runcontrol.Create
+	// applies the same normalization.
 	req.WorkDir = strings.TrimSpace(req.WorkDir)
 
 	// Resolve adapter label for debug logging.
@@ -449,7 +438,7 @@ func (h *Handler) PostRuns(w http.ResponseWriter, r *http.Request) {
 			data["deliveryId"] = req.DeliveryID
 		}
 	}
-	writeSuccess(w, http.StatusAccepted, acceptedResponse(data))
+	writeSuccess(w, http.StatusAccepted, data)
 }
 
 // ---------------------------------------------------------------------------
@@ -469,42 +458,33 @@ func (h *Handler) PostCancelRun(w http.ResponseWriter, r *http.Request) {
 	if h.Executor != nil {
 		result := h.Executor.Cancel(runID)
 		if result.Found {
-			// #108: align cancel response with OpenAPI spec
-			// Terminal runs (finished/failed/cancelled) are already done; return OK with current status
-			if isTerminalRunStatus(result.Status) {
-				writeSuccess(w, http.StatusOK, acceptedResponse(map[string]any{
+			// Terminal runs (finished/failed/cancelled/completed_with_issues)
+			// are already done; return OK with the current status.
+			if store.IsTerminalRunStatus(result.Status) {
+				writeSuccess(w, http.StatusOK, map[string]any{
 					"runId":  runID,
 					"status": result.Status,
-				}))
+				})
 				return
 			}
-			writeSuccess(w, http.StatusAccepted, acceptedResponse(map[string]any{
+			writeSuccess(w, http.StatusAccepted, map[string]any{
 				"runId":  runID,
 				"status": result.Status,
-			}))
+			})
 			return
 		}
 	}
-	// #108: check store as fallback; return 404 for missing run instead of silently accepting
+	// Check store as fallback; return 404 for missing run instead of silently accepting
 	if repository := ensureStore(h); repository != nil {
 		if run, ok := repository.GetRun(runID); ok {
-			writeSuccess(w, http.StatusOK, acceptedResponse(map[string]any{
+			writeSuccess(w, http.StatusOK, map[string]any{
 				"runId":  runID,
 				"status": run.Status,
-			}))
+			})
 			return
 		}
 	}
 	errcode.Write(w, errcode.ErrNotFound.WithMessage("run not found"))
-}
-
-func isTerminalRunStatus(status string) bool {
-	switch status {
-	case "finished", "failed", "cancelled":
-		return true
-	default:
-		return false
-	}
 }
 
 // ---------------------------------------------------------------------------

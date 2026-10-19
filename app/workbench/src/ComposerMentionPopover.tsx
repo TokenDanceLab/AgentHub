@@ -7,7 +7,7 @@ import type { MentionPopoverCoords } from './composerMentionPopoverHelpers';
 import styles from './AgentHubWorkbench.module.css';
 
 /* ═══════════════════════════════════════════════════════════════════════
-   ComposerMentionPopover — presentational @mention candidate list (T11/UI1).
+   ComposerMentionPopover — presentational @mention candidate list.
 
    Rendered by UnifiedComposer when an active '@' trigger is detected in
    the textarea. Pure: the host owns trigger/query/activeIndex/coords and

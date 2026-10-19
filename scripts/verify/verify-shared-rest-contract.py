@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""verify-shared-rest-contract — Hub 前端 hubClient 模块 REST 契约门禁（ps1 迁移，契约见 server docs/design/ps1-to-python-migration.md）。
+"""verify-shared-rest-contract — Hub 前端 hubClient 模块 REST 契约门禁。
 
 Hub server 声明的 REST 面静态注册于 hub-server/internal/router/router.go；Hub 前端客户端在
 app/shared/src（hubClient*.ts，尤其 hubClientPayloadPaths.ts）用纯路径构造器拼调用路径。
@@ -19,7 +19,7 @@ app/shared/src（hubClient*.ts，尤其 hubClientPayloadPaths.ts）用纯路径�
 客户端<->服务端契约回归。
 
 范围说明：本门禁覆盖 Hub 前端 hubClient 模块对 Hub server 面；Edge 侧 REST 面
-（apiClient.ts，按 RFC A-V3 §4.1 已删除）是独立关注点，刻意不在范围内。
+（`apiClient.ts` 已删除）是独立关注点，刻意不在范围内。
 
 用法：
   python scripts/verify/verify-shared-rest-contract.py
@@ -30,6 +30,9 @@ import argparse
 import os
 import re
 import sys
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import hub_router  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -81,43 +84,7 @@ def main() -> int:
     if not os.path.isfile(router_path):
         fail_check(f"router source not found: {args.router_path}")
         return 1
-    router_lines = re.split(r"\r?\n", read_text(router_path))
-
-    # 迭代解析 group 前缀（public := r.Group(...)，child := parent.Group(...)）
-    prefix = {}
-    changed = True
-    while changed:
-        changed = False
-        for line in router_lines:
-            if re.match(r"^\s*//", line):
-                continue
-            group_match = re.search(r'(\w+)\s*:=\s*(\w+)\.Group\("([^"]*)"', line)
-            if not group_match:
-                continue
-            var, parent, segment = group_match.group(1), group_match.group(2), group_match.group(3)
-            if var in prefix:
-                continue
-            if parent == "r":
-                prefix[var] = segment
-                changed = True
-            elif parent in prefix:
-                prefix[var] = prefix[parent] + segment
-                changed = True
-
-    hub_routes = set()
-    for line in router_lines:
-        if re.match(r"^\s*//", line):
-            continue
-        for route_match in re.finditer(r'(\w+)\.(GET|POST|PUT|DELETE|PATCH)\("([^"]*)"', line):
-            var, path = route_match.group(1), route_match.group(3)
-            if var == "r":
-                base = ""
-            elif var in prefix:
-                base = prefix[var]
-            else:
-                continue
-            full = re.sub(r":(\w+)", "{param}", base + path)
-            hub_routes.add(full)
+    hub_routes = hub_router.paths(router_path)
 
     # ── 客户端调用路径（Hub 前端 hubClient 模块）──
     client_dir = os.path.join(ROOT, args.client_src_dir.replace("/", os.sep))
@@ -150,6 +117,12 @@ def main() -> int:
         if norm is not None:
             normalized.add(norm)
 
+    if not normalized:
+        fail_check(
+            "client scan produced 0 normalized API paths — refusing to report clean "
+            "(the hubClient path-building shapes may have changed)"
+        )
+
     print("\n=== Shared REST contract (Hub client <-> Hub router) ===")
     print(f"Hub routes: {len(hub_routes)} | client path(s) scanned: {len(raw_paths)} | normalized unique: {len(normalized)}")
 
@@ -180,6 +153,6 @@ def main() -> int:
 if __name__ == "__main__":
     try:
         sys.exit(main())
-    except Exception as exc:  # noqa: BLE001 —— 顶层兜底，对齐 ps1 $ErrorActionPreference='Stop'
+    except Exception as exc:  # noqa: BLE001 —— fail closed：未捕获异常返回非零
         print(f"ERROR: {exc}", file=sys.stderr)
         sys.exit(1)

@@ -3,7 +3,6 @@ package app
 import (
 	"context"
 	"errors"
-	"fmt"
 	"runtime"
 	"sync/atomic"
 	"testing"
@@ -31,7 +30,7 @@ func TestBackgroundGroupWaitDeadline(t *testing.T) {
 }
 
 // TestBackgroundGroupErrorPropagates: a task error must surface through Wait
-// (no more log-line-only failures, #1542 requirement 9).
+// (no more log-line-only failures, #1542).
 func TestBackgroundGroupErrorPropagates(t *testing.T) {
 	bg := newBackgroundGroup(context.Background())
 	sentinel := errors.New("background task exploded")
@@ -101,7 +100,7 @@ func TestShutdownWaitsForBackground(t *testing.T) {
 }
 
 // TestBackgroundGroupCyclesNoGoroutineGrowth: 20 create/cancel/wait cycles
-// must not accumulate goroutines (#1542 must-test 6).
+// must not accumulate goroutines (#1542).
 func TestBackgroundGroupCyclesNoGoroutineGrowth(t *testing.T) {
 	before := runtime.NumGoroutine()
 	for i := 0; i < 20; i++ {
@@ -130,5 +129,3 @@ func TestBackgroundGroupCyclesNoGoroutineGrowth(t *testing.T) {
 		t.Fatalf("goroutines grew across 20 cycles: before=%d after=%d", before, got)
 	}
 }
-
-var _ = fmt.Sprintf // keep fmt import if unused in future edits

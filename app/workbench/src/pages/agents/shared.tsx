@@ -3,8 +3,7 @@ import styles from '../AgentsPage.module.css';
 import type { RiskLevel } from './types';
 
 /* ═══════════════════════════════════════════════════════════════════════
-   Shared presentational helpers for AgentsPage subviews.
-   Extracted for Phase 16 strangler slice #552.
+   Shared presentational helpers for AgentsPage subviews (#552).
    ═══════════════════════════════════════════════════════════════════════ */
 
 export function permissionClass(value: string): string {

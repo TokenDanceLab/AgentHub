@@ -74,104 +74,96 @@ var (
 	WSRateLimitedMsgs                      prometheus.Counter
 	WSKickedConns                          prometheus.Counter
 	DBPoolInUse                            prometheus.Gauge
-	RedisPoolHitsTotal                     prometheus.Counter // G11: was Gauge redis_pool_hits; PoolStats().Hits is cumulative → Counter
+	RedisPoolHitsTotal                     prometheus.Counter // Cumulative Redis pool hits; PoolStats().Hits is monotonic, so this is a Counter.
 	EventBusQueueLen                       prometheus.Gauge
 	EventBusPanics                         prometheus.Counter // see hubPanicObserver: fed by name dispatch + the ants pool handler, never both for one panic (#2246)
 	TeamFaultEscalationReviewEventFailures prometheus.Counter
 
-	// WSSendFrameBypass counts WebSocket frames sent via handler.sendFrame,
-	// which bypasses Manager.PushToConn and therefore the per-connection
-	// seq_id stamping contract (G12 KNOWN DEFECT). The frame_type label
-	// carries the ws.Frame.Type value so operators can see which frame
-	// types escape seq_id stamping. Observability-only: this metric does
-	// not change the bypass control flow.
-	WSSendFrameBypass *prometheus.CounterVec
-
-	// G3 — Delivery outbox retry / dead-letter / redispatch observability.
+	// Delivery outbox retry / dead-letter / redispatch observability.
 	DeliveryOutboxRetryAttempts      prometheus.Counter
 	DeliveryOutboxDeadLetters        *prometheus.CounterVec
 	DeliveryOutboxRedispatchFailures prometheus.Counter
 	DeliveryOutboxScanFailures       prometheus.Counter
 
-	// G3-Gauge — Delivery outbox backlog by status. Refreshed every retry
+	// Delivery outbox backlog by status. Refreshed every retry
 	// tick by the retry loop (ScanRetryableDeliveries path) so operators see
 	// pending/sent/retrying/dead population growth without polling the DB.
 	// Distinct from the cumulative counters above: a Gauge shows the current
 	// in-flight backlog, not lifetime totals.
 	DeliveryOutboxBacklog *prometheus.GaugeVec
 
-	// G4 — Edge HTTP dispatch failure observability (6 failure categories).
+	// Edge HTTP dispatch failure observability (6 failure categories).
 	AgentDispatchEdgeHTTPFailures *prometheus.CounterVec
 
-	// G9 — JWT / WS auth verification failure observability (security).
+	// JWT / WS auth verification failure observability (security).
 	JWTVerificationFailures     *prometheus.CounterVec
 	WSAuthFailures              *prometheus.CounterVec
 	JTIBlacklistCheckErrors     prometheus.Counter
 	RefreshBlacklistCheckErrors prometheus.Counter
 
 	// RefreshTokenReuseTotal counts refresh attempts that presented an
-	// already-revoked refresh-token row (#2154 F2 step ①). Signal-only:
+	// already-revoked refresh-token row. Signal-only:
 	// the response stays AuthRefreshInvalid and no cascade revocation
 	// happens. Reuse of a rotated-away token is structurally undetectable
 	// in the DB (UpsertRefreshToken ON CONFLICT overwrites the old hash),
 	// so this signal covers logout-revoked rows only.
 	RefreshTokenReuseTotal prometheus.Counter
 
-	// G1 — WS non-buffer-full delivery failures (marshal / conn closed / conn not found).
+	// WS non-buffer-full delivery failures (marshal / conn closed / conn not found).
 	WSDeliveryFailures *prometheus.CounterVec
 
-	// G2 — WS disconnect / reconnect / stale-close counters.
+	// WS disconnect / reconnect / stale-close counters.
 	WSDisconnects prometheus.Counter
 	WSReconnects  prometheus.Counter
 	WSStaleClose  prometheus.Counter
 
-	// G5 — Agent dispatch offline push failures (6 routes).
+	// Agent dispatch offline push failures (6 routes).
 	AgentDispatchOfflinePushFailures *prometheus.CounterVec
 
-	// G6 — Team assignment timeout + state-transition failure counters.
+	// Team assignment timeout + state-transition failure counters.
 	TeamAssignmentTimeouts                prometheus.Counter
 	TeamAssignmentStateTransitionFailures *prometheus.CounterVec
 
-	// G7 — EventBus submit failures (pool full / closed) and events abandoned
+	// EventBus submit failures (pool full / closed) and events abandoned
 	// when Close hits its drain deadline (#1548).
 	EventBusSubmitFailures prometheus.Counter
 	EventBusDroppedOnClose prometheus.Counter
 
-	// G10 — Admin server up gauge (1 = running, 0 = not started / failed).
+	// Admin server up gauge (1 = running, 0 = not started / failed).
 	AdminServerUp prometheus.Gauge
 
-	// G8 — DB slow-query / error counters. The slow-query counter increments
+	// DB slow-query / error counters. The slow-query counter increments
 	// for every slow query regardless of rows-affected; the slog Warn is
 	// silenced when rows==0 (to avoid log flooding) but the metric is not —
 	// operators must see slow-query rate even for empty result sets.
 	DBErrors      prometheus.Counter
 	DBSlowQueries prometheus.Counter
 
-	// G8 — Optional DB pool idle gauge, set periodically in
+	// Optional DB pool idle gauge, set periodically in
 	// app.startMetricsCollector alongside DBPoolInUse.
 	// NOTE: sql.DBStats has no StaleConns field (that is a Redis pool
 	// concept); only db_pool_idle is exposed for the DB pool.
 	DBPoolIdle prometheus.Gauge
 
-	// DB pool exhaustion observability (#2154 Gauss P1-1): cumulative
+	// DB pool exhaustion observability (#2154): cumulative
 	// WaitCount / WaitDuration deltas per collector tick. A nonzero wait
 	// rate means callers blocked on pool exhaustion — the signal that the
 	// old 2-connection default hid completely.
 	DBPoolWaitTotal        prometheus.Counter
 	DBPoolWaitSecondsTotal prometheus.Counter
 
-	// Audit-D (2026-07-29) — Swallowed-error observability for the three
-	// error-swallowing sites flagged by Audit-D §1.1: dead-letter move,
-	// notification delivery, running-task heartbeat, and session touch.
+	// Swallowed-error observability for the four error-swallowing sites:
+	// dead-letter move, notification delivery, running-task heartbeat, and
+	// session touch.
 	// These do NOT change control flow; they only make previously silent
-	// best-effort failures visible. Distinct from G3
+	// best-effort failures visible. Distinct from
 	// delivery_outbox_dead_letter_total (which counts successful moves).
 	DispatchDeadLetterMoveFailures prometheus.Counter
 	NotificationDeliveryFailures   *prometheus.CounterVec
 	AgentHeartbeatFailures         prometheus.Counter
 	SessionTouchFailures           prometheus.Counter
 
-	// Audit-D2 (#1543) — Async audit queue reliability. The audit retry
+	// Async audit queue reliability (#1543). The audit retry
 	// queue previously dropped events silently when full, drained without
 	// bound on shutdown, and retried with a non-cancellable sleep. These
 	// metrics make every loss/retry visible. AuditQueueDepth is maintained
@@ -307,15 +299,7 @@ func Register() {
 			},
 		)
 
-		WSSendFrameBypass = prometheus.NewCounterVec(
-			prometheus.CounterOpts{
-				Name: "ws_sendframe_bypass_total",
-				Help: "Total WebSocket frames sent via handler.sendFrame, bypassing Manager.PushToConn seq_id stamping (G12).",
-			},
-			[]string{"frame_type"},
-		)
-
-		// G3 — Delivery outbox observability counters.
+		// Delivery outbox observability counters.
 		DeliveryOutboxRetryAttempts = prometheus.NewCounter(
 			prometheus.CounterOpts{
 				Name: "delivery_outbox_retry_attempts_total",
@@ -345,7 +329,7 @@ func Register() {
 			},
 		)
 
-		// G3-Gauge — current backlog per status, refreshed by the retry tick.
+		// Current backlog per status, refreshed by the retry tick.
 		DeliveryOutboxBacklog = prometheus.NewGaugeVec(
 			prometheus.GaugeOpts{
 				Name: "delivery_outbox_backlog",
@@ -354,7 +338,7 @@ func Register() {
 			[]string{"status"},
 		)
 
-		// G4 — Edge HTTP dispatch failure counter (6 failure categories).
+		// Edge HTTP dispatch failure counter (6 failure categories).
 		AgentDispatchEdgeHTTPFailures = prometheus.NewCounterVec(
 			prometheus.CounterOpts{
 				Name: "agent_dispatch_edge_http_failures_total",
@@ -363,7 +347,7 @@ func Register() {
 			[]string{"reason"},
 		)
 
-		// G9 — JWT / WS auth verification failure counters (security).
+		// JWT / WS auth verification failure counters (security).
 		JWTVerificationFailures = prometheus.NewCounterVec(
 			prometheus.CounterOpts{
 				Name: "jwt_verification_failures_total",
@@ -387,9 +371,8 @@ func Register() {
 			},
 		)
 
-		// #2064 item ①: symmetric counter for refresh-token blacklist check
-		// errors. Wiring point is in service/auth (see BLOCKED.md); the metric
-		// is registered here so dashboards can query it once wired.
+		// Symmetric counter for refresh-token blacklist check errors. It is
+		// incremented by service/auth and registered here for dashboards.
 		RefreshBlacklistCheckErrors = prometheus.NewCounter(
 			prometheus.CounterOpts{
 				Name: "refresh_blacklist_check_errors_total",
@@ -397,17 +380,17 @@ func Register() {
 			},
 		)
 
-		// #2154 F2 step ①: revoked refresh-token row reuse signal. Observability
+		// Revoked refresh-token row reuse signal. Observability
 		// only — no control-flow change (wired in service/auth RefreshToken);
 		// never logs the token or its hash, only user_id/device_type dimensions.
 		RefreshTokenReuseTotal = prometheus.NewCounter(
 			prometheus.CounterOpts{
 				Name: "refresh_token_reuse_total",
-				Help: "Total number of refresh attempts presenting an already-revoked refresh token row (#2154 F2 step ①; signal-only, no cascade revocation).",
+				Help: "Total number of refresh attempts presenting an already-revoked refresh token row (signal-only, no cascade revocation).",
 			},
 		)
 
-		// G1 — WS non-buffer-full delivery failures by reason.
+		// WS non-buffer-full delivery failures by reason.
 		WSDeliveryFailures = prometheus.NewCounterVec(
 			prometheus.CounterOpts{
 				Name: "ws_delivery_failures_total",
@@ -416,7 +399,7 @@ func Register() {
 			[]string{"reason"},
 		)
 
-		// G2 — WS disconnect / reconnect / stale-close counters.
+		// WS disconnect / reconnect / stale-close counters.
 		WSDisconnects = prometheus.NewCounter(
 			prometheus.CounterOpts{
 				Name: "ws_disconnects_total",
@@ -436,7 +419,7 @@ func Register() {
 			},
 		)
 
-		// G5 — Agent dispatch offline push failures by route.
+		// Agent dispatch offline push failures by route.
 		AgentDispatchOfflinePushFailures = prometheus.NewCounterVec(
 			prometheus.CounterOpts{
 				Name: "agent_dispatch_offline_push_failures_total",
@@ -445,7 +428,7 @@ func Register() {
 			[]string{"route"},
 		)
 
-		// G6 — Team assignment timeout + state-transition failure counters.
+		// Team assignment timeout + state-transition failure counters.
 		TeamAssignmentTimeouts = prometheus.NewCounter(
 			prometheus.CounterOpts{
 				Name: "team_assignment_timeouts_total",
@@ -460,7 +443,7 @@ func Register() {
 			[]string{"phase"},
 		)
 
-		// G7 — EventBus submit failures (pool full / closed).
+		// EventBus submit failures (pool full / closed).
 		EventBusSubmitFailures = prometheus.NewCounter(
 			prometheus.CounterOpts{
 				Name: "eventbus_submit_failures_total",
@@ -468,7 +451,7 @@ func Register() {
 			},
 		)
 
-		// G7 (#1548) — events abandoned when Close hits its drain deadline.
+		// Events abandoned when Close hits its drain deadline (#1548).
 		EventBusDroppedOnClose = prometheus.NewCounter(
 			prometheus.CounterOpts{
 				Name: "eventbus_dropped_on_close_total",
@@ -476,7 +459,7 @@ func Register() {
 			},
 		)
 
-		// G10 — Admin server up gauge.
+		// Admin server up gauge.
 		AdminServerUp = prometheus.NewGauge(
 			prometheus.GaugeOpts{
 				Name: "admin_server_up",
@@ -484,7 +467,7 @@ func Register() {
 			},
 		)
 
-		// G8 — DB slow-query / error counters.
+		// DB slow-query / error counters.
 		DBErrors = prometheus.NewCounter(
 			prometheus.CounterOpts{
 				Name: "db_errors_total",
@@ -498,7 +481,7 @@ func Register() {
 			},
 		)
 
-		// G8 — Optional DB pool idle gauge (set periodically in app.startMetricsCollector).
+		// Optional DB pool idle gauge (set periodically in app.startMetricsCollector).
 		// sql.DBStats has no StaleConns; only idle is exposed for the DB pool.
 		DBPoolIdle = prometheus.NewGauge(
 			prometheus.GaugeOpts{
@@ -519,7 +502,7 @@ func Register() {
 			},
 		)
 
-		// Audit-D — Swallowed-error counters for dead-letter move, notification
+		// Swallowed-error counters for dead-letter move, notification
 		// delivery, running-task heartbeat, and session touch failures.
 		// Observability-only; no control-flow change at the call sites.
 		DispatchDeadLetterMoveFailures = prometheus.NewCounter(
@@ -551,7 +534,7 @@ func Register() {
 			},
 		)
 
-		// Audit-D2 — Async audit queue reliability metrics (#1543).
+		// Async audit queue reliability metrics (#1543).
 		AuditQueueDrops = prometheus.NewCounter(
 			prometheus.CounterOpts{
 				Name: "audit_queue_drops_total",
@@ -621,7 +604,6 @@ func Register() {
 		prometheus.MustRegister(EventBusQueueLen)
 		prometheus.MustRegister(EventBusPanics)
 		prometheus.MustRegister(TeamFaultEscalationReviewEventFailures)
-		prometheus.MustRegister(WSSendFrameBypass)
 		prometheus.MustRegister(DeliveryOutboxRetryAttempts)
 		prometheus.MustRegister(DeliveryOutboxDeadLetters)
 		prometheus.MustRegister(DeliveryOutboxRedispatchFailures)

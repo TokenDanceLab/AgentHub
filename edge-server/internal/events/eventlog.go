@@ -59,8 +59,7 @@ type EventLog struct {
 	// Bus.EventLogTruncations for the edge_event_log_truncations_total metric.
 	truncations atomic.Int64
 	// truncateFailures counts truncateLocked invocations that hit an error
-	// branch (seek/read/truncate/rewrite failure) and previously returned
-	// silently. Exposed via Bus.EventLogTruncateFailures for
+	// branch (seek/read/truncate/rewrite failure). Exposed via Bus.EventLogTruncateFailures for
 	// edge_event_log_truncate_failures_total so an operator whose log was
 	// growing unbounded or losing replay data finally gets a signal.
 	truncateFailures atomic.Int64
@@ -252,8 +251,7 @@ func (l *EventLog) Append(evt EventEnvelope) error {
 		// over 3x2000 appends of a ~660-byte envelope, dropping the two Stats
 		// takes Append from a 13.5us median to 11.8us (-13%), and the same
 		// ~11% shows up under contention because the saving is inside the
-		// critical section every publisher and every replay waits on (#2256
-		// E-P3-7).
+		// critical section every publisher and every replay waits on (#2256).
 		//
 		// Truncation is the one path where the size is genuinely not derivable
 		// — truncateLocked rewrites the file — so that rare branch keeps a real
@@ -327,13 +325,13 @@ func appendSorted(sorted []int64, seq int64) []int64 {
 
 // truncateLocked rewrites the log file keeping only the trailing portion.
 // Must be called with l.mu held. The index is rebuilt after the rewrite so
-// replay offsets stay accurate after truncation. Every failure branch that
-// previously returned silently now increments truncateFailures and emits a
-// slog.Error so an operator whose log is growing unbounded or losing replay
-// offsets finally gets a signal (edge_event_log_truncate_failures_total).
+// replay offsets stay accurate after truncation. Every failure branch
+// increments truncateFailures and emits a slog.Error so an operator whose log
+// is growing unbounded or losing replay offsets gets a signal
+// (edge_event_log_truncate_failures_total).
 func (l *EventLog) truncateLocked() {
 	// Timed because the whole body runs under l.mu: this is the bus freeze an
-	// operator needs to be able to see (#2304). Both counters are written once
+	// operator needs to be able to see. Both counters are written once
 	// per truncation, not per event, so they add nothing to the Append path.
 	truncateStarted := time.Now()
 	defer func() {

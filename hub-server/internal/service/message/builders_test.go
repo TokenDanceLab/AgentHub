@@ -48,19 +48,17 @@ func TestSendMessageResponseFromModel(t *testing.T) {
 // TestIsUniqueViolation_UsedBySendMessage covers the duplicate-key
 // classification SendMessage's idempotent-retry branch depends on.
 //
-// This test used to exercise a package-private isDuplicateKeyError that lived
-// in builders.go. #2244 slice 1 deleted that copy and pointed the branch at
-// repository.IsUniqueViolation, the single implementation, so the test now
-// exercises that.
+// Exercises the branch against repository.IsUniqueViolation, the single
+// implementation.
 //
 // FOUR of the five original cases are carried over verbatim. The fifth —
 // upper-case "UNIQUE constraint failed: messages.client_msg_id" — used to
 // assert `false`, with the comment `// case-sensitive "unique"`. That assertion
-// did not describe intended behaviour, it PINNED THE BUG this slice exists to
-// fix: it locked in that a SQLite-style upper-case unique violation was not
-// recognised, so a client retrying a send that had already landed got a 500
-// instead of its own message. It is flipped to `true` here, and the flip is
-// proved at the behavioural level (not just the classifier level) by
+// did not describe intended behaviour, it pinned a bug: it locked in that a
+// SQLite-style upper-case unique violation was not recognised, so a client
+// retrying a send that had already landed got a 500 instead of its own
+// message. The case now expects `true`, and the behaviour is proved at the
+// behavioural level (not just the classifier level) by
 // TestSendMessage_PersistDuplicateSQLiteUppercaseIsIdempotent and
 // TestPinMessage_DuplicateSQLiteUppercaseIsIdempotent in
 // unique_violation_test.go, both of which are red against the old code.

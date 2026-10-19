@@ -63,7 +63,7 @@ const (
 )
 
 // maxMCPBodyBytes limits the request body size for MCP requests (1 MB).
-// This matches the REST API limit in handlers.go.
+// This matches the REST API limit in decodeOptionalJSON (handlers_events.go).
 const maxMCPBodyBytes = 1 << 20
 
 // jsonrpcRequest represents a JSON-RPC 2.0 request.

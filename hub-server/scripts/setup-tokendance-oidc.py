@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""setup-tokendance-oidc — 创建/轮换 AgentHub Desktop 的 OAuth client 凭据（ps1 迁移，契约见 server docs/design/ps1-to-python-migration.md）。
+"""setup-tokendance-oidc — 创建/轮换 AgentHub Desktop 的 OAuth client 凭据（ps1 迁移）。
 
 用法: python hub-server/scripts/setup-tokendance-oidc.py [--TokenDanceUrl <url>]
 前置: TokenDance ID 正在运行（默认 http://localhost:3000）
@@ -45,7 +45,7 @@ def main() -> int:
         print("  TokenDance ID is running.")
     except Exception:  # noqa: BLE001 —— 对齐 ps1 try/catch 的不可达语义
         print(f"  ERROR: TokenDance ID is not reachable at {token_dance_url}")
-        print("  Start it with: cd ..\\tokendance-id; go run .\\cmd\\tokendance-id")
+        print("  Start it from its checkout: go run ./cmd/tokendance-id")
         print("  Then retry this script.")
         return 1
 
@@ -118,7 +118,7 @@ def main() -> int:
         except Exception as exc:  # noqa: BLE001 —— 对齐 ps1 catch 的 ERROR 语义
             print(f"  ERROR: Failed to create client: {exc}")
             print("  Fallback: run the seed SQL:")
-            print("    sqlite3 ..\\tokendance-id\\data\\tokendance.db < scripts\\seed-tokendance-client.sql")
+            print("    sqlite3 <token-dance-id-db> < scripts/seed-tokendance-client.sql")
             return 1
 
     if not secret:

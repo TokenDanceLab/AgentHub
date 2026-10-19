@@ -22,7 +22,7 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self'; script-src 'self'; frame-src 'none'; object-src 'none'; connect-src 'self' http://127.0.0.1:* ws://127.0.0.1:* http://localhost:* https://*.example.invalid wss://*.example.invalid; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://*.example.invalid https://avatars.githubusercontent.com; font-src 'self'"
+      "csp": "default-src 'self'; script-src 'self'; frame-src 'self' http://127.0.0.1:* http://localhost:* https:; object-src 'none'; connect-src 'self' http://127.0.0.1:* ws://127.0.0.1:* http://localhost:* https://*.example.invalid wss://*.example.invalid; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://*.example.invalid https://avatars.githubusercontent.com; font-src 'self'"
     }
   },
   "bundle": {

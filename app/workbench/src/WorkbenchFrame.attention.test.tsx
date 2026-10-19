@@ -5,7 +5,7 @@ import type { AgentHubPlatform } from '@shared/platform';
 import type { WorkbenchAttentionCounts, ConversationLiveStatus } from './workbenchAttentionModel';
 import { WorkbenchFrame } from './WorkbenchFrame';
 
-/* F1/F6 + F5 (#1994) frame wiring: one attention input must feed rail,
+/* Attention frame wiring (#1994): one attention input must feed rail,
    sidebar and the frame-level global status bar consistently, and the bar's
    click-throughs must reach the Tasks queue / the awaiting conversation. */
 
@@ -143,7 +143,7 @@ const attentionInput = {
   ],
 };
 
-describe('WorkbenchFrame attention wiring (F1/F6 + F5)', () => {
+describe('WorkbenchFrame attention wiring', () => {
   it('derives one summary and feeds rail counts, sidebar dots and the status bar', () => {
     const { navigateRail, selectConversation, setActivePage } = renderFrame(attentionInput);
 

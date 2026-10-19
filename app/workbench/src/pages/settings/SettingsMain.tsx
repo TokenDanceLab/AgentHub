@@ -1,7 +1,7 @@
 /* ═══════════════════════════════════════════════════════════════════════
    Settings main pane cluster — head, load/error status, and active pane.
 
-   Extracted from SettingsPage as Phase 21 residual thin #604.
+   Extracted from SettingsPage (#604).
    CSS remains on shared SettingsPage.module.css.
    ═══════════════════════════════════════════════════════════════════════ */
 

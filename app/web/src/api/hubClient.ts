@@ -1,8 +1,8 @@
-// Web Hub client — thin surface over shared SSOT (#433 / T3.4).
+// Web Hub client — thin surface over shared SSOT (#433).
 // - Method/DTO SSOT: @shared/hub/hubClient
 // - Web-only glue: default HUB_URL
 // Do NOT add new Hub REST methods here; add them to app/shared/src/hub/hubClient.ts first.
-// AH-SR-043: demo/fixture success paths belong in platform dataMode gates, not this client.
+// demo/fixture success paths belong in platform dataMode gates, not this client.
 
 import { HUB_URL } from '@/config';
 import {

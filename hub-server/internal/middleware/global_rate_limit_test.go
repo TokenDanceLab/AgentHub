@@ -276,8 +276,7 @@ func TestRateLimitFailClosed_AuthPath(t *testing.T) {
 // MaxRetries=0 + a short DialTimeout turn off go-redis retry backoff: without
 // these, every operation against the closed server retries with exponential
 // backoff (~8.5s per fail-closed test). With them, each operation fails
-// immediately on the first connection attempt (P1: redisDownClient 不关重试致
-// 慢测试).
+// immediately on the first connection attempt.
 func redisDownClient(t *testing.T) *cache.Client {
 	t.Helper()
 	mr, err := miniredis.Run()

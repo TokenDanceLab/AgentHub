@@ -35,7 +35,7 @@ describe('BrowserPreview sandbox + scheme gating', () => {
     expect(iframe!.hasAttribute('srcDoc')).toBe(true);
   });
 
-  it('reloads the iframe when the refresh button is clicked (#1871 item 2)', () => {
+  it('reloads the iframe when the refresh button is clicked', () => {
     const { container, getByRole } = render(
       <BrowserPreview url="https://example.com" onClose={vi.fn()} />,
     );

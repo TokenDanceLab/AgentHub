@@ -1,5 +1,5 @@
 /**
- * UX F8 — conversation-level goal banner derivation (#1998).
+ * Conversation-level goal banner derivation (#1998).
  *
  * Pure projection of goal tool calls already present in the transcript —
  * not a new data source and no Hub protocol. Goal calls enter transcripts

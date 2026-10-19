@@ -4,14 +4,14 @@
 // Edge server fires the correct callbacks back to the mock Hub.
 //
 // Tests guarded by testing.Short() are skipped in the standard go test -short
-// lane because they launch subprocesses. To run these tests locally:
+// job because they launch subprocesses. To run these tests locally:
 //
-//	go test ./tests -count=1 -run "^TestHubE2E_" -v
+//	go test ./tests -count=1 -v
 //
 // CI status: the backend-edge-e2e job (.github/workflows/checks.yml) runs
-// `go test ./tests/ -run '^TestHubE2E_'` WITHOUT -short, so the full suite
-// (including subprocess tests) executes in CI, with a non-zero PASS count
-// assertion.
+// `go test ./tests/ -count=1 -v -timeout 120s` WITHOUT -short, so the full
+// suite (including subprocess tests) executes in CI, with a non-zero PASS
+// count assertion.
 package tests
 
 import (

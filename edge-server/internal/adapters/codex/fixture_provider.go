@@ -1,7 +1,6 @@
-// AgentHubAgentSpec fixture 投影的 codex-acp 构造器注入（#1760 codex/opencode
-// 增量）。
+// AgentHubAgentSpec fixture 投影的 codex-acp 构造器注入。
 //
-// sdk 子包（agentspec_fixture.go，随 #1760 mapper 增量归组）的
+// sdk 子包（agentspec_fixture.go）的
 // CompileAgentSpecV1ToRuntimeInvocationFixture 在 runtimeID "codex" 时需要
 // 构造 ACPAdapter 以投影 redacted CLI invocation plan。但 sdk 不得
 // import 本包（codex → adapters/sdk 为单向依赖），因此本包在 init 时经

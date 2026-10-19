@@ -11,14 +11,6 @@ import type { HubPageInfo } from './hubClientDomainTypes';
 // and drops `nextCursor` does not get an error: it silently gets the first page
 // and nothing tells it the list was cut.
 //
-// That is what the live paths used to do. `listWorkspaceProjects` was called
-// with a fixed pageSize and no cursor in web and with no parameters at all in
-// desktop; `listAgentProfiles` the same way; so from item 51 onwards the
-// workspace/agent lists were short with no "load more", no truncation hint and
-// no error. Each shell then hand-rolled its own cursor loop for execution
-// targets, and this file exists so the next list does not become the fourth
-// copy of that loop.
-//
 // Contract, deliberately identical for every caller:
 //   - walk pages until the server says stop (`hasMore` false, or no
 //     `nextCursor` to continue with);

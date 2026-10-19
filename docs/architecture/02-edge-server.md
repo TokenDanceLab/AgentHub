@@ -2,11 +2,11 @@
 
 > 子文档 | 主索引：[architecture.md](../architecture.md)
 >
-> 最后更新：2026-09-09
+> 最后更新：2026-10-18
 
 ## 职责
 
-Edge Server（`edge-server/`）是本机执行层：
+Edge Server（`edge-server/`）是执行层，可运行在本机、远程主机或 headless Cloud Edge：
 
 - 本地项目管理
 - Thread 管理
@@ -48,12 +48,12 @@ Web shared workbench
 
 ## Run Lifecycle 状态机
 
-`RunExecutor` 接口（`internal/lifecycle/executor.go`）定义运行状态转换入口：`queued → started → running → finished / failed / cancelled / completed_with_issues`。
+`RunExecutor` 接口（`internal/lifecycle/executor.go`）定义运行状态转换入口：`queued → started → finished / failed / completed_with_issues`；取消通常先置 `cancelling` 再到达 `cancelled`，收尾与 cancel-all 路径也允许从 `queued`/`started` 直接置 `cancelled`。
 
 | 组件 | 文件 | 职责 |
 |---|---|---|
 | ProcessExecutor | `internal/lifecycle/process_executor.go` | 启动 agent CLI 子进程、管理 stdin/stdout pipe、超时与优雅关闭 |
-| DecisionLoop | `internal/lifecycle/process_executor_pure_adapter.go`（`process_executor_pure_*.go` 族） | 原 `decision_loop.go` 已删除，决策循环逻辑并入 ProcessExecutor pure-helper 族；现存证据为 stdin gating（control protocol / DecisionLoop 强制结束判断）与 interrupt 路径 |
+| Pure helper 族 | `internal/lifecycle/process_executor_pure*.go` | ProcessExecutor 的纯函数辅助层：spawn 参数、取消/超时/结束与故障处理；adapter 的 stdio 判定在 `process_executor_build.go` |
 | EvidenceGate | `internal/lifecycle/evidence_gate.go` | 运行前/后证据验证门 |
 | FaultEscalation | `internal/lifecycle/fault_escalation.go` | 故障自动重试链：失败后按 `MaxRetries` 自动重试，错误 review 与 replan 交由 agent in-context 自纠错 |
 | EnvSanitizer | `internal/lifecycle/env_sanitizer.go` | 运行环境变量脱敏 |
@@ -89,9 +89,9 @@ ProcessExecutor 配置 `RunTimeout`（默认 30 分钟）、`ShutdownGracePeriod
 | Metrics / run control | `internal/metrics/`, `internal/runcontrol/`, `internal/runnerctx/` |
 | Runners compat summary | `internal/runners/` — compat summary only; `/v1/runners` is not a new business Agent model |
 
-## Adapter 家族子包（#1760）
+## Adapter 家族子包
 
-`internal/adapters/` 已从平铺大包拆分为按 Agent 家族归组的子包。依赖方向分两类：`claude`/`codex`/`opencode`/`sdk` 是依赖根包与 `acp` 共享子包的叶子（embed `acp.AcpAdapter`）；`orchestrator` 是**唯一不依赖根包的纯叶子**（经机器门禁禁止 import 根 `internal/adapters` 实现，只依赖 `internal/orchestration` 合同 + 窄 ports）。根包（非测试代码）不 import 任何子包，仅保留字符串适配器 ID，注册由组合根（`cmd/agenthub-edge`、`internal/httpserver`）完成。共享 ACP 运行时在 `internal/adapters/acp/` 子包（#1805 下沉），根包保留 NDJSON parser、权限处理链、MCP 临时配置、registry 与字符串适配器 ID。
+`internal/adapters/` 按 Agent 家族归组为子包。依赖方向分两类：`claude`/`codex`/`opencode` 是依赖根包与 `acp` 共享子包的叶子（embed `acp.AcpAdapter`）；`sdk` 是直接调用 HTTP API 的适配器族，不依赖 `internal/adapters/acp`；`orchestrator` 是**唯一不依赖根包的纯叶子**（经机器门禁禁止 import 根 `internal/adapters` 实现，只依赖 `internal/orchestration` 合同 + 窄 ports）。根包（非测试代码）不 import 任何子包，仅保留字符串适配器 ID，注册由组合根（`cmd/agenthub-edge`、`internal/httpserver`）完成。共享 ACP 运行时在 `internal/adapters/acp/` 子包，根包保留 NDJSON parser、权限处理链、MCP 临时配置、registry 与字符串适配器 ID。
 
 | 家族 | 子包 | 内容 |
 |---|---|---|
@@ -102,7 +102,7 @@ ProcessExecutor 配置 `RunTimeout`（默认 30 分钟）、`ShutdownGracePeriod
 | SDK | `internal/adapters/sdk/` | HTTP `AnthropicSDKAdapter`（`anthropic-sdk`）、`OpenAISDKAdapter`（`openai-sdk`） |
 | Test fixtures | `internal/adapters/sdk/testdata/` | 测试共享 JSON fixtures（`sdk_fixture_mapper/`）；mapper 代码在 `sdk/` 子包（`sdk_fixture_mapper.go` 等） |
 
-纯包门禁：`orchestrator` 叶子包经 `scripts/verify/verify-orchestrator-deps.py` 机器门禁（断言：叶子不 import 根、`internal/orchestration` 不 import adapters、根不 import 叶子），`TestLeafDoesNotImportRootAdapters` 保证依赖方向单向。共享 ACP 运行时在 `internal/adapters/acp/` 子包（`acp/acp.go` 的 `AcpAdapter`、`acp/acp_client.go`、`acp/acp_events.go`，#1805 自根包下沉）；根包残留平铺文件含 `parser_ndjson*.go`/`registry.go`/`mcp_config.go`/`model_config.go`/`contract_aliases.go` 等，`sdk_fixture_mapper*.go` 已在 `sdk/` 子包。
+纯包门禁：`orchestrator` 叶子包由 Go 测试 `TestLeafDoesNotImportRootAdapters` 与 `TestOrchestrationContractNeutral` 守护（叶子不 import 根、`internal/orchestration` 不 import adapters）。共享 ACP 运行时在 `internal/adapters/acp/` 子包（`acp/acp.go` 的 `AcpAdapter`、`acp/acp_client.go`、`acp/acp_events.go`）；根包包含平铺文件 `parser_ndjson*.go`/`registry.go`/`mcp_config.go`/`model_config.go`/`contract_aliases.go` 等，`sdk_fixture_mapper*.go` 在 `sdk/` 子包。
 
 ## 与 Hub 的通信
 
@@ -145,7 +145,7 @@ RunEvent -> EvidenceRef -> Inspector -> Artifact/File/Preview
 Edge EventStore -> Hub Sync -> Web/Desktop/Mobile viewers
 ```
 
-## Checkpoint 与恢复语义（#1968）
+## Checkpoint 与恢复语义
 
 **Checkpoint = run 前快照**：执行开始前对 workdir 取快照（`adapters.TakeWorkdirSnapshot`：≤500 文件、单文件文本内容 ≤128KB、跳过隐藏/忽略目录），作为该 run 的 checkpoint 持久化，供时间线卡预览。无 workdir 的 run 诚实缺省——不发射 checkpoint、前端不渲染卡。
 
@@ -155,15 +155,15 @@ Edge EventStore -> Hub Sync -> Web/Desktop/Mobile viewers
 - 存储 `RunCheckpoint`（与 run 1:1）：文件清单（相对路径/大小/SHA-256）+ 文本内容预览副本；只读，不随 run 结束删除（回放/审查证据面）。
 - API：`GET /v1/runs/{runId}/checkpoint`（元数据 + 文件清单）、`GET /v1/runs/{runId}/checkpoint/file?path=...`（单文件预览内容；路径必须命中 checkpoint 记录，防路径逃逸）。
 
-**恢复语义（先文档后实现；本期不落写回）**：
+**恢复语义**：
 
-- 恢复 = 把 checkpoint 状态写回 workdir，属写回操作。按 #1870 收口结论，写回走远程证据轨道：需携带执行器上报的可信 workDir 证据（同 run 审查 workDir 合同）、用户显式批准动作与审计记录；Web 表面禁止（Hub-only 边界）。
+- 恢复 = 把 checkpoint 状态写回 workdir，属写回操作。写回走远程证据轨道：需携带执行器上报的可信 workDir 证据、用户显式批准动作与审计记录；Web 表面禁止（Hub-only 边界）。
 - 权限边界：恢复只允许写回 checkpoint 自身 run 的 workdir；跨目录、符号链接逃逸、checkpoint 文件集之外的写入一律拒绝（与 `validateWorkDirAllowed` 硬边界同源）。
-- 本期产品形态：时间线卡提供只读预览 + 明示「恢复未接线」的诚实提示；不提供假恢复按钮，不产生第二套回滚状态机。
+- UI 只在写回能力接线后提供恢复入口；未接线时显示只读预览和明确提示，不提供假恢复按钮，不产生第二套回滚状态机。
 
 ## 相关文档
 
 - [01-hub-server.md](01-hub-server.md) — Hub 与 Edge 的同步和中继关系
 - [03-runtime-adapters.md](03-runtime-adapters.md) — 所有 adapter 的详细规范
 - [04-frontend-data-flow.md](04-frontend-data-flow.md) — 前端如何消费 Edge 事件
-- [../archives/reference/backend-performance-gates.md](../archives/reference/backend-performance-gates.md) — Edge lifecycle/store/adapters 的性能和泄漏证据边界（已归档 2026-08-19；当前门禁执行者 `scripts/verify/verify-backend-perf-leak-gates.py`）
+- [05-deployment.md](05-deployment.md) — Edge lifecycle/store/adapters 的性能和泄漏证据边界（门禁执行者 `scripts/verify/verify-backend-perf-leak-gates.py`）

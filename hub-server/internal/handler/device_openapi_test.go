@@ -664,7 +664,7 @@ func TestOpenAPIHubWebSocketDocumentsUpgradeAuth(t *testing.T) {
 	wsGet := yamlMapField(t, yamlMapField(t, paths, "/client/ws", "paths./client/ws"), "get", "paths./client/ws.get")
 
 	description := yamlScalarField(t, wsGet, "description", "paths./client/ws.get.description")
-	for _, want := range []string{"HTTP upgrade", "WSAuthMiddleware", "Sec-WebSocket-Protocol", "TokenDance ID RS256 bearer tokens"} {
+	for _, want := range []string{"HTTP upgrade", "AuthMiddleware.WSHandler()", "Sec-WebSocket-Protocol", "TokenDance ID RS256 bearer tokens"} {
 		if !strings.Contains(description, want) {
 			t.Fatalf("/client/ws description missing %q: %s", want, description)
 		}

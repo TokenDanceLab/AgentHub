@@ -101,7 +101,7 @@ func TestSessionService_CreatePrivateSessionFlow(t *testing.T) {
 	bob := createUser(t, db, "bob", "Bob")
 	createFriendship(t, db, alice, bob)
 
-	svc := NewService(db, cc)
+	svc := NewService(db, cc, nil)
 
 	resp, err := svc.CreatePrivateSession(context.Background(), alice, bob)
 	require.NoError(t, err)
@@ -122,7 +122,7 @@ func TestSessionService_CreatePrivateSessionRequiresFriendship(t *testing.T) {
 	alice := createUser(t, db, "alice", "Alice")
 	bob := createUser(t, db, "bob", "Bob")
 
-	svc := NewService(db, cc)
+	svc := NewService(db, cc, nil)
 	_, err := svc.CreatePrivateSession(context.Background(), alice, bob)
 	assert.ErrorIs(t, err, errcode.FriendNotFriend)
 }
@@ -133,7 +133,7 @@ func TestSessionService_CreatePrivateSessionFailsForSelf(t *testing.T) {
 	cc := newBehaviorServiceCache(t)
 	alice := createUser(t, db, "alice", "Alice")
 
-	svc := NewService(db, cc)
+	svc := NewService(db, cc, nil)
 	_, err := svc.CreatePrivateSession(context.Background(), alice, alice)
 	assert.ErrorIs(t, err, errcode.ErrBadRequest)
 }
@@ -202,7 +202,7 @@ func TestSessionService_GroupMemberManagementRequiresOwnerAuth(t *testing.T) {
 	createFriendship(t, db, owner, m1)
 	createFriendship(t, db, owner, m2)
 
-	svc := NewService(db, cc)
+	svc := NewService(db, cc, nil)
 	resp, err := svc.CreateGroupSession(context.Background(), owner, "Auth Group", []string{m1})
 	require.NoError(t, err)
 
@@ -222,7 +222,7 @@ func TestSessionService_CannotAddNonFriendToGroup(t *testing.T) {
 	stranger := createUser(t, db, "stranger", "Stranger")
 	createFriendship(t, db, owner, m1)
 
-	svc := NewService(db, cc)
+	svc := NewService(db, cc, nil)
 	resp, err := svc.CreateGroupSession(context.Background(), owner, "Friends Only", []string{m1})
 	require.NoError(t, err)
 
@@ -238,7 +238,7 @@ func TestSessionService_CannotAddDuplicateMember(t *testing.T) {
 	m1 := createUser(t, db, "m1", "M1")
 	createFriendship(t, db, owner, m1)
 
-	svc := NewService(db, cc)
+	svc := NewService(db, cc, nil)
 	resp, err := svc.CreateGroupSession(context.Background(), owner, "Dup", []string{m1})
 	require.NoError(t, err)
 
@@ -254,7 +254,7 @@ func TestSessionService_CannotRemoveOwner(t *testing.T) {
 	m1 := createUser(t, db, "m1", "M1")
 	createFriendship(t, db, owner, m1)
 
-	svc := NewService(db, cc)
+	svc := NewService(db, cc, nil)
 	resp, err := svc.CreateGroupSession(context.Background(), owner, "Test", []string{m1})
 	require.NoError(t, err)
 
@@ -302,7 +302,7 @@ func TestSessionService_OwnerCannotLeaveIfOthersActive(t *testing.T) {
 	m1 := createUser(t, db, "m1", "M1")
 	createFriendship(t, db, owner, m1)
 
-	svc := NewService(db, cc)
+	svc := NewService(db, cc, nil)
 	resp, err := svc.CreateGroupSession(context.Background(), owner, "Sticky", []string{m1})
 	require.NoError(t, err)
 
@@ -318,7 +318,7 @@ func TestSessionService_TransferOwnershipThenLeave(t *testing.T) {
 	m1 := createUser(t, db, "m1", "M1")
 	createFriendship(t, db, owner, m1)
 
-	svc := NewService(db, cc)
+	svc := NewService(db, cc, nil)
 	resp, err := svc.CreateGroupSession(context.Background(), owner, "Transfer", []string{m1})
 	require.NoError(t, err)
 
@@ -398,7 +398,7 @@ func TestSessionService_UpdateGroupInfoRequiresOwnerAuth(t *testing.T) {
 	m1 := createUser(t, db, "m1", "M1")
 	createFriendship(t, db, owner, m1)
 
-	svc := NewService(db, cc)
+	svc := NewService(db, cc, nil)
 	resp, err := svc.CreateGroupSession(context.Background(), owner, "Test", []string{m1})
 	require.NoError(t, err)
 
@@ -415,7 +415,7 @@ func TestSessionService_UpdateMemberSettings(t *testing.T) {
 	m1 := createUser(t, db, "m1", "M1")
 	createFriendship(t, db, owner, m1)
 
-	svc := NewService(db, cc)
+	svc := NewService(db, cc, nil)
 	resp, err := svc.CreateGroupSession(context.Background(), owner, "Settings", []string{m1})
 	require.NoError(t, err)
 
@@ -432,7 +432,7 @@ func TestSessionService_SearchSessions(t *testing.T) {
 	m1 := createUser(t, db, "m1", "M1")
 	createFriendship(t, db, owner, m1)
 
-	svc := NewService(db, cc)
+	svc := NewService(db, cc, nil)
 	_, err := svc.CreateGroupSession(context.Background(), owner, "Project Alpha", []string{m1})
 	require.NoError(t, err)
 	_, err = svc.CreateGroupSession(context.Background(), owner, "Project Beta", []string{})
@@ -480,15 +480,15 @@ func TestSessionService_DeleteForMe(t *testing.T) {
 	assert.Len(t, sessions, 1)
 }
 
-// TestSessionService_CreatePrivateSessionWithNilCacheDoesNotPanic verifies
-// nil cache is safely handled.
-func TestSessionService_CreatePrivateSessionWithNilCacheDoesNotPanic(t *testing.T) {
+// TestSessionService_CreatePrivateSessionWithoutRedis verifies session creation
+// works with the explicit no-op cache.
+func TestSessionService_CreatePrivateSessionWithoutRedis(t *testing.T) {
 	db := newBehaviorServiceDB(t)
 	alice := createUser(t, db, "alice", "Alice")
 	bob := createUser(t, db, "bob", "Bob")
 	createFriendship(t, db, alice, bob)
 
-	svc := NewService(db, nil)
+	svc := NewService(db, cache.NoOpCache{}, nil)
 	resp, err := svc.CreatePrivateSession(context.Background(), alice, bob)
 	require.NoError(t, err)
 	assert.True(t, resp.Created)

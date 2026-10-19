@@ -1454,7 +1454,7 @@ func TestHubUserIDFromContext(t *testing.T) {
 	}
 }
 
-// ── Remote Read Auth Tests (AH-SR-045) ──
+// ── Remote Read Auth Tests ──
 
 const testRemoteReadJWTSecret = "remote-read-secret-at-least-32!!"
 const testRemoteReadEdgeDevice = "test-edge-1"
@@ -1606,7 +1606,7 @@ func TestRemoteRead_ValidHubJWT_SeesOwnProjects(t *testing.T) {
 	body = unwrapSuccess(body)
 	items := body["items"].([]any)
 	ids := projectIDs(items)
-	// AH-SR-045: unowned projects are fail-closed under Hub JWT.
+	// unowned projects are fail-closed under Hub JWT.
 	if contains(ids, "proj_default") {
 		t.Error("should not see unowned proj_default under Hub JWT")
 	}
@@ -1680,7 +1680,7 @@ func TestRemoteRead_CrossUserAccess_Returns404(t *testing.T) {
 		{http.MethodGet, "/v1/projects/proj_user2"},
 		{http.MethodGet, "/v1/threads/thread_2"},
 		{http.MethodGet, "/v1/runs/run_2"},
-		// Unowned resources fail closed under Hub JWT (AH-SR-045).
+		// Unowned resources fail closed under Hub JWT.
 		{http.MethodGet, "/v1/projects/proj_default"},
 		{http.MethodGet, "/v1/threads/thread_default"},
 		{http.MethodGet, "/v1/runs/run_default"},

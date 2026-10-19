@@ -12,7 +12,7 @@ test.describe('AgentHub Desktop smoke', () => {
     fontGuard = await blockExternalFonts(page, { recordPassthrough: true });
   });
 
-  test.afterEach(async (_, testInfo) => {
+  test.afterEach(async ({ page: _page }, testInfo) => {
     if (!fontGuard) {
       throw new Error('font guard was not installed before the test');
     }

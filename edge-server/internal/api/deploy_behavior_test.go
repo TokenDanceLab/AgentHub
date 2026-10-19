@@ -65,8 +65,8 @@ func TestDeployTargetHost_Default(t *testing.T) {
 	t.Cleanup(func() { os.Unsetenv(envDeployTargetHost) })
 
 	got := DeployTargetHost()
-	if got != defaultDeployTargetHost {
-		t.Errorf("DeployTargetHost() = %q, want %q (default)", got, defaultDeployTargetHost)
+	if got != "" {
+		t.Errorf("DeployTargetHost() = %q, want empty default", got)
 	}
 }
 
@@ -84,8 +84,8 @@ func TestDeployTargetHost_EmptyEnvFallsBackToDefault(t *testing.T) {
 	t.Setenv(envDeployTargetHost, "")
 
 	got := DeployTargetHost()
-	if got != defaultDeployTargetHost {
-		t.Errorf("DeployTargetHost() = %q, want %q (default after empty env)", got, defaultDeployTargetHost)
+	if got != "" {
+		t.Errorf("DeployTargetHost() = %q, want empty after empty env", got)
 	}
 }
 
@@ -98,8 +98,8 @@ func TestDeployTargetPath_Default(t *testing.T) {
 	t.Cleanup(func() { os.Unsetenv(envDeployTargetPath) })
 
 	got := DeployTargetPath()
-	if got != defaultDeployTargetPath {
-		t.Errorf("DeployTargetPath() = %q, want %q (default)", got, defaultDeployTargetPath)
+	if got != "" {
+		t.Errorf("DeployTargetPath() = %q, want empty default", got)
 	}
 }
 
@@ -117,8 +117,8 @@ func TestDeployTargetPath_EmptyEnvFallsBackToDefault(t *testing.T) {
 	t.Setenv(envDeployTargetPath, "")
 
 	got := DeployTargetPath()
-	if got != defaultDeployTargetPath {
-		t.Errorf("DeployTargetPath() = %q, want %q (default after empty env)", got, defaultDeployTargetPath)
+	if got != "" {
+		t.Errorf("DeployTargetPath() = %q, want empty after empty env", got)
 	}
 }
 

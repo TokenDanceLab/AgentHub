@@ -12,7 +12,7 @@ func filterIDs(ids []string, keep func(string) bool) []string {
 	return filtered
 }
 
-func isTerminalRunStatus(status string) bool {
+func IsTerminalRunStatus(status string) bool {
 	switch status {
 	case "cancelled", "failed", "finished", "completed_with_issues":
 		return true

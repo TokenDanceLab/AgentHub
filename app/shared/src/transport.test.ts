@@ -471,7 +471,7 @@ describe('WebSocketTransport', () => {
     });
   });
 
-  // ── Offline queue drop signaling (P1: no silent loss) ──
+  // ── Offline queue drop signaling (no silent loss) ──
 
   describe('offline queue drop signaling', () => {
     it('emits a drop event (queue_full) when the cap forces an oldest-out drop', () => {

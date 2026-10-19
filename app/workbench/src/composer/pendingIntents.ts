@@ -1,8 +1,7 @@
 import type { ComposerIntent, ComposerMention } from '@shared/composer';
 
 /**
- * Client-side pending dispatch queue (CF22 / composer streaming spike ②,
- * visible queue + steer semantics #1965).
+ * Client-side pending dispatch queue (visible queue + steer semantics #1965).
  *
  * The Hub message is already persisted before `turn_in_progress` is returned.
  * Queue entries therefore represent dispatch-only work: they never resend,

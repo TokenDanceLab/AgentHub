@@ -1,6 +1,6 @@
 /* ═══════════════════════════════════════════════════════════════════════
    unifiedComposerHostHelpers — stable public surface for UnifiedComposer
-   host pure helpers (#718 / residual thin #780).
+   host pure helpers (#718 / helper module #780).
 
    Implementation lives in:
    - unifiedComposerHostViewModel
@@ -9,7 +9,7 @@
    - unifiedComposerHostFilePick
 
    Re-exports keep import paths stable for UnifiedComposer and tests.
-   No React hooks / no intentional UX change.
+   No React hooks.
    ═══════════════════════════════════════════════════════════════════════ */
 
 export type {

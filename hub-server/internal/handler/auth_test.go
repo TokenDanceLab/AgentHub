@@ -166,7 +166,7 @@ func TestAuthHandler_Logout_Success(t *testing.T) {
 // Logout scope must come from the authenticated token's claim-derived
 // device_type (set by AuthMiddleware), never from the client query: the old
 // #149 query knob let a client write a blacklist key the refresh path never
-// checks (session-revival window, #2154 Lorentz P3-2).
+// checks (session-revival window, #2154).
 func TestAuthHandler_Logout_DeviceTypeFromClaims(t *testing.T) {
 	capturedDeviceType := ""
 	svc := &mockAuthService{

@@ -120,7 +120,7 @@ func TestDomainErrorCodes(t *testing.T) {
 		// Deploy
 		{ErrDeployInvalidSlug, "deploy_invalid_slug", "slug must be lowercase alphanumeric with hyphens, 2-63 chars", http.StatusBadRequest},
 		{ErrDeployNoArtifacts, "deploy_no_artifacts", "run has no deployable artifacts", http.StatusBadRequest},
-		{ErrDeployRunNotFinished, "deploy_run_not_finished", "run must be in a terminal state before deploying", http.StatusBadRequest},
+		{ErrDeployRunNotFinished, "deploy_run_not_finished", "run must be finished, failed, or cancelled before deploying", http.StatusBadRequest},
 
 		// Capability token
 		{ErrCapabilityTokenInvalid, "capability_token_invalid", "capability token is missing or invalid", http.StatusForbidden},

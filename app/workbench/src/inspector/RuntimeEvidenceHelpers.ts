@@ -6,11 +6,11 @@ import type { InspectorTranslator } from './InspectorModePanelHelpers';
 import type { TaskItem } from './OverviewPanel';
 
 /* ═══════════════════════════════════════════════════════════════════════
-   RuntimeEvidenceHelpers — pure residual slices from RuntimeEvidencePanel
+   RuntimeEvidenceHelpers — pure helpers for RuntimeEvidencePanel
    (#733).
 
    Overview mappers, diff text builders, and workspace status helpers.
-   No React / no intentional UX change.
+   No React.
 
    i18n note (#2032): overview task labels resolve through the
    sharedWorkbench bundle via a passed-in translator.

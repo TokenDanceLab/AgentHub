@@ -1,6 +1,5 @@
 package mcp
 
-// Residual pure-helper peel of MCP tool surface (#1104).
 // Companion files (same package):
 //   - tools_catalog.go  — listTools tool definition catalog
 //   - tools_handlers.go — tool handler implementations

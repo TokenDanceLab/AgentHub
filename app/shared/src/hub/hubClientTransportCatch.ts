@@ -1,6 +1,5 @@
 /**
- * Hub client transport catch / abort / request-context residuals.
- * Peel companion of hubClientTransportUtils (#1102). Pure only; zero behavior change.
+ * Hub client transport catch / abort / request-context helpers.
  */
 
 import { AppError, reportApiError } from '../errors';
@@ -59,7 +58,7 @@ export function createHubAbortTimeout(timeoutMs: number): HubAbortTimeout {
 
 /**
  * Run a Hub fetch under a timeout abort signal.
- * Clears the timer on both success and failure (exactOptional-safe residual).
+ * Clears the timer on both success and failure (exactOptional-safe helper).
  */
 export async function withHubAbortTimeout<T>(
   timeoutMs: number,
@@ -161,7 +160,7 @@ export function resolveHubRequestCatch(
   return { kind: 'other', error: classified.error };
 }
 
-/** Pure residual: assemble headers/timeout/method/url for one JSON Hub request. */
+/** Pure helper: assemble headers/timeout/method/url for one JSON Hub request. */
 export type HubRequestContext = {
   headers: Headers;
   timeoutMs: number;
@@ -184,7 +183,7 @@ export function prepareHubRequestContext(args: {
   };
 }
 
-/** Pure residual: assemble auth-only headers/timeout/url for multipart upload. */
+/** Pure helper: assemble auth-only headers/timeout/url for multipart upload. */
 export type HubMultipartUploadContext = {
   headers: Headers;
   timeoutMs: number;
@@ -204,7 +203,7 @@ export function prepareMultipartUploadContext(args: {
   };
 }
 
-/** Pure residual: opts.onRefreshToken presence predicate. */
+/** Pure helper: opts.onRefreshToken presence predicate. */
 export function hasTokenRefreshHandler(
   onRefreshToken?: (() => Promise<string | null>) | null | undefined,
 ): boolean {
@@ -212,7 +211,7 @@ export function hasTokenRefreshHandler(
 }
 
 /**
- * Pure residual of request catch side-effect planning (#978).
+ * Pure helper of request catch side-effect planning (#978).
  * logMessage/report are omitted (exactOptional-safe) when not needed.
  */
 export type HubRequestCatchEffects =
@@ -263,12 +262,7 @@ export function planHubRequestCatchEffects(
   return { error: resolved.error };
 }
 
-/** Token-refresh failure log line (console.error residual). */
-export function buildTokenRefreshFailedLogPrefix(): string {
-  return '[HubClient] Token refresh failed';
-}
-
-// ── Residual pure peels (#990) ────────────────────────────────────────────────
+// ── Pure helpers (#990) ────────────────────────────────────────────────
 
 /**
  * exactOptional-safe prepareHubRequestContext entry for createHubClient.request.
@@ -330,7 +324,7 @@ export function prepareMultipartUploadContextFromClient(args: {
   return prepareMultipartUploadContext(input);
 }
 
-/** Pure residual: after onRefreshToken settles, retry once or abort. */
+/** Pure helper: after onRefreshToken settles, retry once or abort. */
 export type RefreshedTokenRetryPlan =
   | { action: 'retry'; token: string }
   | { action: 'abort' };
@@ -344,7 +338,7 @@ export function planRefreshedTokenRetry(
   return { action: 'abort' };
 }
 
-/** Pure residual: console/report payloads for failed onRefreshToken. */
+/** Pure helper: console/report payloads for failed onRefreshToken. */
 export function planTokenRefreshFailureReport(
   path: string,
   refreshErr: unknown,
@@ -354,14 +348,14 @@ export function planTokenRefreshFailureReport(
   context: { path: string; context: 'token_refresh' };
 } {
   return {
-    logPrefix: buildTokenRefreshFailedLogPrefix(),
+    logPrefix: '[HubClient] Token refresh failed',
     error: toReportableError(refreshErr),
     context: buildTokenRefreshReportContext(path),
   };
 }
 
 /**
- * Pure residual: whether the primary response should enter token-refresh recovery.
+ * Pure helper: whether the primary response should enter token-refresh recovery.
  * Combines status + handler presence so createHubClient stays a thin if-branch.
  */
 export function shouldEnterTokenRefreshRecovery(
@@ -391,7 +385,7 @@ export function applyHubRequestCatchEffects(
   throw effects.error;
 }
 
-/** Apply planned token-refresh failure log/report residual (no throw). */
+/** Apply planned token-refresh failure log/report helper (no throw). */
 export function applyTokenRefreshFailureReport(
   report: {
     logPrefix: string;
@@ -409,7 +403,7 @@ export function applyTokenRefreshFailureReport(
 }
 
 /**
- * Default request-catch residual for createHubClient: plan + log/report + rethrow.
+ * Default request-catch helper for createHubClient: plan + log/report + rethrow.
  * Keeps console/report sinks collocated so createHubClient catch stays one line.
  */
 export function applyDefaultHubRequestCatchEffects(

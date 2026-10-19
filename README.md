@@ -15,10 +15,6 @@
   [![license](https://img.shields.io/badge/license-Apache--2.0-lightgrey?style=flat-square)](https://github.com/TokenDanceLab/AgentHub/blob/master/LICENSE)
 </div>
 
-<div align="center">
-  <img src="docs/images/desktop-workbench-preview.png" alt="AgentHub Desktop 工作台" width="800" />
-</div>
-
 ## 产品定位
 
 AgentHub 让你像在 IM 群聊里协作一样，把真人好友、Builder、Reviewer、Researcher、Deployer 等 AI Agent 放进同一个项目会话，围绕代码、文档、Diff、Preview、Approval 和产物协同工作。
@@ -28,7 +24,7 @@ AgentHub 让你像在 IM 群聊里协作一样，把真人好友、Builder、Rev
 - **IM 形态协作** — 单聊、群聊、@Agent，在同一条任务流里完成
 - **多 Runtime 调度** — Claude Code、Codex、OpenCode 通过统一 Adapter 接入
 - **Diff / Preview / Approval** — 代码变更内联展示，审批流可控
-- **三端原生** — Tauri Desktop + Web + Expo React Native Mobile（Desktop/Web 主线；Mobile 是装配中的 fixture/边界验证 lane，**非 release candidate** —— 发布链路的 `build-mobile` 受 `RELEASE_MOBILE_ENABLED` 门控、默认关闭）
+- **三端客户端** — Tauri Desktop + Web + Expo React Native Mobile（Desktop/Web 主线；Mobile 是装配中的 fixture/边界验证 lane，**非 release candidate** —— 发布链路的 `build-mobile` 受 `RELEASE_MOBILE_ENABLED` 门控、默认关闭）
 - **Hub-Edge 分布式** — 本地执行不依赖 Hub；Hub 提供多端同步、远程查看和审计
 
 ## 技术栈
@@ -51,19 +47,29 @@ AgentHub 让你像在 IM 群聊里协作一样，把真人好友、Builder、Rev
 | `app/workbench` | 端级工作台壳（`@agenthub/workbench`，依赖方向 workbench → shared 单向） |
 | `hub-server` | Hub API：身份、会话、项目、任务、消息、审批 |
 | `edge-server` | 本地执行节点：CLI Adapter、SQLite、事件回放 |
-| `pkg` | Hub/Edge 共享的 Go 包（errcode、jwtutil、logmask、testkit 等；独立 module，经根 `go.work` 联编） |
+| `pkg` | Hub/Edge 共享的 Go 包（errcode、jwtutil、testkit 等；独立 module，经根 `go.work` 联编） |
 | `api` | OpenAPI 与 WebSocket 事件合同 |
-| `docs` | 架构、治理与设计文档（进度与路线图在 GitHub issues，不在 `docs/`） |
+| `docs` | 稳定架构、治理与设计文档；交付进度与路线图在 GitHub issues |
 
 ## 快速开始
 
 最小本地启动路径（5 步）。需要 OpenSSL、Docker、Go 1.26+、Node 24+/corepack、pnpm 10+。
 
+终端 A（基础设施与 Hub）：
+
 ```bash
-cp .env.example .env && secret="$(openssl rand -hex 32)" && sed -i.bak "s/^AGENTHUB_JWT_SECRET=.*/AGENTHUB_JWT_SECRET=$secret/" .env && rm -f .env.bak && export AGENTHUB_JWT_SECRET="$secret" && unset secret  # 1. 复制配置并生成随机开发 secret
+cp .env.example .env
+secret="$(openssl rand -hex 32)"
+sed -i.bak "s/^AGENTHUB_JWT_SECRET=.*/AGENTHUB_JWT_SECRET=$secret/" .env && rm -f .env.bak
+set -a; . ./.env; set +a                   # 1. 复制配置、生成开发 secret 并导出给 Hub 进程
 docker compose up -d postgres redis         # 2. 起基础设施（PG16 + Redis7，仅绑 127.0.0.1）
 cd hub-server && go run ./cmd/server-hub    # 3. 起 Hub Server（自动跑迁移，API 在 :8080）
-cd ../app && corepack pnpm install          # 4. 装前端依赖
+```
+
+终端 B（前端）：
+
+```bash
+cd app && corepack pnpm install             # 4. 装前端依赖
 corepack pnpm dev                           # 5. 起 Desktop Vite（:5173）；web 用 corepack pnpm dev:web
 ```
 
@@ -77,22 +83,6 @@ corepack pnpm dev                           # 5. 起 Desktop Vite（:5173）；w
 | [docs/architecture.md](docs/architecture.md) | 架构总览与模块索引 |
 | [docs/README.md](docs/README.md) | 文档导航 |
 | [AGENTS.md](AGENTS.md) | 项目规则 SSOT（分支、红线、证据等级） |
-
-## 仓库内容边界
-
-本仓库是 **public** 的，只包含：
-
-- 全部源代码、API 契约（`api/`）、工程门禁脚本（`scripts/verify/`）
-- 面向用户与贡献者的公开文档（`docs/` 中不含内部运营/安全材料）
-- 安全策略摘要（`SECURITY.md`，含发布门禁风险状态表）
-
-**不在本仓库**（属 TokenDance 私有文档中枢 `TokenDanceLab/docs`，private）：
-
-- 内部治理执行映射（TokenDance 队列、飞书集成、发布审批切片）
-- 安全风险登记表正文与威胁模型（本仓只保留无细节的发布门禁状态）
-- 私有部署拓扑、运维证据与路由
-
-公开文档不包含真实服务器地址、生产 secret、token、日志或个人路径（见 `AGENTS.md` 的“安全和隐私”）。治理公开区说明见 [docs/governance/README.md](docs/governance/README.md)。
 
 ## 贡献
 

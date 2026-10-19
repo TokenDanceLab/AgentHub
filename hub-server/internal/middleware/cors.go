@@ -45,11 +45,12 @@ func resolveCORSEnv(env string) string {
 
 func defaultCORSOrigins(env string) string {
 	if isProductionEnvironment(env) {
-		// Product hub (same-origin) + Tauri
-		return "https://hub.example.invalid,https://tauri.localhost"
+		// Tauri Desktop is the only known cross-origin caller by default.
+		// Web deployments must list their own origins in AGENTHUB_CORS_ORIGINS.
+		return "https://tauri.localhost"
 	}
-	// Dev: product hub + local Vite + Tauri Desktop
-	return "https://hub.example.invalid,http://localhost:3000,http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174,http://127.0.0.1:5174,https://tauri.localhost"
+	// Dev: local Vite + Tauri Desktop.
+	return "http://localhost:3000,http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174,http://127.0.0.1:5174,https://tauri.localhost"
 }
 
 func validateCORSOriginsForEnvironment(env string, origins []string) error {

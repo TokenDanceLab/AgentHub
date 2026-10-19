@@ -23,12 +23,11 @@ import {
 } from './unifiedComposerHelpers';
 
 /* ═══════════════════════════════════════════════════════════════════════
-   unifiedComposerHostViewModel — pure host view/chrome residual slices
-   from unifiedComposerHostHelpers (#780).
+   unifiedComposerHostViewModel — pure host view/chrome builders (#780).
 
    Props types, runtime defaults, chrome visibility, chrome render model,
    and combined host view-model builders.
-   No React hooks / no intentional UX change.
+   No React hooks.
    exactOptionalPropertyTypes: only assign `?: T` fields when defined,
    unless the public field type explicitly allows `| undefined`.
    ═══════════════════════════════════════════════════════════════════════ */
@@ -56,7 +55,7 @@ export interface UnifiedComposerProps {
   } | undefined;
   uploadProgresses?: Record<string, AttachmentUploadState>;
   /**
-   * Retry an attachment whose upload failed (#1821). Wired by the host; the
+   * Retry an attachment whose upload failed. Wired by the host; the
    * failed chip renders a retry button only when this is present.
    */
   onRetryAttachmentUpload?: ((attachmentId: string) => void) | undefined;
@@ -65,7 +64,7 @@ export interface UnifiedComposerProps {
   targetLabel?: string | undefined;
   /**
    * Whether an agent run is currently active. When true (and `onCancel` is
-   * provided) the send button morphs into a stop button (#1462 CF13).
+   * provided) the send button morphs into a stop button (#1462).
    */
   isRunning?: boolean | undefined;
   /** Cancel the active agent run (stop button handler). */
@@ -186,7 +185,7 @@ export function deriveComposerChromeVisibility(params: {
     replyBar: Boolean(composer.replyTo),
     quoteBar: Boolean(composer.quote),
     mentionChips: hasMentions,
-    /* P76: show mainchain when mentions or targets exist so Agent/目标/任务 always readable. */
+    /* Show mainchain when mentions or targets exist so Agent/目标/任务 always readable. */
     mainchainStrip: hasMentions || hasExecutionTargets,
     attachmentBar: composer.attachments.length > 0,
     agentPicker: mentionableAgentsCount > 0,

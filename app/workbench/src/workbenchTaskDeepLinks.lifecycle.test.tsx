@@ -12,7 +12,7 @@ const task: TaskItem = {
   id: 'task-052',
   title: '分页任务 52',
   project: '前端重构任务',
-  assignee: 'contributor-b',
+  assignee: 'Bob',
   startTime: '刚刚',
   dueDate: '今天 18:00',
   creator: 'demo-user',

@@ -27,13 +27,12 @@ import (
 // The sqlite fixtures never showed this: three of them hand-create a
 // *non*-partial unique index on tokendance_sub, which is exactly the shape the
 // unqualified ON CONFLICT clause can infer. The result was that the only
-// provisioning path of the OIDC login (service/oidc.go →
+// provisioning path of the OIDC login (internal/service/oidc/oidc.go →
 // repository.FindOrCreateByTokenDanceSub) was broken on the single database
 // engine production runs, while every gate stayed green.
 //
-// Confirmed against the dev stack's PG16 with EXPLAIN (which plans without
-// executing, so the probe wrote nothing — the dev database holds 0 users and
-// still holds 0 after the probe):
+// Verified with EXPLAIN on PostgreSQL 16 (EXPLAIN plans without executing, so
+// the probe writes nothing):
 //
 //	probe A  ON CONFLICT (tokendance_sub)                  → ERROR 42P10
 //	probe B  ON CONFLICT (tokendance_sub) WHERE <predicate> → plan, arbiter idx_users_tokendance_sub

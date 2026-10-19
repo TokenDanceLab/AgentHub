@@ -1,11 +1,11 @@
 package auth
 
-// #2154 F2 step ①（低风险信号片）行为级核验：已撤销（revoked）的
-// refresh token 行被再次出示是 refresh 链路上唯一可在 DB 侧检测的
-// 复用信号（轮换走 UpsertRefreshToken ON CONFLICT 覆盖旧 hash，
-// 轮换后旧 token 复用结构性不可检测）。本片只加信号——拒绝语义不变
-// （仍为 AuthRefreshInvalid）、warn 日志 + refresh_token_reuse_total
-// 计数器、**不做任何级联吊销**（级联是独立决策项）。
+// 行为级核验：已撤销（revoked）的 refresh token 行被再次出示是 refresh
+// 链路上唯一可在 DB 侧检测的复用信号（轮换走 UpsertRefreshToken
+// ON CONFLICT 覆盖旧 hash，轮换后旧 token 复用结构性不可检测）。
+// 该路径只增加信号——拒绝语义不变（仍为 AuthRefreshInvalid）、
+// warn 日志 + refresh_token_reuse_total 计数器、**不做任何级联吊销**
+// （级联是独立决策项）。
 
 import (
 	"context"
@@ -17,6 +17,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/agenthub/hub-server/internal/cache"
 	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/metrics"
 )
@@ -51,7 +52,7 @@ func TestRefreshToken_RevokedReuseSignal(t *testing.T) {
 
 	before := testutil.ToFloat64(metrics.RefreshTokenReuseTotal)
 
-	svc := NewService(db, jwtCfg(), nil) // nil cache → NoOpCache, DB-only path
+	svc := NewService(db, jwtCfg(), cache.NoOpCache{}) // DB-only path
 
 	// Logout (revoke).
 	require.NoError(t, svc.Logout(context.Background(), "user-uuid", "dev-1", "", ""))
@@ -85,7 +86,7 @@ func TestRefreshToken_ExpiredNoReuseSignal(t *testing.T) {
 
 	before := testutil.ToFloat64(metrics.RefreshTokenReuseTotal)
 
-	svc := NewService(db, jwtCfg(), nil)
+	svc := NewService(db, jwtCfg(), cache.NoOpCache{})
 	resp, err := svc.RefreshToken(context.Background(), "expired-refresh-token")
 	assert.Nil(t, resp)
 	assert.ErrorIs(t, err, errcode.AuthRefreshInvalid)

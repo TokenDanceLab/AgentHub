@@ -189,12 +189,10 @@ function MobileAppContent({ preview }: { preview: PreviewOptions }): React.React
   ]);
 
   // Mount-once push registration (#1824): request notification permission and
-  // grab the Expo push token for LOCAL notification handling. Deliberately no
-  // Hub device registration here — verified (lane C-1824) that hub-server has
-  // no push delivery facility (no FCM/APNs/Expo push consumer, no push_token
-  // field on registerDevice), so forwarding tokens would be a half-wired
-  // claim. The real permission state drives the account surface; delivery is
-  // local only until the Hub side lands a delivery path.
+  // grab the Expo push token for local notification handling. The Hub has no
+  // push delivery facility (no FCM/APNs/Expo push consumer, no push_token
+  // field on registerDevice), so forwarding the token would have no receiver.
+  // The real permission state drives the account surface; delivery stays local.
   useEffect(() => {
     let cancelled = false;
     registerExpoForPushNotificationsAsync()

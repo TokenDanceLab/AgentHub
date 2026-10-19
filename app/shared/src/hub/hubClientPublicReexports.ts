@@ -1,5 +1,5 @@
 /**
- * Hub client public re-export barrel (types + envelope runtime + SSOT gaps).
+ * Hub client public re-export barrel (types + envelope runtime).
  * Extracted from hubClient.ts (#810) so createHubClient stays the only executable surface
  * while @shared/hub/hubClient import paths remain stable.
  */
@@ -217,7 +217,7 @@ export type {
   HubRelayCommand,
 } from './hubClientDomainTypes';
 
-// ── Compat aliases + SSOT gaps (extracted #799) ──
+// ── Compat aliases (extracted #799) ──
 export type {
   EmptyHubResponse,
   RegisterRequest,
@@ -231,7 +231,6 @@ export type {
   ContactInfo,
   Contact,
   Session,
-  HubSessionAlias,
   SessionMember,
   CreatePrivateSessionRequest,
   CreateGroupSessionRequest,
@@ -239,16 +238,13 @@ export type {
   SendMessageResponse,
   ReplyToInfo,
   MessageResponse,
-  MessageAttachment,
   RegisterDeviceRequest,
   Device,
   AddAgentToSessionRequest,
   CustomAgentRequest,
-  CustomAgent,
   Notification,
   ExecutionTarget,
   ExecutionTargetType,
-  ExecutionTargetRequest,
   ExecutionTargetListResponse,
   WorkspaceProject,
   WorkspaceProjectListResponse,
@@ -259,12 +255,5 @@ export type {
   SendWorkspaceProjectThreadMessageRequest,
   WorkspaceProjectThreadMessage,
   AgentTask,
-  TriggerAgentTaskOptions,
-  OIDCAuthorizeRequest,
-  OIDCAuthorizeResponse,
-  OIDCCallbackRequest,
-  OIDCCallbackResponse,
   Skill,
-  MCPServer,
 } from './hubClientCompatTypes';
-export { HUBCLIENT_SSOT_GAPS } from './hubClientCompatTypes';

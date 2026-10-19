@@ -1,4 +1,4 @@
-// SubagentTranscript — #1406 Phase 3
+// SubagentTranscript — #1406
 // Renders a list of TeamSubagentStreamEvent as a readable transcript
 // with per-type icons, colors, Chinese labels, and formatted payload.
 // Empty state shows "等待 agent 启动…" when no events exist.

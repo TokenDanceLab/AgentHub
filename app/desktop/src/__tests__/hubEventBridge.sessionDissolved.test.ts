@@ -19,7 +19,7 @@ function createFakeHubWS() {
   };
 }
 
-describe('desktop hub event bridge — session.dissolved (#2072 P2-⑰)', () => {
+describe('desktop hub event bridge — session.dissolved (#2072)', () => {
   beforeEach(() => {
     useToastStore.setState({ toasts: [] });
   });

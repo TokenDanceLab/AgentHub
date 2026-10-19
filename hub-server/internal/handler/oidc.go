@@ -105,10 +105,10 @@ func (h *OIDCHandler) GetOIDCCallback(c *gin.Context) {
 	if code == "" || state == "" {
 		slog.Error("oidc callback get missing parameters", "request_id", middleware.GetRequestID(c))
 		if lang == "zh" {
-			const missing = `<!DOCTYPE html><html lang="zh"><head><meta charset="utf-8"><title>AgentHub — 缺少参数</title></head><body style="font-family:system-ui;max-width:480px;margin:60px auto"><h2>缺少参数</h2><p>回调地址缺少 <code>code</code> 或 <code>state</code> 参数，这通常意味着登录流程被中断，或 URL 被截断。</p><p><a href="https://hub.example.invalid">返回 AgentHub</a></p></body></html>`
+			const missing = `<!DOCTYPE html><html lang="zh"><head><meta charset="utf-8"><title>AgentHub — 缺少参数</title></head><body style="font-family:system-ui;max-width:480px;margin:60px auto"><h2>缺少参数</h2><p>回调地址缺少 <code>code</code> 或 <code>state</code> 参数，这通常意味着登录流程被中断，或 URL 被截断。</p><p><a href="/">返回 AgentHub</a></p></body></html>`
 			c.String(400, missing)
 		} else {
-			const missing = `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>AgentHub — Missing Parameters</title></head><body style="font-family:system-ui;max-width:480px;margin:60px auto"><h2>Missing OIDC Parameters</h2><p>The callback is missing <code>code</code> or <code>state</code>. This usually means the login flow was interrupted or the URL was truncated.</p><p><a href="https://hub.example.invalid">Back to AgentHub</a></p></body></html>`
+			const missing = `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>AgentHub — Missing Parameters</title></head><body style="font-family:system-ui;max-width:480px;margin:60px auto"><h2>Missing OIDC Parameters</h2><p>The callback is missing <code>code</code> or <code>state</code>. This usually means the login flow was interrupted or the URL was truncated.</p><p><a href="/">Back to AgentHub</a></p></body></html>`
 			c.String(400, missing)
 		}
 		return

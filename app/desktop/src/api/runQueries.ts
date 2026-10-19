@@ -115,7 +115,7 @@ export function useCreateRun() {
     onSettled: () => {
       qc.invalidateQueries({ queryKey: edgeQueryKeys.runs.root });
       // threads.root reaches the thread LIST only — the transcript lives under
-      // ['edge','threadItems',…], a prefix that root does not match (#2274 A-12).
+      // ['edge','threadItems',…], a prefix that root does not match (#2274).
       qc.invalidateQueries({ queryKey: edgeQueryKeys.threads.root });
       void invalidateEdgeThreadTranscript(qc);
     },
@@ -141,7 +141,7 @@ export function useCancelRun() {
     onSettled: () => {
       qc.invalidateQueries({ queryKey: edgeQueryKeys.runs.root });
       // threads.root reaches the thread LIST only — the transcript lives under
-      // ['edge','threadItems',…], a prefix that root does not match (#2274 A-12).
+      // ['edge','threadItems',…], a prefix that root does not match (#2274).
       qc.invalidateQueries({ queryKey: edgeQueryKeys.threads.root });
       void invalidateEdgeThreadTranscript(qc);
     },
@@ -159,10 +159,8 @@ export function useDecideEdgePermission() {
   return useMutation({
     mutationFn: (req: PermissionDecideRequest) => decidePermission(req),
     onSettled: () => {
-      // The doc comment above names this invalidation as the thing that "closes
-      // the replay gap when the persisted transcript is reloaded" — but
-      // threads.root cannot reach the transcript key, so it never did
-      // (#2274 A-12). The thread is not known here, hence the family-wide form.
+      // threads.root reaches the thread LIST only, not the transcript key; the
+      // thread is not known here, hence the family-wide form (#2274).
       qc.invalidateQueries({ queryKey: edgeQueryKeys.threads.root });
       void invalidateEdgeThreadTranscript(qc);
     },

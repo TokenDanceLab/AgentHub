@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════════════════════
-   Project create/update editor state for ProjectsPage residual thin #595.
+   Project create/update editor state for ProjectsPage helper module #595.
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { useEffect, useState } from 'react';

@@ -95,7 +95,7 @@ describe('createHubClient', () => {
               owner_id: '00000000-0000-0000-0000-00000000u101',
               name: 'Workstation',
               target_type: 'local_edge',
-              workspace_allowlist: '["D:\\\\Code"]',
+              workspace_allowlist: '["/workspace"]',
               trust_level: 'local',
               health_state: 'healthy',
               is_online: true,

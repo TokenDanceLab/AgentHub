@@ -2,8 +2,8 @@ import { test, expect, type Page } from '@playwright/test';
 import { blockExternalFonts, isExternalFontUrl } from '../../../e2e/fontBlocker';
 
 const LIVE_BACKEND_HOSTS = new Set([
-  'api.hub.example.invalid',
   'hub.example.invalid',
+  'api.hub.example.invalid',
   'id.example.invalid',
   'api.example.invalid',
   'localhost:8080',
@@ -46,8 +46,7 @@ test.describe('TeamRun UI evidence fixture', () => {
     // types.ts) — the chatview adapter drops them from the transcript stream
     // (adapterMapBlock.ts skip list). Their fixture evidence now surfaces in
     // the right inspector: run evidence index (run_session) and the agent
-    // delegation tree (route_decision + subagent). Assert that live surface
-    // instead of the retired inline transcript rows.
+    // delegation tree (route_decision + subagent). Assert that live surface.
     const runInspector = page.getByRole('complementary', { name: 'Right inspector' });
     await expect(runInspector).toContainText('run-teamrun-1');
     await expect(
@@ -62,11 +61,10 @@ test.describe('TeamRun UI evidence fixture', () => {
       path: testInfo.outputPath('teamrun-transcript.png'),
     });
 
-    // The retired right-inspector Files tab used to list block-level evidence
-    // files (teamrun-state/tasks/events.json). Those blocks are now
-    // sidebar-only, and the redesigned inspector aggregates run-level evidence
-    // in the Overview panel; expand the artifacts section and assert the
-    // fixture's evidence artifact surface there.
+    // Run-level evidence (teamrun-state/tasks/events.json) is sidebar-only
+    // transcript content; the right inspector aggregates it in the Overview
+    // panel. Expand the artifacts section and assert the fixture's evidence
+    // artifact surface there.
     await runInspector
       .getByRole('button', { name: /^(展开|Expand).*(产物|Artifacts)/i })
       .click();

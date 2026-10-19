@@ -17,7 +17,7 @@ import (
 // Handler holds dependencies for HTTP and WebSocket handlers.
 func (h *Handler) GetSettings(w http.ResponseWriter, r *http.Request) {
 	// Settings are Edge-local shared config with no per-user owner binding.
-	// Hub JWT / multi-user remote reads fail closed (AH-SR-045); local single-tenant keeps access.
+	// Hub JWT / multi-user remote reads fail closed; local single-tenant keeps access.
 	if h.denyRemoteHubSharedConfig(w, r) {
 		return
 	}
@@ -27,7 +27,7 @@ func (h *Handler) GetSettings(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) PatchSettings(w http.ResponseWriter, r *http.Request) {
 	// Settings are Edge-local shared config with no per-user owner binding, so the
-	// write side fails closed exactly like the read side above (AH-SR-045). The gate
+	// write side fails closed exactly like the read side above. The gate
 	// runs before decodeOptionalJSON: an unauthorized caller must not be able to make
 	// the Edge parse a body at all.
 	if h.denyRemoteHubSharedConfig(w, r) {
@@ -35,7 +35,7 @@ func (h *Handler) PatchSettings(w http.ResponseWriter, r *http.Request) {
 	}
 	var patch map[string]string
 	// decodeOptionalJSON applies the shared 1MB body limit; this was the only
-	// JSON decode point bypassing it (memory exhaustion, #2154 security scan).
+	// JSON decode point bypassing it (memory exhaustion, #2154).
 	if err := decodeOptionalJSON(r, &patch); err != nil {
 		errcode.Write(w, errcode.ErrBadRequest.WithMessage("invalid json body"))
 		return
@@ -82,14 +82,15 @@ func genID(prefix string) string {
 // polling while still surfacing a store that goes bad within one poll cycle.
 const storeReadinessCacheTTL = 30 * time.Second
 
-// storeReadinessCache holds the last computed store-readiness probe so /v1/health
+// storeReadinessCached / storeReadinessCachedAt (guarded by
+// storeReadinessMu) hold the last computed store-readiness probe so /v1/health
 // does not re-probe the store on every poll. The probe is a functional read
 // (ListProjects) rather than a literal store.SQLiteReadiness(path) call because
 // the SQLite DB path is wired at the composition root (cmd/agenthub-edge) and
-// is not carried on Handler — adding it would require editing handlers.go,
-// which is out of this lane's scope (Wave7 follow-up). The functional probe
-// still catches the failure mode the task targets: a store that cannot serve
-// reads (corrupt/unopenable SQLite) is reported as degraded with a 503.
+// is not carried on Handler — adding it would require editing handlers.go.
+// The functional probe still catches the failure mode the task targets: a
+// store that cannot serve reads (corrupt/unopenable SQLite) is reported as
+// degraded with a 503.
 var (
 	storeReadinessMu       sync.Mutex
 	storeReadinessCached   map[string]any
@@ -178,10 +179,10 @@ func (h *Handler) GetHealth(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// HTTP status reflects the health status: degraded → 503, ok → 200.
-	// Previously /v1/health always returned 200 even when degraded, so
-	// load balancers and operators could not distinguish a healthy edge
-	// from one that was partially broken. The response body carries the
-	// same http_status so clients parsing JSON get the signal too.
+	// Returning 503 when degraded lets load balancers and operators
+	// distinguish a healthy edge from one that is partially broken. The
+	// response body carries the same http_status so clients parsing JSON get
+	// the signal too.
 	httpStatus := http.StatusOK
 	if status == "degraded" {
 		httpStatus = http.StatusServiceUnavailable

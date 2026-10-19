@@ -26,8 +26,7 @@ import (
 // with the injected exit code instead of running the test suite. This keeps
 // the exec path real while staying hermetic and deterministic. Talking to a
 // real SSH host is deliberately uncovered — see the note at the top of
-// deploy_ssh_test.go (the -ssh-integration flag it used to point at was never
-// registered by anything, so nothing was actually skipped-pending there).
+// deploy_ssh_test.go.
 // ---------------------------------------------------------------------------
 
 const (
@@ -127,7 +126,7 @@ func readDeployStubLog(t *testing.T, dir string) string {
 }
 
 // ---------------------------------------------------------------------------
-// PostDeployments behavior tests (quad-scan Q8, #2056)
+// PostDeployments behavior tests (#2056)
 // ---------------------------------------------------------------------------
 
 // seedDeployRun creates the project/thread/run chain used by deploy tests.
@@ -245,6 +244,39 @@ func TestPostDeploymentsRejectsUnfinishedRun(t *testing.T) {
 	assertErrorCode(t, rec.Body.String(), "deploy_run_not_finished")
 }
 
+func TestPostDeploymentsRejectsCompletedWithIssuesRun(t *testing.T) {
+	h := newTestHandler()
+	seedDeployRun(t, h.Store, "run-issues")
+	if _, ok := h.Store.SetRunStatus("run-issues", "completed_with_issues"); !ok {
+		t.Fatal("SetRunStatus(completed_with_issues) failed")
+	}
+	rec := doDeployments(h, http.MethodPost, `{"runId":"run-issues","slug":"ok-slug"}`)
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want 400; body=%s", rec.Code, rec.Body.String())
+	}
+	assertErrorCode(t, rec.Body.String(), "deploy_run_not_finished")
+}
+
+func TestPostDeploymentsRejectsUnconfiguredTarget(t *testing.T) {
+	t.Setenv(envDeployTargetHost, "")
+	t.Setenv(envDeployTargetPath, "")
+
+	h := newTestHandler()
+	seedDeployRun(t, h.Store, "run-no-target")
+	if _, ok := h.Store.SetRunStatus("run-no-target", "finished"); !ok {
+		t.Fatal("SetRunStatus(finished) failed")
+	}
+	seedDeployArtifact(t, h.Store, "run-no-target", "art-index", "index.html")
+
+	rec := doDeployments(h, http.MethodPost, `{"runId":"run-no-target","slug":"ok-slug"}`)
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf("status = %d, want 500; body=%s", rec.Code, rec.Body.String())
+	}
+	if !strings.Contains(rec.Body.String(), "deployment target is not configured") {
+		t.Fatalf("body does not name the missing target: %s", rec.Body.String())
+	}
+}
+
 func TestPostDeploymentsRejectsRunWithoutArtifacts(t *testing.T) {
 	h := newTestHandler()
 	seedDeployRun(t, h.Store, "run-empty")
@@ -314,6 +346,8 @@ func TestPostDeploymentsDeploysArchiveOverStubbedSSH(t *testing.T) {
 }
 
 func TestPostDeploymentsReportsRemoteMkdirFailure(t *testing.T) {
+	t.Setenv(envDeployTargetHost, "test-host")
+	t.Setenv(envDeployTargetPath, "/tmp/agenthub-pages")
 	installDeploySSHStubs(t)
 	t.Setenv(envDeployTargetHost, "stub-host")
 	t.Setenv(deployStubEnvFail, "mkdir")
@@ -343,5 +377,64 @@ func TestPostDeploymentsReportsRemoteMkdirFailure(t *testing.T) {
 	}
 	if !strings.Contains(decoded.Error.Message, "failed to create remote directory") {
 		t.Errorf("error message = %q, want remote directory failure context", decoded.Error.Message)
+	}
+}
+
+// A workspace path (and the OS account name in it) must not reach the client
+// through the archive-build 500; the detailed error stays in the server log.
+func TestPostDeploymentsArchiveFailureDoesNotLeakWorkspacePath(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("chmod 000 does not make a file unreadable on Windows")
+	}
+	workDir := t.TempDir()
+	site := filepath.Join(workDir, "site")
+	if err := os.MkdirAll(site, 0o755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	blocked := filepath.Join(site, "index.html")
+	if err := os.WriteFile(blocked, []byte("<html></html>"), 0o644); err != nil {
+		t.Fatalf("write fixture: %v", err)
+	}
+	if err := os.Chmod(blocked, 0o000); err != nil {
+		t.Fatalf("chmod: %v", err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(blocked, 0o644) })
+	if handle, err := os.Open(blocked); err == nil {
+		_ = handle.Close()
+		t.Skip("running with privileges that bypass file permissions")
+	}
+
+	h := newTestHandler()
+	repo := store.New()
+	h.Store = repo
+	seedDeployRun(t, repo, "run-archive-fail")
+	if _, ok := repo.SetRunStatus("run-archive-fail", "finished"); !ok {
+		t.Fatal("SetRunStatus(finished) failed")
+	}
+	if _, ok := repo.SetRunWorkDir("run-archive-fail", workDir); !ok {
+		t.Fatal("SetRunWorkDir failed")
+	}
+	if _, err := repo.UpsertArtifact(store.Artifact{
+		ID:    "art-site",
+		RunID: "run-archive-fail",
+		Kind:  "dir",
+		Path:  "site",
+		ContentSource: &store.ArtifactContentSource{
+			Kind: "workspace_relative", Path: "site", Readable: true,
+		},
+	}); err != nil {
+		t.Fatalf("UpsertArtifact: %v", err)
+	}
+
+	rec := doDeployments(h, http.MethodPost, `{"runId":"run-archive-fail","slug":"ok-slug"}`)
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf("status = %d, want 500; body=%s", rec.Code, rec.Body.String())
+	}
+	body := rec.Body.String()
+	if !strings.Contains(body, "failed to build archive") {
+		t.Fatalf("body does not name the archive failure: %s", body)
+	}
+	if strings.Contains(body, workDir) {
+		t.Fatalf("response leaks the workspace path: %s", body)
 	}
 }

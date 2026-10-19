@@ -5,7 +5,7 @@ import {
   DesignNavIcon,
   DESIGN_NAV_ICON_SIZE,
 } from '../../designIcons';
-import { RuntimeBrandIcon } from '../../RuntimeBrandIcon';
+import { RuntimeBrandIcon } from '@shared/ui';
 import styles from '../AgentsPage.module.css';
 import {
   ccSwitchConnectionTone,
@@ -29,11 +29,11 @@ import type {
 } from './types';
 
 /* ═══════════════════════════════════════════════════════════════════════
-   AgentOpsItemParts — presentational residual slices from
+   AgentOpsItemParts — presentational parts for
    AgentOpsParts (#684).
 
    Policy/tool/cc-switch/model/audit leaf rows and cards. CSS stays on
-   AgentsPage.module.css. No intentional UX change.
+   AgentsPage.module.css.
    ═══════════════════════════════════════════════════════════════════════ */
 
 export const PolicyRuleRow: React.FC<{ rule: PolicyRule }> = ({ rule }) => (
@@ -258,7 +258,7 @@ export const AuditFilterChip: React.FC<{
   <button
     className={`${active ? styles.active : ''}`}
     type="button"
-    // #2154 P2-16: no handler = no clickable chip. The audit filters are not
+    // #2154: no handler = no clickable chip. The audit filters are not
     // wired by any shell today, so they render disabled instead of looking
     // interactive and doing nothing (same gate as the market install buttons).
     disabled={!onAuditFilterChange}
@@ -285,10 +285,8 @@ export const AuditEntryRow: React.FC<{
     </>
   );
 
-  // #2154 P2-16: this row used to be a focusable <button> with hover styling
-  // and no onClick at all — a "looks clickable, does nothing" element next to
-  // an export button that correctly hides when unwired. Without a handler it is
-  // plain content now; with one it keeps the button semantics.
+  // Without an audit handler the row is plain content; with one it keeps
+  // button semantics.
   if (!onAuditRowClick) {
     return <div className={styles['audit-row']}>{cells}</div>;
   }

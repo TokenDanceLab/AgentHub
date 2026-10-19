@@ -2,15 +2,17 @@ package dispatchsvc
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/agenthub/hub-server/internal/bus"
+	"github.com/agenthub/hub-server/internal/cache"
 	"github.com/agenthub/hub-server/internal/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-// ── Port mocks (#617 residual, moved with the dispatch package) ─────────────
+// ── Port mocks (#617) ──────────────────────────────────────────────────────
 
 type recordingDispatchBus struct {
 	events []bus.Event
@@ -108,6 +110,21 @@ func TestDispatchService_NilOutboxWrappers(t *testing.T) {
 	svc.moveDeliveryToDeadLetter(context.Background(), "d1", "boom")
 }
 
+func TestResolveDispatchCacheNilFallback(t *testing.T) {
+	var typedNil *cache.Client
+	for label, port := range map[string]dispatchCache{
+		"nil interface": nil,
+		"typed nil":     typedNil,
+		"noop cache":    cache.NoOpCache{},
+	} {
+		resolved := resolveDispatchCache(port)
+		_, err := resolved.GetRoute(context.Background(), "u1", "desktop")
+		if !errors.Is(err, cache.ErrCacheUnavailable) {
+			t.Errorf("%s: GetRoute error = %v, want ErrCacheUnavailable", label, err)
+		}
+	}
+}
+
 func TestDispatchService_ConstructorPortsComposition(t *testing.T) {
 	b := &recordingDispatchBus{}
 	cachePort := &recordingDispatchCache{routes: map[string]string{"u1:desktop": "conn-1"}}
@@ -131,8 +148,8 @@ func TestDispatchService_ConstructorPortsComposition(t *testing.T) {
 	assert.Equal(t, 1, outbox.dead)
 	assert.Equal(t, "hard-fail", outbox.lastError)
 
-	got := svc.cachePort()
-	route, err := got.GetRoute(context.Background(), "u1", "desktop")
+	assert.Same(t, cachePort, svc.cacheClient)
+	route, err := svc.cacheClient.GetRoute(context.Background(), "u1", "desktop")
 	require.NoError(t, err)
 	assert.Equal(t, "conn-1", route)
 	assert.Same(t, wsPort.conn, svc.mgr.FindByConnID("conn-1"))

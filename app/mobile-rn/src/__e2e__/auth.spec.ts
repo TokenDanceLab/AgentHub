@@ -88,7 +88,7 @@ test.describe('Account interaction tests', () => {
     await page.waitForTimeout(1000);
 
     // Hero section shows user display name
-    const displayName = page.getByText('maintainer').first();
+    const displayName = page.getByText('Demo User').first();
     await expect(displayName).toBeVisible({ timeout: 10000 });
 
     // Shows TokenDance workspace

@@ -168,7 +168,7 @@ func TestHandleTaskStreamPersistsTypedRunEventAndProjection(t *testing.T) {
 	var projected model.Message
 	require.NoError(t, db.Where("session_id = ? AND client_msg_id = ?", "sess-1", "11111111-1111-4111-8111-111111111111").First(&projected).Error)
 	require.Equal(t, model.ContentTypeText, projected.ContentType)
-	// #2274 B-1: the projection keeps the event payload verbatim AND carries
+	// #2274: the projection keeps the event payload verbatim AND carries
 	// the producing task ref (`agent_task.task_id`) that the transcript needs
 	// to offer an honest regenerate — hub stamps it on both callback paths.
 	require.JSONEq(

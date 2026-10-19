@@ -43,7 +43,7 @@ export type {
 } from './AgentHubWorkbenchTypes';
 
 /**
- * AgentHub workbench composition shell (#683 residual).
+ * AgentHub workbench composition shell.
  * Owns page state + chrome hooks; frame/overlay props come from pure helpers.
  */
 export function AgentHubWorkbench(props: AgentHubWorkbenchProps): React.ReactElement {
@@ -94,7 +94,7 @@ function AgentHubWorkbenchContent(props: AgentHubWorkbenchProps): React.ReactEle
     isChatPage,
     platformSurface: platform.surface,
     setActivePage,
-    // #1997 (UX F3): split-view placement derives from the shell selection.
+    // #1997: split-view placement derives from the shell selection.
     ...(props.activeConversationId !== undefined
       ? { activeConversationId: props.activeConversationId }
       : {}),

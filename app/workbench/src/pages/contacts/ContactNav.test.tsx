@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════════════════════
-   ContactNav — frozen-input honesty gate (#2154 P1-1).
+   ContactNav — frozen-input honesty gate (#2154).
 
    The contacts shell is assembled without `onSearchChange`, which made the
    nav search box a frozen input: it looked editable and silently dropped
@@ -27,7 +27,7 @@ function baseProps(overrides: Partial<ContactNavProps> = {}): ContactNavProps {
   };
 }
 
-describe('ContactNav search gate (#2154 P1-1)', () => {
+describe('ContactNav search gate (#2154)', () => {
   it('disables the search input and states why when no handler is wired', () => {
     render(<ContactNav {...baseProps()} />);
 

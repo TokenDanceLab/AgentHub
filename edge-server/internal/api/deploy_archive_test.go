@@ -269,13 +269,13 @@ func TestAddDirToArchive_NestedFiles(t *testing.T) {
 	}
 }
 
-func TestAddDirToArchive_MissingDirReturnsNil(t *testing.T) {
+func TestAddDirToArchive_MissingDirReturnsError(t *testing.T) {
 	var buf bytes.Buffer
 	gw := gzip.NewWriter(&buf)
 	tw := tar.NewWriter(gw)
 	err := addDirToArchive(tw, filepath.Join(t.TempDir(), "does-not-exist"))
-	if err != nil {
-		t.Errorf("addDirToArchive on missing dir = %v, want nil (walk errors swallowed)", err)
+	if err == nil {
+		t.Error("addDirToArchive on missing dir = nil, want error")
 	}
 	// Closing should succeed even though nothing was written.
 	if cerr := tw.Close(); cerr != nil {

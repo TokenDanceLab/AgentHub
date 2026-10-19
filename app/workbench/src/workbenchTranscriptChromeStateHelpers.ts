@@ -10,11 +10,11 @@ import {
 } from './workbenchTranscriptChromeLabels';
 
 /* ═══════════════════════════════════════════════════════════════════════
-   workbenchTranscriptChromeStateHelpers — pure residual selection / hold /
-   timer / snapshot slices from workbenchTranscriptChromeHelpers (#755).
+   workbenchTranscriptChromeStateHelpers — selection/hold/timer/snapshot
+   helpers for the transcript chrome (#755).
 
    Id-list math, hold/pointer planners, selection hotkey plans, toast/pulse
-   disposers. No React hooks / no intentional UX change.
+   disposers. No React hooks.
    ═══════════════════════════════════════════════════════════════════════ */
 
 export function toggleIdInList(current: string[], id: string): string[] {

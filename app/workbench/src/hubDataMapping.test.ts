@@ -16,13 +16,9 @@ import {
 
    Desktop 的 workbench model 通过这里的共享**编排**函数做 Hub→UI 映射
    （`resolveHubProjects` / `resolveHubContacts` / `resolveHubDocuments` /
-   `hubSessionToConversation`），per-shell 的 projects mapper 由 desktop 自己
-   传入（`useDesktopWorkbenchModel.ts` 的本地副本）；Web 走自己的副本
-   `app/web/src/platform/webWorkbenchProjects.ts`（分岔已登记，收敛属另一批）。
-   #2274 B-6：原先此处还有一个共享 `workspaceProjectToProjectInfo`，它把每个
-   Hub 项目硬编码成 status:'Active'（Hub 侧无 status 事实），#2291 之后 0 非测试
-   消费者；旧注释曾错误宣称 desktop 使用它，正是这句错注释让孤儿活了下来。
-   现已删除，`resolveHubProjects` 的测试改用 stub mapper（它是纯编排器）。
+   `hubSessionToConversation`）；per-shell 的 projects mapper 由调用方注入
+   （desktop 为 `useDesktopWorkbenchModel.ts` 的本地副本，Web 为
+   `app/web/src/platform/webWorkbenchProjects.ts`）。
    ═══════════════════════════════════════════════════════════════════════ */
 
 // Deterministic helpers: formatDocTime / formatProjectDate / formatSessionTime
@@ -42,7 +38,7 @@ describe('contactInfoToMember', () => {
     const member = contactInfoToMember({
       user_id: 'u-1',
       username: 'john',
-      nickname: 'contributor-a',
+      nickname: 'Alice',
       remark: '  John Smith  ',
       online: true,
     });
@@ -123,8 +119,8 @@ describe('resolveHubContacts', () => {
 });
 
 describe('resolveHubProjects', () => {
-  // #2274 B-6: resolveHubProjects 是纯编排器（错误态 / hubReady / fixture 门 +
-  // map），per-shell mapper 不在共享包里，测试用 stub 表达合同即可。
+  // resolveHubProjects 是纯编排器（错误态 / hubReady / fixture 门 + map），
+  // per-shell mapper 不在共享包里，测试用 stub 表达合同即可。
   const mapFn = (project: { id: string; name?: string }): ProjectInfo => ({
     id: project.id,
     name: project.name?.trim() || 'unnamed',

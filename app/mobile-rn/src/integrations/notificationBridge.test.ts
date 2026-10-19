@@ -33,7 +33,7 @@ describe('AgentHub notification bridge', () => {
             intent: 'approval',
             approvalId: 'approval-agenthub',
             runId: 'run-agenthub',
-            threadId: 'thread-maintainer',
+            threadId: 'thread-demo',
           });
         },
       },
@@ -45,7 +45,7 @@ describe('AgentHub notification bridge', () => {
       source: 'approval',
       approvalId: 'approval-agenthub',
       runId: 'run-agenthub',
-      threadId: 'thread-maintainer',
+      threadId: 'thread-demo',
     });
   });
 
@@ -66,7 +66,7 @@ describe('AgentHub notification bridge', () => {
     listener?.(createResponse('notification-2', {
       intent: 'run',
       runId: 'run-agenthub',
-      threadId: 'thread-maintainer',
+      threadId: 'thread-demo',
     }));
     bridge.stop();
 
@@ -74,7 +74,7 @@ describe('AgentHub notification bridge', () => {
       screen: 'tasks',
       source: 'run',
       runId: 'run-agenthub',
-      threadId: 'thread-maintainer',
+      threadId: 'thread-demo',
     });
     expect(remove).toHaveBeenCalledOnce();
   });
@@ -84,7 +84,7 @@ describe('AgentHub notification bridge', () => {
     const onNavigate = vi.fn();
     const response = createResponse('notification-3', {
       intent: 'thread',
-      threadId: 'thread-maintainer',
+      threadId: 'thread-demo',
     });
 
     await startAgentHubNotificationBridge({
@@ -104,7 +104,7 @@ describe('AgentHub notification bridge', () => {
     expect(onNavigate).toHaveBeenCalledTimes(1);
     expect(onNavigate).toHaveBeenCalledWith({
       screen: 'thread',
-      threadId: 'thread-maintainer',
+      threadId: 'thread-demo',
     });
   });
 
@@ -148,6 +148,6 @@ describe('AgentHub notification bridge', () => {
       vibrationPattern: [0, 180, 120, 180],
       lightColor: '#0071BC',
     });
-    expect(JSON.stringify(setNotificationChannelAsync.mock.calls)).not.toContain('maintainer');
+    expect(JSON.stringify(setNotificationChannelAsync.mock.calls)).not.toContain('Demo User');
   });
 });

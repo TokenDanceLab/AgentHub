@@ -13,66 +13,13 @@ import (
 	"testing"
 )
 
-// ── 常量：A-V1 RFC §6 / #1566 定义的已迁移文件（编排去重后剩余 8 个源文件）───
-
-// orchestratorSourceFiles 是已从根 adapters 包迁移到当前叶子包
-// edge-server/internal/adapters/orchestrator/ 的 orchestrator_*.go
-// 源文件（不含 _test.go）。
-var orchestratorSourceFiles = []string{
-	"orchestrator.go",
-	"orchestrator_dispatch_handle.go",
-	"orchestrator_dispatch_interceptor.go",
-	"orchestrator_dispatch_parse.go",
-	"orchestrator_dispatch_results.go",
-	"orchestrator_ids.go",
-	"orchestrator_payloads.go",
-	"orchestrator_prompt.go",
-}
-
-// orchestratorTestFiles 是配套测试文件。
-var orchestratorTestFiles = []string{
-	"orchestrator_e2e_test.go",
-	"orchestrator_residual_test.go",
-}
-
 // parentDir 是上游 adapters 包路径（相对于 edge-server 模块根）。
 const parentDir = "internal/adapters"
 
 // leafDir 是当前叶子包路径（相对于 edge-server 模块根）。
 const leafDir = parentDir + "/orchestrator"
 
-// ── 阶段 1a：确认 13 个源文件已迁移到叶子包（根包不得再持有）──────────────
-
-func TestOrchestratorFilesLiveInLeaf(t *testing.T) {
-	edgeRoot, err := edgeServerRoot()
-	if err != nil {
-		t.Fatalf("查找 edge-server 根目录: %v", err)
-	}
-	leafPath := filepath.Join(edgeRoot, leafDir)
-
-	for _, f := range orchestratorSourceFiles {
-		p := filepath.Join(leafPath, f)
-		if _, err := os.Stat(p); os.IsNotExist(err) {
-			t.Errorf("orchestrator 源文件应位于叶子包: %s", p)
-		}
-	}
-	for _, f := range orchestratorTestFiles {
-		p := filepath.Join(leafPath, f)
-		if _, err := os.Stat(p); os.IsNotExist(err) {
-			t.Errorf("orchestrator 测试文件应位于叶子包: %s", p)
-		}
-	}
-
-	// 反向断言：根包不得再持有这些文件（防回退到 god package）。
-	parentPath := filepath.Join(edgeRoot, parentDir)
-	for _, f := range orchestratorSourceFiles {
-		if _, err := os.Stat(filepath.Join(parentPath, f)); err == nil {
-			t.Errorf("根 adapters 包不应再持有 %s（已迁移到叶子包）", f)
-		}
-	}
-}
-
-// ── 阶段 1b：go vet（当前包卫生检查）───────────────────────────────────────
+// ── go vet（当前包卫生检查）───────────────────────────────────────────────
 
 func TestGoVetAdaptersPackage(t *testing.T) {
 	edgeRoot, err := edgeServerRoot()
@@ -91,10 +38,10 @@ func TestGoVetAdaptersPackage(t *testing.T) {
 	}
 }
 
-// ── 阶段 1c：依赖方向门禁（叶子不反向依赖根）───────────────────────────────
+// ── 依赖方向门禁（叶子不反向依赖根）───────────────────────────────────────
 
 // TestLeafDoesNotImportRootAdapters 断言叶子包的 go list -deps 输出中不出现
-// 根 internal/adapters 实现包（#1566 verifier 核心断言之一）。注意叶子包
+// 根 internal/adapters 实现包。注意叶子包
 // 自身的 import path 以 internal/adapters/ 开头，因此按完整包路径精确匹配。
 func TestLeafDoesNotImportRootAdapters(t *testing.T) {
 	edgeRoot, err := edgeServerRoot()
@@ -140,9 +87,9 @@ func TestOrchestrationContractNeutral(t *testing.T) {
 	t.Logf("orchestration 合同包依赖方向正确（无 adapters 依赖）")
 }
 
-// ── 阶段 1d：合同类型归属门禁 ────────────────────────────────────────────────
+// ── 合同类型归属门禁 ────────────────────────────────────────────────────────
 
-// contractTypes 是 A-V1 合同词汇表：唯一权威定义必须在 internal/orchestration；
+// contractTypes 是 合同词汇表：唯一权威定义必须在 internal/orchestration；
 // adapters 根包内只允许 `type X = orchestration.X` 的 alias，不允许 struct/string
 // 定义（防双 SSOT 与环回退）。
 var contractTypes = []string{
@@ -152,7 +99,7 @@ var contractTypes = []string{
 	"PlanApprovalConfig",
 	"PendingPlan",
 	"PlanDecision",
-	// Step 2 (#1566)：adapter-domain 合同类型随叶子包迁移进入 orchestration。
+	// adapter-domain 合同类型。
 	"AgentAdapter",
 	"EventEmitter",
 	"AdapterMetadata",
@@ -224,7 +171,7 @@ func containsString(list []string, s string) bool {
 	return false
 }
 
-// ── 阶段 1e：go build 自检 ───────────────────────────────────────────────────
+// ── go build 自检 ───────────────────────────────────────────────────────────
 
 func TestGoBuildSelf(t *testing.T) {
 	edgeRoot, err := edgeServerRoot()

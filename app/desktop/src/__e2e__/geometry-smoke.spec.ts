@@ -9,13 +9,9 @@ import { assertFontGuardHermetic, blockExternalFonts } from '../../../e2e/fontBl
 /**
  * Desktop geometry smoke (#1284) — mock/demo workbench layout contract.
  *
- * #2154 P1-7: Desktop no longer declares `capabilities.localTerminal` (the only
- * host was the in-memory #1193 mock: no output, no close affordance), so the
- * terminal dock renders on no surface. The original sidebar-vs-dock
- * intersection check has no dock left to measure — this spec now pins the
- * honest capability (dock absent) and keeps the conversation sidebar inside the
- * 1440x810 workspace viewport. When a real PTY host lands, restore the
- * sidebar-vs-dock assertion with `evaluateSidebarVsTerminalDock`.
+ * Desktop declares no `capabilities.localTerminal`, so no terminal dock
+ * renders on any surface. This spec pins that capability (dock absent) and
+ * keeps the conversation sidebar inside the 1440x810 workspace viewport.
  */
 test.describe('Desktop geometry smoke (#1284)', () => {
   test.describe.configure({ timeout: 60_000 });
@@ -33,7 +29,7 @@ test.describe('Desktop geometry smoke (#1284)', () => {
     await expect(page.getByTestId('agenthub-workbench')).toBeVisible();
     await expect(page.getByTestId('agenthub-workbench')).toHaveAttribute('data-page', 'chat');
 
-    // #2154 P1-7: capability is false, so the dock must never mount.
+    // #2154: capability is false, so the dock must never mount.
     await expect(page.getByTestId('workbench-terminal-dock')).toHaveCount(0);
 
     const sidebar = page

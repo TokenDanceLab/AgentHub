@@ -2,7 +2,7 @@ import React from 'react';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, within } from '../__tests__/setup';
 import { ProjectsPage } from './ProjectsPage';
-import { DEFAULT_PROJECTS } from './projects';
+import { WORKBENCH_MOCK_PROJECTS } from '../mockData';
 import type { ProjectInfo, ProjectsPageProps } from './projects';
 
 // Projects copy resolves via the sharedWorkbench namespace; opt into the zh
@@ -57,7 +57,7 @@ describe('ProjectsPage empty state', () => {
   });
 
   it('does not render EmptyState when projects are present', () => {
-    const projects: ProjectInfo[] = DEFAULT_PROJECTS;
+    const projects: ProjectInfo[] = WORKBENCH_MOCK_PROJECTS;
 
     render(
       <ProjectsPage
@@ -78,7 +78,7 @@ describe('ProjectsPage empty state', () => {
 describe('ProjectsPage detail tabs', () => {
   it('switches between overview and runs without losing project chrome', () => {
     const onTabChange = vi.fn();
-    const projects = DEFAULT_PROJECTS;
+    const projects = WORKBENCH_MOCK_PROJECTS;
 
     render(
       <ProjectsPage
@@ -103,7 +103,7 @@ describe('ProjectsPage per-folder theme color', () => {
   });
 
   it('applies the active folder accent token on render', () => {
-    const projects: ProjectInfo[] = DEFAULT_PROJECTS;
+    const projects: ProjectInfo[] = WORKBENCH_MOCK_PROJECTS;
     const [first] = projects;
     expect(first?.themeColor).toBe('emerald');
 
@@ -123,7 +123,7 @@ describe('ProjectsPage per-folder theme color', () => {
   });
 
   it('switches --td-accent token when the active folder changes', () => {
-    const projects: ProjectInfo[] = DEFAULT_PROJECTS;
+    const projects: ProjectInfo[] = WORKBENCH_MOCK_PROJECTS;
     const [first, second] = projects;
     expect(first?.themeColor).toBe('emerald');
     expect(second?.themeColor).toBe('amber');
@@ -151,7 +151,7 @@ describe('ProjectsPage per-folder theme color', () => {
 
   it('leaves no accent attribute when the active folder has no themeColor', () => {
     const projects: ProjectInfo[] = [
-      { ...DEFAULT_PROJECTS[0]!, id: 'plain', themeColor: undefined },
+      { ...WORKBENCH_MOCK_PROJECTS[0]!, id: 'plain', themeColor: undefined },
     ];
 
     render(
@@ -223,7 +223,7 @@ describe('ProjectsPage theme color picker', () => {
   });
 
   it('pre-selects the active project themeColor when editing', () => {
-    const projects: ProjectInfo[] = DEFAULT_PROJECTS;
+    const projects: ProjectInfo[] = WORKBENCH_MOCK_PROJECTS;
     const [first] = projects;
     const onProjectUpdate = vi.fn(async () => undefined);
 
@@ -239,7 +239,7 @@ describe('ProjectsPage theme color picker', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '编辑项目' }));
 
-    // DEFAULT_PROJECTS[0].themeColor === 'emerald'
+    // WORKBENCH_MOCK_PROJECTS[0].themeColor === 'emerald'
     expect(screen.getByRole('radio', { name: 'Emerald' })).toHaveAttribute('aria-checked', 'true');
   });
 });

@@ -24,9 +24,9 @@ import type {
 } from './types';
 
 /* ═══════════════════════════════════════════════════════════════════════
-   ContactMainItemParts — presentational residual slices from
+   ContactMainItemParts — presentational parts for
    ContactMainSections (#707). List / search / request / pending / empty
-   chrome. CSS stays on ContactsPage.module.css. No intentional UX change.
+   chrome. CSS stays on ContactsPage.module.css.
    exactOptionalPropertyTypes-safe FriendRequestCard props (#672).
    ═══════════════════════════════════════════════════════════════════════ */
 

@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
-"""dev-start — 一键启动 Edge、Hub 与 Desktop 开发服务（ps1 迁移，契约见 server docs/design/ps1-to-python-migration.md）。
+"""dev-start — 一键启动 Edge、Hub 与 Desktop 开发服务。
 
 后台启动 edge-server（go run）、hub-server（go run）与 Desktop dev server
 （pnpm dev），等待端口就绪后常驻；Ctrl+C 停止全部。
 URLs: Edge=http://127.0.0.1:3210, Hub=http://127.0.0.1:8080, Desktop=http://localhost:5173
 
-契约：stdlib only；前置检查（go/node/pnpm 缺失即 exit 1）、端口等待行
-（`  [Name] Ready on port N` / `  [Name] TIMEOUT — port N did not become
-available in Ns`）与原 ps1 一致。
+契约：stdlib only；前置检查（go/node/pnpm 缺失即 exit 1）；就绪输出行为
+`  [Name] Ready on port N`，超时为 `  [Name] TIMEOUT — port N did not become
+available in Ns`。
 """
 
 import os
@@ -136,6 +136,6 @@ if __name__ == "__main__":
         sys.exit(main())
     except KeyboardInterrupt:
         sys.exit(0)
-    except Exception as exc:  # noqa: BLE001 —— 顶层兜底，对齐 ps1 $ErrorActionPreference='Stop'，禁止静默吞错
+    except Exception as exc:  # noqa: BLE001 —— fail closed：未捕获异常返回非零
         print(f"ERROR: {exc}", file=sys.stderr)
         sys.exit(1)

@@ -52,7 +52,7 @@ describe('webPlatform workbench agent mapping', () => {
       targetPreferences: {
         target_id: 'target-local-edge-1',
         target_type: 'local_edge',
-        work_dir: '<REPO_ROOT>',
+        work_dir: '/workspace/agenthub',
       },
       status: 'available',
       capabilities: {
@@ -83,7 +83,7 @@ describe('webPlatform workbench agent mapping', () => {
       targetPreferences: {
         target_id: 'target-local-edge-1',
         target_type: 'local_edge',
-        work_dir: '<REPO_ROOT>',
+        work_dir: '/workspace/agenthub',
       },
       status: 'available',
     });
@@ -136,7 +136,7 @@ describe('webPlatform workbench agent mapping', () => {
       seq_id: 2,
       client_msg_id: 'client-pin-1',
       sender_type: 'user',
-      sender_id: 'maintainer',
+      sender_id: 'demo',
       content_type: 'text',
       content: 'Hub 会话自己的置顶',
       created_at: '2026-06-07T06:49:00Z',
@@ -145,7 +145,7 @@ describe('webPlatform workbench agent mapping', () => {
       pinnedAnnouncement: {
         title: '真实 Hub 会话',
         content: 'Hub 会话自己的置顶',
-        author: 'maintainer',
+        author: 'demo',
         sourceId: 'message-pin-1',
       },
     });
@@ -177,7 +177,7 @@ describe('webPlatform workbench agent mapping', () => {
     ]));
   });
 
-  it('rejects auto-mode demoRuntimeFallback instead of silent fake success (AH-SR-043)', async () => {
+  it('rejects auto-mode demoRuntimeFallback instead of silent fake success', async () => {
     const demoRuntimeStore = createWorkbenchDemoRuntimeStore();
     const platform = createWebPlatform({
       demoRuntimeFallback: true,
@@ -394,7 +394,7 @@ describe('webPlatform workbench agent mapping', () => {
         contentPreview: 'attachment context',
       }],
       approvalMode: 'workspace-write',
-      workDir: '<REPO_ROOT>',
+      workDir: '/workspace/agenthub',
     }, 'target-local-edge-1'))).resolves.toEqual({ intentId: 'task-1' });
 
     expect(hubClient.sendMessage).toHaveBeenCalledWith('hub-session-1', {
@@ -422,7 +422,7 @@ describe('webPlatform workbench agent mapping', () => {
       source: 'web-v4-workbench',
       mode: 'code',
       approval_mode: 'workspace-write',
-      work_dir: '<REPO_ROOT>',
+      work_dir: '/workspace/agenthub',
       mentions: [{ id: 'profile-builder', label: 'Hub Builder', runtime_id: 'claude-code', model: 'glm-5.1' }],
       attachments: [{ id: 'att-1', name: 'notes.md', source: 'browser' }],
     });
@@ -945,7 +945,7 @@ describe('webPlatform workbench agent mapping', () => {
 });
 
 // ---------------------------------------------------------------------------
-// redispatchTask: client-side dispatch queue flush port (UIUX #H)
+// redispatchTask: client-side dispatch queue flush port
 // Re-dispatches ONLY (no message re-send); maps 409 turn_in_progress;
 // no dispatch mention → drains as no-op.
 // ---------------------------------------------------------------------------

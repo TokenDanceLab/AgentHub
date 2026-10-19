@@ -119,9 +119,9 @@ type WorkspaceProjectListResponse =
 
 export async function fetchWorkspaceProjects(): Promise<WorkspaceProjectListResponse> {
   // Canonical Hub list contract (pageSize 200 x 5 pages, cap reported via
-  // hasMore) — see @shared/hub/paginate (#2290). Desktop used to call
-  // listWorkspaceProjects() with no parameters at all, so it got the server
-  // default of 50 and dropped the cursor.
+  // hasMore) — see @shared/hub/paginate (#2290). Always pass pagination
+  // parameters: without them the Hub returns a single page of 50 and no
+  // cursor.
   return fetchAllPages(getHubClient().listWorkspaceProjects);
 }
 

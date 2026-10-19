@@ -52,8 +52,8 @@ func TestSanitizeSubAgentResult_APIKey(t *testing.T) {
 		name  string
 		input string
 	}{
-		{"OpenAI key", "config: api_key=sk-proj-abc123def456ghi789jkl012mno345pqr678stu"},
-		{"Anthropic key", "Authorization: Bearer sk-ant-api03-abc123def456ghi789jkl012mno345pqr678stu901vwx234"},
+		{"OpenAI key", "config: api_key=sk-proj-0000000000000000000000000000000000000000"},
+		{"Anthropic key", "Authorization: Bearer sk-ant-api03-0000000000000000000000000000000000000000000000000000"},
 		{"Google key", "key: AIzaSyDabc123def456ghi789jkl012mno345pqr"},
 		{"GitHub classic", "token: ghp_abc123def456ghi789jkl012mno345pqr678s"},
 		{"GitHub fine-grained", "token: github_pat_abc123def456ghi789jkl0_12"},
@@ -89,7 +89,7 @@ func TestSanitizeSubAgentResult_FilePath(t *testing.T) {
 		name  string
 		input string
 	}{
-		{"Windows Code path", "reading from <REPO_ROOT>\\src\\main.go"},
+		{"Windows Code path", "reading from D:\\Projects\\agenthub\\src\\main.go"},
 		{"Windows Users path", "found at C:\\Users\\Example\\Documents\\file.txt"},
 		{"Windows Projects path", "opening D:\\Projects\\myapp\\config.yaml"},
 		{"Unix home path", "loading /home/example/config/settings.json"},
@@ -119,7 +119,7 @@ func TestSanitizeSubAgentResult_FilePath(t *testing.T) {
 }
 
 func TestSanitizeSubAgentResult_ChineseText(t *testing.T) {
-	input := "执行结果：代码审查完成，发现3个问题。建议修复文件 src/utils/helper.go 中的空指针检查。\n分析报告已生成在 D:\\Code\\Projects\\report.md"
+	input := "执行结果：代码审查完成，发现3个问题。建议修复文件 src/utils/helper.go 中的空指针检查。\n分析报告已生成在 C:\\Users\\Example\\project\\report.md"
 	result, reason := SanitizeSubAgentResult(input)
 	s, ok := result.(string)
 	if !ok {
@@ -176,7 +176,7 @@ func TestSanitizeSubAgentResult_OversizedPayload(t *testing.T) {
 }
 
 func TestSanitizeSubAgentResult_MultipleRedactions(t *testing.T) {
-	input := "panic: runtime error\ngoroutine 1 [running]:\n\tat main.main(main.go:10)\nConfig loaded from D:\\Code\\Projects\\config.yaml\nusing api key: sk-proj-abc123def456ghi789jkl012mno345pqr678stu"
+	input := "panic: runtime error\ngoroutine 1 [running]:\n\tat main.main(main.go:10)\nConfig loaded from D:\\Projects\\agenthub\\config.yaml\nusing api key: sk-proj-0000000000000000000000000000000000000000"
 	result, reason := SanitizeSubAgentResult(input)
 	s, ok := result.(string)
 	if !ok {
@@ -200,8 +200,8 @@ func TestSanitizeSubAgentResult_MultipleRedactions(t *testing.T) {
 func TestSanitizeSubAgentResult_StructuredMapPayload(t *testing.T) {
 	payload := map[string]any{
 		"status":  "ok",
-		"message": "deployed from D:\\Code\\Projects\\app",
-		"token":   "sk-ant-api03-abc123def456ghi789jkl012mno345",
+		"message": "deployed from D:\\Projects\\agenthub\\app",
+		"token":   "sk-ant-api03-000000000000000000000000",
 		"count":   float64(42),
 		"nested": map[string]any{
 			"path": "/home/user/secret/config.yaml",
@@ -248,8 +248,8 @@ func TestSanitizeSubAgentResult_StructuredMapPayload(t *testing.T) {
 func TestSanitizeSubAgentResult_StructuredSlicePayload(t *testing.T) {
 	payload := []any{
 		"status ok",
-		"path: D:\\Code\\Projects\\main.go",
-		"key: sk-proj-abc123def456ghi789jkl012mno345",
+		"path: D:\\Projects\\agenthub\\main.go",
+		"key: sk-proj-000000000000000000000000",
 		map[string]any{
 			"error": "panic at /home/user/app/main.go:42\ngoroutine 1 [running]:",
 		},
@@ -360,5 +360,32 @@ func TestSanitizeSubAgentResult_OversizedChineseText(t *testing.T) {
 	// Verify the result is valid UTF-8 (no broken CJK characters).
 	if !utf8.ValidString(s) {
 		t.Fatal("truncated CJK result is not valid UTF-8")
+	}
+}
+
+func TestSanitizeHubStreamTextRedactsAPIKeysAndKeepsPaths(t *testing.T) {
+	key := "sk-" + strings.Repeat("a", 24)
+	input := "reading /home/user/project/a.go with token=" + key
+	got := sanitizeHubStreamText(input)
+
+	if strings.Contains(got, key) {
+		t.Fatalf("sanitizeHubStreamText leaked the API key: %q", got)
+	}
+	if !strings.Contains(got, "[redacted:api-key]") {
+		t.Fatalf("sanitizeHubStreamText did not redact the API key: %q", got)
+	}
+	// Hub stream text deliberately keeps workdir paths.
+	if !strings.Contains(got, "/home/user/project/a.go") {
+		t.Fatalf("sanitizeHubStreamText redacted a file path it must keep: %q", got)
+	}
+}
+
+func TestSanitizeHubStreamTextNoChange(t *testing.T) {
+	const input = "plain progress text"
+	if got := sanitizeHubStreamText(input); got != input {
+		t.Fatalf("sanitizeHubStreamText(%q) = %q, want unchanged", input, got)
+	}
+	if got := sanitizeHubStreamText(""); got != "" {
+		t.Fatalf("sanitizeHubStreamText(\"\") = %q, want empty", got)
 	}
 }

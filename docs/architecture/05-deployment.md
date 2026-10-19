@@ -1,45 +1,34 @@
 # Deployment
 
 > 子文档 | 主索引：[architecture.md](../architecture.md)
-> 最后更新：2026-09-02（配置面索引新增 AGENTHUB_MAX_CLOUD_EDGE_DEVICES）
+> 最后更新：2026-10-18
 
-本文件只记录仓库内可维护的部署结构和证据边界。Live host、DNS、TLS、secret、机器路径、发布状态和生产回滚记录由 TokenDance server SSOT 维护，不在本仓库复制。
+本文件记录仓库内可维护的部署结构和证据边界；实际运行环境由部署方提供。
 
 ## Current production pointer
 
-- **Live facts（权威）**：私有部署仓 SSOT。本仓库不复制 host 标签、secret 或 IP。
-- **In-repo production shape**：`deployments/production/docker-compose.yml`（与 live compose 形状对齐的仓库模板）。
-- **构建输入目录**：`hub-server/deployments/` 仅保留镜像构建输入（Dockerfile、docker-entrypoint.sh、README.md），旧区域部署资产已在 #1527 PR2 收口删除。
+- **In-repo production shape**：`deployments/production/docker-compose.yml`。
+- **构建输入目录**：`hub-server/deployments/` 只保留 Dockerfile、entrypoint 和 README。
 
-## 仓库内资产（#1527 inventory）
+## 仓库内资产
 
-| 资产 | 用途 | 状态 |
-|---|---|---|
-| `docker-compose.yml` | 本地开发：PostgreSQL、Redis、Hub Server | local-development shape（#1527 明确不删） |
-| `deployments/production/docker-compose.yml` | 当前生产形状 compose 模板 | **权威 in-repo production shape**（唯一） |
-| `deployments/production/.env.example` | 权威生产 env 占位模板（含 OIDC 回调/交换端点说明） | 保留 |
-| `hub-server/deployments/Dockerfile` | Hub Server 镜像构建输入 | 保留（构建职责） |
-| `hub-server/deployments/docker-entrypoint.sh` | 镜像 ENTRYPOINT（Dockerfile COPY 的构建输入） | 保留（构建职责） |
-| `hub-server/deployments/README.md` | 构建输入目录说明 | 保留（#1527 PR2 精简） |
-| `hub-server/deployments/docker-compose.prod.yml` | 旧独立 PG+Redis 拓扑模板 | **已删除**（#1527 PR2 收口） |
-| `hub-server/deployments/docker-compose.host-redacted.yml` | 区域（host-redacted）旧模板 | **已删除**（#1527 PR2 收口） |
-| `hub-server/deployments/legacy/`（compose、deploy 脚本、nginx/env 模板） | 区域旧部署资产 | **已删除**（#1527 PR2 收口） |
-| `hub-server/deployments/Caddyfile` / `Caddyfile.prod` | 旧 reverse-proxy 模板 | **已删除**（#1527 PR2 收口） |
-| `hub-server/deployments/.env.production.example` | 旧生产 env 占位模板 | **已删除**（env 说明迁至 `deployments/production/.env.example`） |
-| `hub-server/deployments/deploy.sh` / `deploy-region.sh` | 旧人工运维胶水脚本 | **已删除**（部署指引改指权威 compose，运维由 server SSOT 覆盖） |
-| `scripts/dev/devserver.sh` | 远程 dev 服务器测试平台统一入口（sync/start/stop/status/test/integration） | 新增（#1681，拓扑见 09-dev-server-topology.md） |
-| `scripts/verify/verify-deployment-shape.py` | 部署形状 SSOT 门禁 | CI 强制（#1527 PR1） |
-| `.github/workflows/cd-pr-check.yml` | PR 前置：compose 形状 + Dockerfile + 构建 dry run | 消费权威模板（#1527 PR1） |
+| 资产 | 用途 |
+|---|---|
+| `docker-compose.yml` | 本地开发：PostgreSQL、Redis、Hub Server |
+| `deployments/production/docker-compose.yml` | 生产形状 compose 模板（唯一 in-repo 模板） |
+| `deployments/production/.env.example` | 生产 env 占位模板 |
+| `hub-server/deployments/{Dockerfile,docker-entrypoint.sh,README.md}` | Hub 镜像构建输入 |
+| `scripts/dev/devserver.sh` | 维护者远程测试环境入口（sync/start/stop/status/test/integration；在远端启动依赖容器、Hub 和 Edge） |
+| `scripts/verify/verify-deployment-shape.py` | 部署形状 SSOT 门禁 |
+| `.github/workflows/cd-pr-check.yml` | PR 前置：compose 形状 + Dockerfile + 构建 dry run |
 
-遗留清单由 `verify-deployment-shape.py` 关闭：#1527 PR2 后 `hub-server/deployments/` 下出现**任何** compose 文件即 FAIL（该目录只剩构建输入）；`deployments/production/` 下出现第二份手维护 production compose 同样 FAIL——机器证明见 `scripts/verify/tests/verify-deployment-shape.Tests.py`。
+`verify-deployment-shape.py` fail-closed：`hub-server/deployments/` 下出现任何 compose 文件，或 `deployments/production/` 出现第二份手维护 compose，即 FAIL。
 
 ## 本地开发
 
 ```powershell
 docker compose up -d
 ```
-
-默认端口：
 
 | 服务 | 端口 |
 |---|---:|
@@ -51,7 +40,7 @@ docker compose up -d
 | Web Vite | 5174 |
 | Mobile RN Expo Web | 5177 |
 | Local Edge | 3210 |
-| TokenDance ID（外部服务，非本 compose；远程 dev 服务器 start.sh） | 3000 |
+| TokenDance ID（外部服务） | 3000 |
 
 默认 compose 绑定开发本机；远程调试必须显式配置网络和防火墙，不能把默认开发密码或 admin 端口暴露出去。
 
@@ -60,136 +49,108 @@ docker compose up -d
 | Claim | 最低证据 |
 |---|---|
 | Compose 配置形状正确 | `docker compose config` 或 CI compose check |
-| OIDC 配置形状正确 | OIDC/session tests + L3 真实 OIDC 流（远程 dev 服务器入口 `scripts/dev/devserver.sh`；WSL 本机 `scripts/e2e/wsl-full-stack-e2e.sh`），当前映射见 `docs/governance/verifier-map.md` 的 OIDC 行；真实 E2E lane（`scripts/e2e/run-real-e2e-lane.sh`，workflow_dispatch `real-e2e-stack`，evidence manifest 六字段合同） |
+| OIDC 配置形状正确 | OIDC/session tests + L3 真实 OIDC 流（`scripts/e2e/run-real-e2e-lane.sh`）；WSL 全栈用 `scripts/e2e/wsl-full-stack-e2e.sh` 搭建，维护者远程 lane 用 `scripts/dev/devserver.sh` |
 | Hub/Edge API 行为正确 | 相关 Go handler/service tests + OpenAPI parse |
 | Web/Desktop UI 流程正确 | Playwright UI + Visual QA，按证据等级标注 |
 | Desktop packaged 行为正确 | Tauri package/sidecar/icon/installer evidence |
-| 生产发布正确 | 外部 approved-real 发布 gate + live smoke + rollback evidence |
+| 生产发布正确 | 运维方发布 gate + live smoke + rollback evidence |
 
 Stub、fixture、readiness-only 或 dry-run 证据必须保留 `real_tested=false`。
 
+## Backend performance and leak evidence
+
+`scripts/verify/verify-backend-perf-leak-gates.py` 是行为门禁与短微基准的 CI 执行者：
+
+```bash
+python ./scripts/verify/verify-backend-perf-leak-gates.py --Benchtime 100ms
+```
+
+| 证据类 | 证明 | 不证明 |
+|---|---|---|
+| Behavior gate | 并发、取消、TTL、重试、背压行为 | 延迟基线、容量、goroutine/进程泄漏 |
+| Microbenchmark | 本地 CPU/alloc 回归信号 | 生产容量、长时间稳定性 |
+| Load smoke | 单端点可达性、延迟、错误率 | WS fanout、Agent dispatch、DB 争用、泄漏 |
+| Pprof/leak evidence | 压力下特定路径的 goroutine/heap/进程变化 | 未配套行为测试时的功能正确性 |
+
+`scripts/smoke/load-test.sh` 只覆盖单 HTTP 端点（默认 `/health`）的可达性、延迟分位、吞吐和非 2xx 率；OIDC、WS fanout、消息顺序、dispatch 并发、进程泄漏和生产容量需要各自的 evidence。性能结论必须绑定实际运行的命令。
+
 ## 生产边界
 
-生产发布不由本仓库 Markdown 单独证明。发布前至少需要：
+发布前需要：镜像 digest、部署命令、rollback 方案和备份状态；secret 通过 secret store 注入；`/health`、CORS、OIDC callback、WebSocket upgrade 和 admin exposure smoke；声明 Desktop packaged/release 时附 packaged-release gate。
 
-- 明确审批。
-- 镜像 digest、部署命令、rollback 方案和备份状态。
-- secret store 注入，不把 secret 写进 repo。
-- `/health`、CORS、OIDC callback、WebSocket upgrade 和 admin exposure smoke。
-- 若声明 Desktop packaged/release，附 packaged-release gate；Vite renderer 测试不等同于 packaged Desktop。
+## 安全配置
 
-## 安全配置（Wave7）
-
-生产 compose 模板（`deployments/production/docker-compose.yml`）默认开启两项 fail-closed 开关，二者都依赖 Redis，决定 Redis 故障时的对外行为。本节是这两个开关的仓库内 SSOT；live host 是否启用以 server SSOT 为准。
+生产 compose 模板默认开启两项 fail-closed 开关，二者都依赖 Redis，决定 Redis 故障时的对外行为。本节是仓库内 SSOT；实际部署是否启用以部署环境为准。
 
 | 环境变量 | 默认 | 语义 |
 |---|---|---|
-| `AGENTHUB_AUTH_FAIL_CLOSED` | `false`（dev）；生产模板置 `true` | access-token jti 黑名单检查（Redis-backed）在 Redis 错误时的行为。`true`=fail-closed：拒绝请求，防止已登出（吊销）的 access JWT 在 Redis 中断时复活；`false`=fail-open：放行以保留历史行为，避免 Redis 中断锁死所有用户。 |
-| `AGENTHUB_RATE_LIMIT_FAIL_OPEN` | `true`（dev）；生产模板置 `false` | 非认证限流器在 Redis 错误时的行为。`true`=fail-open：放行并写 warn 日志、置响应头 `X-Rate-Limit-Degraded: true`；`false`=fail-closed：返回 503 `rate_limit_unavailable`。**认证路径**（`/client/auth/*`）始终 fail-closed，与本开关无关。 |
+| `AGENTHUB_AUTH_FAIL_CLOSED` | Go 默认 `false`；dev 与生产 compose 均为 `true`；生产守卫要求显式设置 | access-token jti 黑名单检查在 Redis 错误时的行为。`true`=拒绝请求，防止已吊销的 JWT 在 Redis 中断时复活；`false`=放行以保留历史行为。 |
+| `AGENTHUB_RATE_LIMIT_FAIL_OPEN` | Go 默认 `true`；dev 与生产 compose 均为 `false` | 非认证限流器在 Redis 错误时的行为。`true`=放行并写 warn + `X-Rate-Limit-Degraded: true`；`false`=503 `rate_limit_unavailable`。**认证路径**（`/client/auth/*`）始终 fail-closed。 |
 
-Redis 故障时对外暴露的 HTTP 状态/`code`：
-
-- **认证路径**（登录/注册/OIDC 回调等）：始终 503 `rate_limit_unavailable`，且 access-token jti 检查在 `AUTH_FAIL_CLOSED=true` 时也拒绝 → 401。运维侧不应在 Redis 故障窗口强行重放登录，会持续 503。
-- **非认证路径**：
-  - `RATE_LIMIT_FAIL_OPEN=true`（dev 默认）：请求放行，响应头带 `X-Rate-Limit-Degraded: true`；不会产生 429/503。
-  - `RATE_LIMIT_FAIL_OPEN=false`（生产默认）：返回 503 `rate_limit_unavailable`。
-- **正常限流命中**（Redis 健康，超出配额）：429 `rate_limited`，响应头带 `Retry-After: 60`（`GlobalRateLimitRetryAfterSeconds`）；WS 连接限流返回 429 `ws_rate_limited`，无 `Retry-After`。
-
-`code` 与 HTTP 状态的完整对照见 [../../api/conventions.md](../../api/conventions.md) §Errors。开关常量定义见 `hub-server/internal/config/constants.go`（`AuthFailClosedDefault`、`RateLimitFailOpenDefault`、`GlobalRateLimitRetryAfterSeconds`），运行时读取见 `hub-server/internal/config/config_env.go`。
+Redis 故障时对外行为：认证路径始终 503 `rate_limit_unavailable`，且 `AUTH_FAIL_CLOSED=true` 时 jti 检查拒绝 → 401；非认证路径按开关返回放行或 503；正常限流命中返回 429 `rate_limited` + `Retry-After`（全局限流固定 60，路径级为 key 剩余 TTL），WS 连接限流返回 429 `ws_rate_limited`。`code` 与 HTTP 状态完整对照见 [../../api/conventions.md](../../api/conventions.md) §Errors；开关常量见 `hub-server/internal/config/constants.go`。
 
 ## OIDC 回调契约
 
-TokenDance ID（TDID）OIDC 回调有三条浏览器/原生回跳地址，外加一条机器侧入口。三条回调集合必须与 TDID 侧 `oauth_clients.redirect_uris` 同步（live 注册见 server identity STATE.md）。
+TokenDance ID（TDID）OIDC 回调有三条浏览器/原生回跳地址，外加一条机器侧入口。三条回调集合必须与 TDID 侧 `oauth_clients.redirect_uris` 同步。
 
 | 回调 URI | 用途 |
 |---|---|
-| `https://hub.example.invalid/api/auth/callback` | 首页 SPA 回调页（nginx `/api/auth/` 反代到 `:3001` 静态站） |
-| `https://hub.example.invalid/workbench/auth/tokendance/callback` | 工作台 `app/web`（`BASE_URL=/workbench/`） |
-| `http://127.0.0.1/callback` | 桌面 Tauri loopback（RFC 8252 端口宽松匹配，用于桌面客户端） |
+| `https://<hub-host>/api/auth/callback` | 首页 SPA 回调页 |
+| `https://<hub-host>/workbench/auth/tokendance/callback` | 工作台 `app/web`（`BASE_URL=/workbench/`） |
+| `http://127.0.0.1/callback` | 桌面 Tauri loopback（RFC 8252 端口宽松匹配） |
 
-Hub 侧 code 交换端点固定为 `POST /client/auth/oidc/callback`，桌面/Web/CLI 共用，**不是**浏览器回跳地址。
+Hub 侧 code 交换端点固定为 `POST /client/auth/oidc/callback`，桌面/Web/CLI 共用，不是浏览器回跳地址。机器侧 code 交换与 JWKS 拉取使用部署方配置的 OIDC token 入口；域名/解析由部署方维护。对应变量 `AGENTHUB_TOKENDANCE_ID_TOKEN_URL`、`AGENTHUB_TOKENDANCE_ID_JWKS_URI`。
 
-机器侧 code 交换（hub-server → TDID `/oidc/token`）与 JWKS 拉取（ID token 签名校验）走 **DNS-only 的 OIDC token 机器入口**（公开仓不写该 hostname，域名/解析 SSOT 在 TokenDance 私有治理文档）：
-
-- 公网 `id.example.invalid` 启用了 Bot Fight 挑战，会拦非 JS 客户端（hub-server 是服务端，拿不到 JS 挑战 cookie）。
-- 该机器入口仅供服务端使用，**不是**面向浏览器的地址。
-- 对应环境变量：`AGENTHUB_TOKENDANCE_ID_TOKEN_URL`、`AGENTHUB_TOKENDANCE_ID_JWKS_URI`（默认值已写进生产 compose 模板）。
-
-回调集合通过 `AGENTHUB_TOKENDANCE_ID_REDIRECT_URI`（单值，必须是集合成员之一）和 `AGENTHUB_TOKENDANCE_ID_ALLOWED_REDIRECT_URIS`（逗号分隔白名单）注入；前者是默认回跳，后者是一次性 OIDC 往返里额外接受的回跳。OIDC client 注册与 secret 由 TokenDance ID 管理，禁止写入仓库。
+回调通过 `AGENTHUB_TOKENDANCE_ID_REDIRECT_URI`（fallback，隐式加入候选）和 `AGENTHUB_TOKENDANCE_ID_ALLOWED_REDIRECT_URIS`（逗号分隔的额外候选）配置。OIDC client 注册与 secret 由 TokenDance ID 管理，禁止写入仓库。
 
 ## 必填变量表
 
-下表是生产部署的必填/强校验变量。`docker compose up` 启动顺序与校验点：
-
-1. `redis` 先起，healthcheck 等到 `redis-cli ping` 通过。
-2. `hub-server` 起（`depends_on: redis: service_healthy`）。
-3. `docker-entrypoint.sh` 先校验 `AGENTHUB_DB_PASSWORD` 与 `AGENTHUB_JWT_SECRET` 非空，空则 exit 1。
-4. server 二进制依次：`repository.InitDB` → `repository.RunMigrations`（自动执行 `hub-server/migrations/*.up.sql`）→ `cache.InitRedis` → `app.Run`。迁移在服务接流量前自动跑，无需人工 `migrate up`。
+启动顺序：`redis` healthcheck 通过 → `hub-server` 启动 → `docker-entrypoint.sh` 校验 `AGENTHUB_DB_PASSWORD` 与 `AGENTHUB_JWT_SECRET` 非空 → `InitDB` → `RunMigrations`（自动执行 `hub-server/migrations/*.up.sql`）→ `InitRedis` → `app.Run`。
 
 | 变量 | 必填 | 校验点 | 说明 |
 |---|---|---|---|
-| `PG_PASSWORD`（→ `AGENTHUB_DB_PASSWORD`） | 是 | entrypoint + `config.Validate` | DB 密码。entrypoint 缺失即 exit 1。 |
-| `PG_HOST`（→ `AGENTHUB_DB_HOST`） | 是（有默认 `127.0.0.1`） | `config.Validate`（`db.host is required`） | **只写主机，不带端口**。`DBConfig.DSN()` 不拆分 `host:port`，host 带端口会拼成 `host=127.0.0.1:<port> port=5433` 连不上。端口走 `PG_PORT`。 |
-| `PG_PORT`（→ `AGENTHUB_DB_PORT`） | 是（有默认 `5433`） | `config.Validate`（1–65535） | 端口独立于 host。 |
-| `AGENTHUB_JWT_SECRET` | 是 | entrypoint + `config.Validate`（≥32 字符，且不在弱密钥 blocklist） | JWT 签名密钥。`change-me-production*` / `dev-secret-change-in-production*` 前缀被 `weakSecretPrefixes` 拒绝，即使长度达标。 |
-| `AGENTHUB_TOKENDANCE_ID_CLIENT_ID` | 配置 OIDC 即必填 | `config.Validate`（client_id 设了则 issuer_url/client_secret/redirect_uri 都必填） | TDID OIDC client。留空=未启用 OIDC。 |
-| `AGENTHUB_TOKENDANCE_ID_CLIENT_SECRET` | 配置 OIDC 即必填 | 同上 | TDID client secret，由 TDID 管理，不入仓库。 |
-| `AGENTHUB_TOKENDANCE_ID_REDIRECT_URI` | 配置 OIDC 即必填 | 同上 | 默认 `https://hub.example.invalid/api/auth/callback`，必须是 allowed 集合成员。 |
-| `AGENTHUB_TOKENDANCE_ID_ALLOWED_REDIRECT_URIS` | 否（有默认三条） | — | 浏览器/原生回跳白名单，逗号分隔。改回调集合时必须与 TDID 侧 `oauth_clients.redirect_uris` 同步。 |
-| `AGENTHUB_AUTH_FAIL_CLOSED` | 否（生产建议 `true`） | `AuthFailClosed()` | 见 §安全配置。 |
+| `PG_PASSWORD`（→ `AGENTHUB_DB_PASSWORD`） | 是 | `docker-entrypoint.sh` | DB 密码；容器路径缺失即 exit 1（`config.Validate` 不校验密码）。 |
+| `PG_HOST`（→ `AGENTHUB_DB_HOST`） | 是（默认 `127.0.0.1`） | `config.Validate` | **只写主机，不带端口**；端口走 `PG_PORT`。 |
+| `PG_PORT`（→ `AGENTHUB_DB_PORT`） | 是（默认 `5433`） | `config.Validate`（1–65535） | 独立于 host。 |
+| `AGENTHUB_JWT_SECRET` | 是 | entrypoint + `config.Validate`（≥32 字符且不在弱密钥 blocklist） | `change-me-production*` / `dev-secret-change-in-production*` 前缀被拒绝。 |
+| `AGENTHUB_TOKENDANCE_ID_CLIENT_ID` | 配置 OIDC 即必填 | `config.Validate` | 留空=未启用 OIDC。 |
+| `AGENTHUB_TOKENDANCE_ID_CLIENT_SECRET` | 配置 OIDC 即必填 | 同上 | 由 TDID 管理，不入仓库。 |
+| `AGENTHUB_TOKENDANCE_ID_REDIRECT_URI` | 配置 OIDC 即必填 | 同上 | 无代码默认；`deployments/production/.env.example` 留空，生产 compose 默认 `https://hub.example.com/api/auth/callback`。该值会隐式加入候选集合。 |
+| `AGENTHUB_TOKENDANCE_ID_ALLOWED_REDIRECT_URIS` | 否（默认三条） | — | 额外的回调候选；改集合时必须与 TDID `oauth_clients.redirect_uris` 同步。 |
+| `AGENTHUB_AUTH_FAIL_CLOSED` | 生产必填（显式设置）；dev compose 默认 `true` | `validateProdGuard` 拒绝未设置的生产启动；`AuthFailClosed()` 决定 Redis 故障时的 jti 检查行为 | 见 §安全配置。 |
 | `AGENTHUB_RATE_LIMIT_FAIL_OPEN` | 否（生产建议 `false`） | `RateLimitFailOpen()` | 见 §安全配置。 |
 
-迁移自动执行意味着：升级到带新 `.up.sql` 的镜像时，容器一起新迁移。`hub-server/migrations/` 下的 `0062_agent_team_runs_indexes.up.sql`、`0063_agent_run_events_unique_seq.up.sql` 使用普通 `CREATE INDEX`/`CREATE UNIQUE INDEX`（非 `CONCURRENTLY`），在已堆积数据的表上会取 `ACCESS EXCLUSIVE` 锁；大表升级应在维护窗口执行（停服 → 跑迁移 → 起服），不要在流量高峰直接 `compose up`。详见 [../../CHANGELOG.md](../../CHANGELOG.md) v0.6.1 节的升级注意段。
+迁移自动执行意味着升级镜像会一起跑新迁移。`0062`、`0063` 使用普通 `CREATE INDEX` / `CREATE UNIQUE INDEX`（非 `CONCURRENTLY`），在已堆积数据的表上会取 `SHARE` 锁阻塞写入但允许读取；大表升级应在维护窗口执行。详见 [../../CHANGELOG.md](../../CHANGELOG.md) v0.6.1 节的升级注意段。
 
-## 配置面索引（#2124 文档缺口补齐）
+## 配置面索引
 
-以下为「存在且有行为影响、但此前未文档」的配置项（必填/强校验变量见上表）。
-### Hub
+必填/强校验变量见上表；以下变量有行为影响。
 
-| 环境变量 | 默认 | 语义 |
-|---|---|---|
-| `AGENTHUB_PPROF_USER`/`PASS`、`AGENTHUB_CORS_ORIGINS`、`AGENTHUB_ADMIN_USERS` | 空/硬编码默认 | debug 门禁（未配=404 fail-closed）、CORS 白名单覆盖、管理端点用户白名单 |
-| `AGENTHUB_AGENT_TEAM_*`（9 字段） | 见 `config_agent_team.go` | delegation_depth / active_subagents / route_repeats / tasks_per_team_run / assignment_timeout / budget_tokens / budget_usage_pct / compete_max_agents / human_review_enabled |
-| `AGENTHUB_EGRESS_*` | 见 `config.yaml` egress 节 | allow_cidrs / allow_hostnames / allow_plain_http / timeout（行为见 08-outbound-http.md） |
-| `AGENTHUB_UPLOAD_*` / `AGENTHUB_S3_*`（+裸 `S3_*` legacy） | 见 `config_jwt_upload.go` / `config_s3.go` | 上传目录/大小/MIME；对象存储后端，legacy 前缀兼容期 |
-| `AGENTHUB_TOKENDANCE_ID_HTTP_TIMEOUT` / `AGENTHUB_TOKENDANCE_ID_MAX_RESPONSE_BODY_BYTES` | 见 `config_tokendance.go` | TDID OIDC 客户端超时与响应体上限 |
-| `AGENTHUB_MAX_CLOUD_EDGE_DEVICES` | `50`（`DefaultMaxCloudEdgeDevicesPerUser`） | 每用户 `cloud_edge` 设备行数上限（`device.Register` 在 UpsertDevice 前判定）；达上限后新 `device_id` 注册返回 403 `device_limit_exceeded`，已有 `device_id` 的 upsert 刷新不受限。未设/非法回默认；`<= 0` 关闭上限。 |
+| 变量 | 服务 | 默认 | 语义 |
+|---|---|---|---|
+| `AGENTHUB_PPROF_USER` / `PASS`、`AGENTHUB_CORS_ORIGINS`、`AGENTHUB_ADMIN_USERS` | hub | 空 | debug 门禁（未配=404）、CORS 白名单覆盖、管理端点用户白名单 |
+| `AGENTHUB_AGENT_TEAM_*`（9 字段） | hub | 见 `config_agent_team.go` | delegation depth、subagents、route repeats、budget、compete、human review |
+| `AGENTHUB_EGRESS_*` | hub | 见 `config.yaml` | allow CIDRs/hostnames/plain HTTP/timeout（见 08-outbound-http.md）。Edge 没有独立 allowlist：出站目标是部署方配置的 Hub URL 与用户配置的模型 baseURL，统一受 edgehttp/SDK 的 timeout、redirect、TLS 合同约束 |
+| `AGENTHUB_UPLOAD_*` / `AGENTHUB_S3_*`（+裸 `S3_*` legacy） | hub | 见 config | 上传目录/大小/MIME；对象存储后端 |
+| `AGENTHUB_TOKENDANCE_ID_HTTP_TIMEOUT` / `_MAX_RESPONSE_BODY_BYTES` | hub | 见 config | OIDC 客户端超时与响应体上限 |
+| `AGENTHUB_MAX_CLOUD_EDGE_DEVICES` | hub | `50` | 每用户 `cloud_edge` 设备上限；超限新 `device_id` 返回 403 `device_limit_exceeded`；`<=0` 关闭上限 |
+| `AGENTHUB_EVIDENCE_GATE_ENABLED`、`AGENTHUB_FAULT_ESCALATION_ENABLED`、`AGENTHUB_ESCALATION_TIMEOUT` | edge | `true` / 见 config | Edge 证据门禁与故障升级 |
+| `AGENTHUB_EVENT_WORKERS`、`AGENTHUB_DELIVERY_JOURNAL_DB` | edge | `4` / 空（关闭） | 事件总线 worker 数、durable journal 开关 |
+| `AGENTHUB_DEPLOY_HOST` / `_PATH`、`AGENTHUB_PAGES_DOMAIN` | edge | `HOST`/`PATH` 默认空；`PAGES_DOMAIN` 默认 `example.agenthub.dev` | Pages 部署目标；`HOST`/`PATH` 为空时部署接口返回未配置（服务启动不强制校验） |
+| `AGENTHUB_EDGE_SHUTDOWN_TIMEOUT` | edge | `10s` | 优雅停机总预算 |
+| `AGENTHUB_HUB_MCP_SYNC_URL` / `_INTERVAL` | edge | URL 空（关闭）/ `5m` | Hub MCP 配置同步 |
 
-### Edge
-
-| 环境变量 | 默认 | 语义 |
-|---|---|---|
-| `AGENTHUB_EVIDENCE_GATE_ENABLED`、`AGENTHUB_FAULT_ESCALATION_ENABLED`、`AGENTHUB_ESCALATION_TIMEOUT` | `true` / 见 `fault_escalation.go` | 证据门禁与故障升级开关 |
-| `AGENTHUB_EVENT_WORKERS`、`AGENTHUB_DELIVERY_JOURNAL_DB` | `4` / 空（关闭） | 事件总线 worker 数、durable journal 开关 |
-| `AGENTHUB_DEPLOY_HOST`/`_PATH`/`AGENTHUB_PAGES_DOMAIN` | 占位默认 | Pages 部署目标 |
-| `AGENTHUB_EDGE_SHUTDOWN_TIMEOUT`、`AGENTHUB_HUB_MCP_SYNC_URL`/`_INTERVAL` | `10s` / 空（关闭） | 优雅停机总预算（#2129 L6）、Hub MCP 配置同步 |
+生产 compose 模板默认 `PG_SSLMODE=require` 并注入 `AGENTHUB_ENV=production`；`config.Validate` 在 production guard 下拒绝 `db.sslmode=disable`。升级已有部署前确认宿主 PostgreSQL 接受 TLS；本地/测试环境应显式使用非 production 的 `AGENTHUB_ENV` 或调整 `PG_SSLMODE`。
 
 ## 迁移回滚约定
 
-> 来源：#2125 审计切片 A/C。本节定义 down 语义与操作纪律，不替代具体迁移文件的注释。
+GitHub Release 的 `agenthub-hub-*` 二进制把 migrations embed 在二进制内，配置可完全来自 `AGENTHUB_*` 环境变量（缺少 `configs/config.yaml` 也合法）；运行时只需 PostgreSQL/Redis 连接。容器镜像仍是推荐部署形态。
 
-### Down 语义
-
-- **DROP TABLE / DROP COLUMN = 数据丢失**。down 迁移不会保留被删列或表的数据；回滚后这些数据不可恢复。
-- **回滚前必须备份**。生产环境执行任何 `.down.sql` 前，先 `pg_dump` 完整库快照（或至少受影响表的 `COPY TO`）。
-- **外键与占位行**。部分 down 会重建 FK 约束（如 0016 的 `fk_workspaces_device`），要求被引用表中存在对应行。若目标库缺少占位行，down 会因 NOT NULL / FK 校验失败。**ON CONFLICT DO NOTHING 不抑制 NOT NULL 违规**——PostgreSQL 在检查 conflict 前先验证 NOT NULL。
-- **dirty 状态**。down 中途失败会把 `schema_migrations.dirty` 置为 true，阻断后续所有迁移。恢复步骤：①修复导致失败的根因（补占位行、修数据）；②`UPDATE schema_migrations SET dirty = false`；③重试 down 或 force 到安全版本。
-
-### 早期迁移禁止重跑
-
-- **0001–0068 中多数 up 迁移非幂等**（使用 `CREATE TABLE` 而非 `CREATE TABLE IF NOT EXISTS`，`ALTER TABLE ADD COLUMN` 而非 `ADD COLUMN IF NOT EXISTS`）。对已应用的库重跑 up 会报 "already exists" 错误。
-- **dirty 恢复走备份还原**，不要尝试手动重跑早期 up。若 `schema_migrations.dirty=true` 且无法通过修补数据解决，从备份恢复到上一个干净版本是最安全路径。
-- **新迁移（0069+）应使用幂等语法**（`IF NOT EXISTS`、`DO $$ ... END $$` 守卫），使 up/down 可安全重跑。这是 #2125 切片 B 的建议方向，但不对历史迁移追溯改造。
-
-### 操作清单（回滚前）
-
-1. `pg_dump -Fc -f backup_$(date +%Y%m%d_%H%M%S).dump agenthub` — 完整备份
-2. `SELECT version, dirty FROM schema_migrations;` — 确认当前版本与干净状态
-3. 阅读目标 `.down.sql` 全文，识别 FK/NOT NULL/占位行依赖
-4. 预置所需占位行（如零 UUID users/devices）
-5. 在维护窗口执行 down（停服 → down → 验证 → 起服）
-6. 验证 `schema_migrations` 版本与 dirty=false
-7. 应用层冒烟测试确认 schema 符合预期
+- **Down 语义**：`DROP TABLE` / `DROP COLUMN` 等于数据丢失，down 不保留被删数据；回滚前必须 `pg_dump` 完整备份。
+- **外键与占位行**：部分 down 重建 FK（如 0016 的 `fk_workspaces_device`），要求被引用表存在对应行；`ON CONFLICT DO NOTHING` 不抑制 NOT NULL 违规。
+- **dirty 状态**：down 中途失败会置 `schema_migrations.dirty=true`，阻断后续迁移。恢复：修复根因 → `UPDATE schema_migrations SET dirty=false` → 重试 down 或 force 到安全版本。
+- **早期迁移禁止重跑**：0001–0068 多数 up 非幂等；dirty 无法修补时从备份恢复，不要手动重跑早期 up。0069+ 使用幂等语法（`IF NOT EXISTS`、`DO $$ ... END $$`），但不对历史迁移追溯改造。
+- **操作清单**：`pg_dump -Fc` → 确认 `version/dirty` → 阅读目标 `.down.sql` 的 FK/NOT NULL 依赖 → 预置占位行 → 维护窗口执行 down → 验证版本与 `dirty=false` → 应用层冒烟。
 
 ## 相关文档
 

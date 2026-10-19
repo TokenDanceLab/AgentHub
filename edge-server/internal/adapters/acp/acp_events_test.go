@@ -121,7 +121,7 @@ func TestMapACPSessionUpdate_UsageUpdate(t *testing.T) {
 		t.Fatalf("expected 1 context_usage event, got %+v", got)
 	}
 	// Typed semantics: context window usage (used/size), not a per-turn
-	// input/output split (the pre-SDK hand-rolled struct misread the schema).
+	// input/output split.
 	if got[0].Payload["tokens_used"] != 120 {
 		t.Errorf("tokens_used = %v, want 120", got[0].Payload["tokens_used"])
 	}
@@ -132,8 +132,7 @@ func TestMapACPSessionUpdate_UsageUpdate(t *testing.T) {
 
 func TestMapACPSessionUpdate_UnmappedVariantsYieldNothing(t *testing.T) {
 	// Plan / SessionInfoUpdate / ToolCallUpdate / UserMessageChunk are
-	// deliberately unmapped in Phase 2 prep until the Edge frame design is
-	// approved.
+	// deliberately unmapped until an Edge frame model is agreed.
 	cases := []acp.SessionUpdate{
 		{Plan: &acp.SessionUpdatePlan{Entries: []acp.PlanEntry{}}},
 		{SessionInfoUpdate: &acp.SessionSessionInfoUpdate{}},

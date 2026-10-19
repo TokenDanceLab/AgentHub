@@ -19,8 +19,10 @@ export default defineConfig({
   // headroom. Assertions still fail closed once the budget is exhausted.
   timeout: 120_000,
   expect: { timeout: 20_000 },
-  // Flake retry policy SSOT: docs/governance/known-flaky.md. Budget stays 0
-  // (fail-closed); raising it needs a registry entry with a review deadline.
+  // Flake retry policy SSOT: docs/architecture/github-actions-ci-cd-policy.md.
+  // Default budget stays 0 (fail-closed). The CI stubbed-hub lane sets its
+  // bounded retry allowance at its invocation (`--retries=1`, checks.yml);
+  // keep this default at 0.
   retries: 0,
   use: {
     baseURL: webE2EBaseURL,

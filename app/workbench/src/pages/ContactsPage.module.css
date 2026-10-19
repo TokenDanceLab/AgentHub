@@ -36,7 +36,7 @@
   box-shadow: var(--focus-ring);
 }
 
-/* #2154 P1-1: an unwired search box renders disabled — make that visible
+/* #2154: an unwired search box renders disabled — make that visible
    instead of leaving an editable-looking input that drops every keystroke. */
 .search:disabled {
   color: var(--td-ink-subtle);
@@ -1031,7 +1031,7 @@
   }
 }
 
-/* ── Infinite-scroll load-more (T14 pattern: sentinel + fallback button) ── */
+/* ── Infinite-scroll load-more (sentinel + fallback button) ── */
 .sentinel {
   height: 1px;
   width: 100%;

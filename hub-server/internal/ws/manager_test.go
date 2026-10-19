@@ -806,8 +806,8 @@ func TestRegister_ExceedsPerUserCap(t *testing.T) {
 	require.Equal(t, config.WSMaxConnsPerUser, m.Count())
 }
 
-// TestPingAll_ClosesStaleConnection proves the pingAll stale-detection path
-// (P1: pingAll stale-close 14.6%): a real-dial connection whose underlying
+// TestPingAll_ClosesStaleConnection proves the pingAll stale-detection path:
+// a real-dial connection whose underlying
 // WebSocket is silently closed must be detected by the heartbeat pinger,
 // accumulate missed-pong up to config.WSMaxMissedPongs, and then be closed +
 // unregistered + counted by the ws_stale_close_total metric.
@@ -899,7 +899,7 @@ func TestPingAll_ClosesStaleConnection(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// Shutdown drain & shutdown-flag behavior tests (#2129 High-1)
+// Shutdown drain & shutdown-flag behavior tests (#2129)
 // ---------------------------------------------------------------------------
 
 func TestShutdown_WaitsForGoroutineConvergence(t *testing.T) {

@@ -1,4 +1,4 @@
-// Shared incremental message resync for hubWS reconnect/gap recovery (#2101 G4-②).
+// Shared incremental message resync for hubWS reconnect/gap recovery (#2101).
 //
 // When hubWS detects a reconnect (auth.ok after prior auth) or a seq_id gap,
 // platforms call `resyncMessagesAfterReconnect` with their queryClient and

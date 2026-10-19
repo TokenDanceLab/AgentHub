@@ -30,7 +30,7 @@ import (
 // can confirm filtering is active. The DEBUG log is suppressed at default log
 // levels to avoid leaking key names into production logs.
 //
-// Callers (e.g., envForRun in process_executor.go) may also emit run-scoped audit
+// Callers (e.g., envForRun in run_env.go) may also emit run-scoped audit
 // logs using the same field names when SensitiveVars > 0 or NotWhitelisted > 0,
 // adding a "runId" key for correlation.
 type EnvFilterAudit struct {

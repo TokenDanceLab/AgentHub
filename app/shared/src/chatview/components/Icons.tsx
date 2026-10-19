@@ -1,8 +1,7 @@
 // Chatview card icons — single source of truth: lucide-react.
 //
-// These re-exports keep the historic Icon* export names stable for consumers
-// (RowItem / AgentGroup / OrchestratorCard) while removing the duplicated
-// hand-written SVG set that previously mirrored lucide paths.
+// lucide-react is the single icon source; these Icon* aliases preserve the
+// names used by RowItem / AgentGroup / OrchestratorCard.
 export { Search as IconSearch } from 'lucide-react'
 export { Pencil as IconEdit } from 'lucide-react'
 export { FileText as IconFileText } from 'lucide-react'

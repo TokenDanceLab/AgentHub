@@ -4,8 +4,9 @@ import "encoding/json"
 
 // Frame is the Hub /client/ws wire envelope.
 //
-// SeqID is a per-connection delivery counter stamped by Manager.PushToConn; it
-// is NOT a cross-connection business idempotency key. Duplicate-delivery /
+// SeqID is a per-connection delivery counter stamped by enqueueLocked (used by
+// Manager.PushToConn and by Manager.SetAuth for the auth.ok frame); it is NOT a
+// cross-connection business idempotency key. Duplicate-delivery /
 // apply semantics for each Type* constant are documented in api/events.md
 // (UPSERT by id / idempotent on apply / watermark / ephemeral). Keep this
 // const block 1:1 with app/shared/src/hubEvents.ts and OpenAPI HubWebSocketFrame.
@@ -59,11 +60,9 @@ const (
 	TypeTeamAssignmentDone   = "team.assignment.done"
 	TypeTeamAssignmentFailed = "team.assignment.failed"
 
-	// Team subagent live-stream family (#1478 Phase A).
+	// Team subagent live-stream family.
 	// UPSERT by (agent_task_id, event_seq) + event_seq watermark — same semantics
-	// as agent.stream, aggregated into the team-run view. Only team.subagent.stream
-	// ships in Phase A; activity/batch/subscribe gain producers in later phases
-	// (no dead protocol surface — #1362/#1422).
+	// as agent.stream, aggregated into the team-run view.
 	TypeTeamSubagentStream = "team.subagent.stream"
 
 	// Social: notification UPSERT by id; friend.* by request/user id.

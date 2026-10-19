@@ -14,7 +14,7 @@ import { AgentHubWorkbench } from '../AgentHubWorkbench';
 import {
   workbenchAgents as agents,
   workbenchTranscript as transcript,
-} from '../workbenchTestFixtures';
+} from './fixtures/workbenchTestFixtures';
 
 installWorkbenchTestHooks();
 
@@ -146,7 +146,7 @@ describe('AgentHubWorkbench', () => {
           pinnedAnnouncement: {
             title: 'Builder',
             content: 'Builder 会话自己的置顶',
-            author: 'maintainer',
+            author: 'Demo User',
             time: '14:49',
           },
         },
@@ -175,7 +175,7 @@ describe('AgentHubWorkbench', () => {
       surface: 'desktop',
       capabilities: { browserPreview: true },
       conversations: [
-        { id: 'builder', title: 'Builder', kind: 'direct', subtitle: 'B0 SQLite', updatedLabel: '14:49' },
+        { id: 'builder', title: 'Builder', kind: 'direct', subtitle: 'SQLite', updatedLabel: '14:49' },
         { id: 'reviewer', title: 'Reviewer', kind: 'direct', subtitle: '代码审查', updatedLabel: '12:15', unreadCount: 2 },
       ],
     });

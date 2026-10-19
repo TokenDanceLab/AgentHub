@@ -143,15 +143,10 @@ func TestSessionMemberRepo_LeaveAndReactivate(t *testing.T) {
 	// No other member
 	_, err = GetOtherMemberInPrivate(db, s.ID, "user-z")
 	require.NoError(t, err)
-	// user-z does not exist as a member, but the query still runs; the result is nil
-	// Actually: the query excludes user-z, so it returns one of the active members
-	// Let's verify: both user-x and user-y are active, excluding user-z returns both.
-	// But First() only returns one.
-	// Actually wait - user-z is not "user-x", so it returns... hmm.
-	// The query is: WHERE member_id != `user-z` AND left_at IS NULL
-	// Both user-x and user-y match that. First() picks one.
-	// So we should get a result, it's just that user-z is not the excluded one.
-	// This is fine, GetOtherMemberInPrivate returns the "other" member.
+	// user-z is not a member, so nothing is excluded: both user-x and user-y
+	// match member_id != 'user-z' AND left_at IS NULL, and First() returns one
+	// of them. The call therefore succeeds even through a non-member ID; only
+	// the error-free behavior is asserted here.
 }
 
 func TestSessionMemberRepo_LastReadSeq(t *testing.T) {

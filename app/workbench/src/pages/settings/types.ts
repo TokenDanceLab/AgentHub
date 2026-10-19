@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════════════════════
-   Settings page public types — extracted for Phase 18 strangler slice #572.
+   Settings page public types (#572).
    ═══════════════════════════════════════════════════════════════════════ */
 
 import type { DesignNavIconName } from '../../designIcons';

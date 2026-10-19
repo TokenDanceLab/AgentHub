@@ -138,11 +138,9 @@ describe('produceWordDiffTokens', () => {
   });
 
   it('treats a pure-whitespace change as context (diffWords ignores ws for diff)', () => {
-    // NOTE: this contradicts P6 report §5.3's claim that diffWords flags
-    // whitespace-only changes as token changes. jsdiff's own docstring says
-    // "Whitespace is ignored when computing the diff"; flagging whitespace
-    // changes would require `diffWordsWithSpace`. Pinned here to document the
-    // actual behavior — revisit if reviewers want whitespace-flagging.
+    // NOTE: jsdiff's docstring says "Whitespace is ignored when computing the
+    // diff"; flagging whitespace-only changes would require
+    // `diffWordsWithSpace`. Pinned here to document the actual behavior.
     const t = tokens('  indented', '    indented');
     expect(t.every((x) => x.type === 'context')).toBe(true);
   });

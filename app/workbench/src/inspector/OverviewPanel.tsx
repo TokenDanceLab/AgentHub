@@ -76,7 +76,7 @@ export const OverviewPanel: React.FC<OverviewPanelProps> = ({
   const tasksTitle = taskSectionTitle ?? t('inspector.tasks');
   const primaryTitle = primaryFileLabel ?? t('inspector.deliverableFiles');
   const workingTitle = workingFileLabel ?? t('inspector.workingFiles');
-  /* P76: single primary card — tasks open by default; files collapsed until needed. */
+  /* Single primary card — tasks open by default; files collapsed until needed. */
   const [tasksOpen, setTasksOpen] = useState(true);
   const [filesOpen, setFilesOpen] = useState(false);
 

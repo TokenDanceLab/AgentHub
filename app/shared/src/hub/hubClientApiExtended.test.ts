@@ -174,7 +174,7 @@ describe('createHubClientExtendedApi', () => {
     });
   });
 
-  describe('message extras (T3.2 parity)', () => {
+  describe('message extras (desktop ∩ web)', () => {
     it('edits a message via JSON PUT', async () => {
       const { api, requestCalls } = createHarness();
 
@@ -642,7 +642,7 @@ describe('createHubClientExtendedApi', () => {
     });
   });
 
-  describe('task approvals and artifacts (T3.4)', () => {
+  describe('task approvals and artifacts', () => {
     it('lists task approvals', async () => {
       const { api, requestCalls } = createHarness();
 

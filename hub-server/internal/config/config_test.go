@@ -77,11 +77,14 @@ upload:
 	}
 }
 
-func TestLoadMissingFile(t *testing.T) {
+func TestLoadAllowsMissingFileForEnvOnly(t *testing.T) {
 	t.Setenv("AGENTHUB_JWT_SECRET", "some-secret-value-padded-to-32-chars")
-	_, err := Load("/nonexistent/path/to/config.yaml")
-	if err == nil {
-		t.Fatal("expected error for missing config file, got nil")
+	cfg, err := Load("/nonexistent/path/to/config.yaml")
+	if err != nil {
+		t.Fatalf("env-only config without a file must load, got: %v", err)
+	}
+	if cfg.JWT.Secret != "some-secret-value-padded-to-32-chars" {
+		t.Fatalf("JWT.Secret = %q, want env value", cfg.JWT.Secret)
 	}
 }
 
@@ -411,6 +414,72 @@ func TestEnvOverrideServerPort(t *testing.T) {
 	}
 	if cfg.Server.Port != 9999 {
 		t.Errorf("Server.Port = %d, want 9999 (env override)", cfg.Server.Port)
+	}
+}
+
+func TestEnvOverridesWithoutConfigFile(t *testing.T) {
+	missing := filepath.Join(t.TempDir(), "missing.yaml")
+	t.Setenv("AGENTHUB_DB_HOST", "env-db-host")
+	t.Setenv("AGENTHUB_DB_PORT", "6543")
+	t.Setenv("AGENTHUB_DB_USER", "env-db-user")
+	t.Setenv("AGENTHUB_DB_NAME", "env-db-name")
+	t.Setenv("AGENTHUB_REDIS_HOST", "env-redis-host")
+	t.Setenv("AGENTHUB_REDIS_PORT", "6380")
+	t.Setenv("AGENTHUB_SERVER_PORT", "9090")
+	t.Setenv("AGENTHUB_JWT_ACCESS_TTL", "7m")
+	t.Setenv("AGENTHUB_JWT_SECRET", "env-only-secret-padded-to-minimum-32-chars")
+	t.Setenv("AGENTHUB_UPLOAD_DIR", "/srv/uploads")
+	t.Setenv("AGENTHUB_UPLOAD_MAX_SIZE", "2048")
+	t.Setenv("AGENTHUB_SERVER_AUDIT_LOG_FILE", "/var/log/agenthub/audit.log")
+	t.Setenv("AGENTHUB_REDIS_POOL_SIZE", "42")
+	t.Setenv("AGENTHUB_REDIS_MIN_IDLE_CONNS", "7")
+	t.Setenv("AGENTHUB_REDIS_READ_TIMEOUT_SEC", "11")
+	t.Setenv("AGENTHUB_REDIS_WRITE_TIMEOUT_SEC", "13")
+	t.Setenv("AGENTHUB_AGENT_TEAM_HUMAN_REVIEW_ENABLED", "true")
+	t.Setenv("AGENTHUB_EGRESS_ALLOW_CIDRS", "10.0.0.0/8,192.168.0.0/16")
+	t.Setenv("AGENTHUB_EGRESS_ALLOW_HOSTNAMES", "internal.example.com")
+	t.Setenv("AGENTHUB_EGRESS_ALLOW_PLAIN_HTTP", "true")
+	t.Setenv("AGENTHUB_EGRESS_TIMEOUT", "9s")
+
+	cfg, err := Load(missing)
+	if err != nil {
+		t.Fatalf("Load() with a missing config file must succeed, got %v", err)
+	}
+	if cfg.DB.Host != "env-db-host" || cfg.DB.Port != 6543 || cfg.DB.User != "env-db-user" || cfg.DB.Name != "env-db-name" {
+		t.Errorf("DB env-only binding = %#v, want host/port/user/name from env", cfg.DB)
+	}
+	if cfg.Redis.Host != "env-redis-host" || cfg.Redis.Port != 6380 {
+		t.Errorf("Redis env-only binding = %#v, want host/port from env", cfg.Redis)
+	}
+	if cfg.Server.Port != 9090 {
+		t.Errorf("Server.Port = %d, want 9090", cfg.Server.Port)
+	}
+	if cfg.JWT.AccessTTL != 7*time.Minute {
+		t.Errorf("JWT.AccessTTL = %v, want 7m", cfg.JWT.AccessTTL)
+	}
+	if cfg.Upload.Dir != "/srv/uploads" || cfg.Upload.MaxSize != 2048 {
+		t.Errorf("Upload env-only binding = %#v, want dir and max_size from env", cfg.Upload)
+	}
+	if cfg.Server.AuditLogFile != "/var/log/agenthub/audit.log" {
+		t.Errorf("Server.AuditLogFile = %q, want env value", cfg.Server.AuditLogFile)
+	}
+	if cfg.Redis.PoolSize != 42 {
+		t.Errorf("Redis.PoolSize = %d, want 42", cfg.Redis.PoolSize)
+	}
+	if cfg.Redis.MinIdleConns != 7 || cfg.Redis.ReadTimeoutSec != 11 || cfg.Redis.WriteTimeoutSec != 13 {
+		t.Errorf("Redis tuning = %#v, want 7/11/13 from env", cfg.Redis)
+	}
+	if !cfg.AgentTeam.HumanReviewEnabled {
+		t.Error("AgentTeam.HumanReviewEnabled = false, want true from env")
+	}
+	if !cfg.Egress.AllowPlainHTTP || cfg.Egress.Timeout != 9*time.Second {
+		t.Errorf("Egress env-only binding = %#v, want plain HTTP and 9s timeout from env", cfg.Egress)
+	}
+	if len(cfg.Egress.AllowCIDRs) != 2 || cfg.Egress.AllowCIDRs[0] != "10.0.0.0/8" {
+		t.Errorf("Egress.AllowCIDRs = %v, want comma-separated CIDRs from env", cfg.Egress.AllowCIDRs)
+	}
+	if len(cfg.Egress.AllowHostnames) != 1 || cfg.Egress.AllowHostnames[0] != "internal.example.com" {
+		t.Errorf("Egress.AllowHostnames = %v, want hostname from env", cfg.Egress.AllowHostnames)
 	}
 }
 
@@ -898,7 +967,7 @@ func TestLoadYAMLEmptyFile(t *testing.T) {
 		t.Errorf("JWT.Secret = %q, want empty-file-secret", cfg.JWT.Secret)
 	}
 	// DB pool defaults must be the sized-for-concurrency values, not the
-	// historical 2/1 that starved every consumer (#2154 Gauss P1-1).
+	// historical 2/1 that starved every consumer (#2154).
 	if cfg.DB.MaxOpenConns != DefaultDBMaxOpenConns || cfg.DB.MaxIdleConns != DefaultDBMaxIdleConns {
 		t.Errorf("DB pool defaults = %d/%d, want %d/%d",
 			cfg.DB.MaxOpenConns, cfg.DB.MaxIdleConns, DefaultDBMaxOpenConns, DefaultDBMaxIdleConns)
@@ -1269,7 +1338,7 @@ func TestEdgeDispatchTimeoutDefault(t *testing.T) {
 	}
 }
 
-// ── #2124 P1 scheme-b: production guard tests ────────────────────────────────
+// ── #2124: production guard tests ────────────────────────────────
 
 // prodGuardYAML is a minimal valid config for production-guard tests.
 // server.env is set via yaml; AGENTHUB_JWT_SECRET and AGENTHUB_AUTH_FAIL_CLOSED

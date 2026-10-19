@@ -1,4 +1,3 @@
-// #1161: Session Service pure-helper peel — member/group mgmt paths extracted from service.go.
 package session
 
 import (
@@ -69,7 +68,7 @@ func (s *Service) AddGroupMembers(ctx context.Context, currentUserID, sessionID 
 			return err
 		}
 	}
-	_ = resolveCache(s.cacheClient).Invalidate(ctx, SessionMembersCacheKey(sessionID))
+	_ = s.cacheClient.Invalidate(ctx, SessionMembersCacheKey(sessionID))
 	for _, m := range joinedMembers {
 		s.publishEvent(ctx, EventTypeSessionMemberJoined, MemberJoinedPayload(sessionID, m.MemberID, m.MemberType))
 	}
@@ -116,7 +115,7 @@ func (s *Service) RemoveGroupMember(ctx context.Context, currentUserID, sessionI
 	if err := repository.SoftDeleteMember(s.db, sessionID, model.MemberTypeUser, targetUserID); err != nil {
 		return err
 	}
-	_ = resolveCache(s.cacheClient).Invalidate(ctx, SessionMembersCacheKey(sessionID))
+	_ = s.cacheClient.Invalidate(ctx, SessionMembersCacheKey(sessionID))
 	s.publishEvent(ctx, EventTypeSessionMemberLeft, MemberLeftPayload(sessionID, targetUserID))
 	s.recordMemberAudit(ctx, auditActionMemberRemove, sessionID, currentUserID, auditOutcomeSuccess, "")
 	return nil
@@ -146,7 +145,7 @@ func (s *Service) LeaveGroup(ctx context.Context, currentUserID, sessionID strin
 		}
 	}
 
-	// P11.3: clean up agents invited by this user
+	// Clean up agents invited by this user.
 	if err := s.cleanupInvitedAgents(sessionID, currentUserID); err != nil {
 		return err
 	}
@@ -154,7 +153,7 @@ func (s *Service) LeaveGroup(ctx context.Context, currentUserID, sessionID strin
 	if err := repository.SoftDeleteMember(s.db, sessionID, model.MemberTypeUser, currentUserID); err != nil {
 		return err
 	}
-	_ = resolveCache(s.cacheClient).Invalidate(ctx, SessionMembersCacheKey(sessionID))
+	_ = s.cacheClient.Invalidate(ctx, SessionMembersCacheKey(sessionID))
 	s.publishEvent(ctx, EventTypeSessionMemberLeft, MemberLeftPayload(sessionID, currentUserID))
 	return nil
 }
@@ -187,7 +186,7 @@ func (s *Service) TransferGroupOwnership(ctx context.Context, currentUserID, ses
 	if err := repository.TransferOwnership(s.db, sessionID, currentUserID, newOwnerID); err != nil {
 		return err
 	}
-	_ = resolveCache(s.cacheClient).Invalidate(ctx, SessionMembersCacheKey(sessionID))
+	_ = s.cacheClient.Invalidate(ctx, SessionMembersCacheKey(sessionID))
 	return nil
 }
 
@@ -255,7 +254,7 @@ func (s *Service) DissolveGroup(ctx context.Context, currentUserID, sessionID st
 			}
 		}
 	}
-	_ = resolveCache(s.cacheClient).Invalidate(ctx, SessionMembersCacheKey(sessionID))
+	_ = s.cacheClient.Invalidate(ctx, SessionMembersCacheKey(sessionID))
 
 	slog.Info("dissolve group: session dissolved",
 		"session_id", sessionID, "dissolved_by", currentUserID,
@@ -344,7 +343,7 @@ func (s *Service) DeleteForMe(ctx context.Context, currentUserID, sessionID stri
 	if err := repository.SoftDeleteMember(s.db, sessionID, model.MemberTypeUser, currentUserID); err != nil {
 		return err
 	}
-	_ = resolveCache(s.cacheClient).Invalidate(ctx, SessionMembersCacheKey(sessionID))
+	_ = s.cacheClient.Invalidate(ctx, SessionMembersCacheKey(sessionID))
 	s.publishEvent(ctx, EventTypeSessionMemberLeft, MemberLeftPayload(sessionID, currentUserID))
 	return nil
 }

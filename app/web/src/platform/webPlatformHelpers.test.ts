@@ -36,7 +36,7 @@ import {
   webTranscript,
 } from './webPlatformFixtures';
 
-describe('webPlatformFixtures residual seam', () => {
+describe('webPlatformFixtures helper seam', () => {
   it('exports non-empty demo conversations/agents and empty hub placeholders', () => {
     expect(webConversations.length).toBeGreaterThan(0);
     expect(webAgents.length).toBeGreaterThan(0);
@@ -254,12 +254,12 @@ describe('webPlatformDispatchHelpers pure helpers', () => {
       mentions: [{ id: 'p1', label: 'Builder', runtimeId: 'claude-code', model: 'glm-5.1' }],
       attachments: [{ id: 'a1', name: 'notes.md', source: 'browser', kind: 'file', mime: 'text/markdown', truncated: true }],
       approvalMode: 'workspace-write',
-      workDir: '<REPO_ROOT>',
+      workDir: '/workspace/agenthub',
     })).toEqual({
       source: 'web-v4-workbench',
       mode: 'code',
       approval_mode: 'workspace-write',
-      work_dir: '<REPO_ROOT>',
+      work_dir: '/workspace/agenthub',
       mentions: [{ id: 'p1', label: 'Builder', runtime_id: 'claude-code', model: 'glm-5.1' }],
       attachments: [{ id: 'a1', name: 'notes.md', source: 'browser', kind: 'file', mime: 'text/markdown', truncated: true }],
     });

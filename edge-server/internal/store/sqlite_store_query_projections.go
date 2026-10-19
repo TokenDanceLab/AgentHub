@@ -7,9 +7,8 @@ import (
 	"fmt"
 )
 
-// sqlite_store_query_projections.go holds pure projection map builders and
-// prepare* write-column helpers peeled from sqlite_store_query.go.
-// No *sql.DB / *sql.Tx / IO ownership.
+// Projection map builders and prepare* write-column helpers for SQLite queries.
+// No *sql.DB, *sql.Tx, or IO ownership.
 
 type artifactProjection struct {
 	ArtifactID            string `json:"artifactId"`

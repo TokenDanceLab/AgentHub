@@ -367,7 +367,7 @@
   color: var(--td-moss);
 }
 
-/* ── Long-code collapse (fable UIUX #3) ─────────────────────────
+/* ── Long-code collapse ─────────────────────────────────────────
    Collapsed body clips at 400px; overflow-y comes from the shorthand below
    while overflow-x stays auto from .codeBlockWrapper > div, so horizontal
    scrolling of long lines still works inside the clipped region. */

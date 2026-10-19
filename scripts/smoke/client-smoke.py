@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
 """client-smoke — AgentHub client local smoke test.
 
-ps1 迁移（契约见 server docs/design/ps1-to-python-migration.md）：stdlib only、
-CLI 参数/退出码兼容（0=通过/1=失败）、机器可读行（`  PASS  `/`  FAIL  ` 与
-`=== ... ===` step）与原 ps1 一致。
+stdlib only；CLI 参数同时接受 -Xxx 与 --Xxx；退出码 0=通过 / 1=失败；
+机器可读行为 `  PASS  `/`  FAIL  ` 与 `=== ... ===` step。
 
 串联 Edge 与 Desktop-facing API 端到端验证。先运行 `scripts/dev/setup.py`，
 再运行本脚本。默认用 mock runner（powershell 输出 "Initializing mock runner"），
@@ -94,7 +93,7 @@ def invoke_edge_rest(url: str, method: str = "GET", body=None, timeout_sec: int 
             raw = ""
         if raw.strip():
             try:
-                # 对齐 ps1 Invoke-RestMethod 异常消息：CRLF + 2-space 缩进 JSON body
+                # 异常消息保留 CRLF + 2-space 缩进 JSON body
                 raw = "\r\n" + json.dumps(json.loads(raw), ensure_ascii=False, indent=2).replace("\n", "\r\n")
             except json.JSONDecodeError:
                 pass
@@ -108,15 +107,16 @@ def test_edge_health(edge_url: str, edge_headers: dict, timeout_sec: int = 2) ->
     try:
         health = invoke_edge_rest(f"{edge_url}/v1/health", timeout_sec=timeout_sec, headers=edge_headers)
         return isinstance(health, dict) and health.get("status") == "ok" and health.get("version") == "v1"
-    except Exception:  # noqa: BLE001 —— 对齐 ps1 catch 语义
+    except Exception:  # noqa: BLE001 —— 探测失败视为 unhealthy
         return False
 
 
 def get_smoke_runner_command() -> str:
-    powershell = shutil.which("powershell")
-    if powershell:
-        return powershell
-    return shutil.which("pwsh")
+    powershell = shutil.which("powershell") or shutil.which("pwsh")
+    if not powershell:
+        fail_check("mock runner requires PowerShell (powershell/pwsh) on PATH")
+        raise RuntimeError("mock runner requires PowerShell (powershell or pwsh) on PATH")
+    return powershell
 
 
 def run_native(args: list, cwd: str | None = None) -> subprocess.CompletedProcess:
@@ -127,8 +127,8 @@ def run_native(args: list, cwd: str | None = None) -> subprocess.CompletedProces
     """
     executable = shutil.which(args[0]) if args else None
     if executable and re.search(r"\.(cmd|bat)$", executable, re.IGNORECASE):
-        return subprocess.run(["cmd", "/c", executable, *args[1:]], cwd=cwd, capture_output=True, text=True)
-    return subprocess.run(args, cwd=cwd, capture_output=True, text=True)
+        return subprocess.run(["cmd", "/c", executable, *args[1:]], cwd=cwd, capture_output=True, text=True, encoding="utf-8", errors="replace")
+    return subprocess.run(args, cwd=cwd, capture_output=True, text=True, encoding="utf-8", errors="replace")
 
 
 # ── Minimal RFC6455 WebSocket client (stdlib only) ──────────────
@@ -479,7 +479,7 @@ def main() -> int:
                 assert_true(isinstance(health, dict) and health.get("status") == "ok", "status=ok")
                 assert_true(isinstance(health, dict) and health.get("version") == "v1", "version=v1")
                 assert_true(isinstance(health, dict) and health.get("edgeId") == "local", "edgeId=local")
-            except Exception as exc:  # noqa: BLE001 —— 对齐 ps1 catch 语义
+            except Exception as exc:  # noqa: BLE001 —— 记录失败并继续
                 fail_check(f"health: {exc}")
 
             # Runners
@@ -575,7 +575,7 @@ def main() -> int:
 
         return 0 if failed == 0 else 1
 
-    except Exception as exc:  # noqa: BLE001 —— 对齐 ps1 $ErrorActionPreference='Stop' 顶层抛错
+    except Exception as exc:  # noqa: BLE001 —— fail closed：未捕获异常返回非零
         emit(f"ERROR: {exc}")
         return 1 if failed == 0 else 1
 

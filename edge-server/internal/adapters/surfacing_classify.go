@@ -5,8 +5,6 @@ import (
 	"strings"
 )
 
-// Residual pure-helper peel #1112: file classification for auto-surfacing.
-
 // Directories to skip when walking the workdir.
 var skipDirs = map[string]bool{
 	".git": true, "node_modules": true, "__pycache__": true,

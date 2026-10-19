@@ -29,15 +29,15 @@ import (
 )
 
 // TestUnwiredACPEndpointsFailClosed locks the STUB INVENTORY in acp_client.go:
-// every deliberately unwired ACP endpoint (#1404 fs/terminal frame design)
-// must answer with an error wrapping errACPEndpointNotWired — a JSON-RPC
-// error the agent can surface — and must never return a nil error (silent
-// hang from the agent's perspective) or a fabricated success response.
+// every deliberately unwired ACP fs/terminal endpoint must answer with an
+// error wrapping errACPEndpointNotWired — a JSON-RPC error the agent can
+// surface — and must never return a nil error (silent hang from the agent's
+// perspective) or a fabricated success response.
 //
-// This table exercises the frame-gate rejection branch (#1743 item 1): with
+// This table exercises the frame-gate rejection branch (frame gate): with
 // no workspace configured, every path is rejected by the allowlist and
 // every terminal frame is malformed (empty requests) — both gate errors
-// still wrap errACPEndpointNotWired (unwiredFrameError). When #1743 item 3
+// still wrap errACPEndpointNotWired (unwiredFrameError). When real-run verification
 // wires an endpoint, remove it from this table and from the inventory.
 func TestUnwiredACPEndpointsFailClosed(t *testing.T) {
 	handler := newACPClientHandler(nil, store.Run{ID: "run_test"}, nil, context.Background(), "")
@@ -93,7 +93,7 @@ func TestUnwiredACPEndpointsFailClosed(t *testing.T) {
 // TestUnwiredACPEndpointsFailClosedInsideWorkspace covers the second
 // fail-closed branch: requests whose frames pass the allowlist gate still
 // end in errACPEndpointNotWired because no execution is wired behind the
-// gate yet (#1743 item 3 pending). Together with
+// gate yet (real-run verification pending). Together with
 // TestUnwiredACPEndpointsFailClosed this locks both answers an unwired
 // stub can give.
 func TestUnwiredACPEndpointsFailClosedInsideWorkspace(t *testing.T) {
@@ -208,7 +208,7 @@ func TestFsTerminalStubsEnforceAllowlistGate(t *testing.T) {
 }
 
 // TestWorkspaceAllowlistValidatePath locks the fail-closed containment
-// rules of the frame gate (#1743 item 1): only paths resolving inside the
+// rules of the frame gate (frame gate): only paths resolving inside the
 // workspace root pass; traversal, outside paths, relative paths, empty
 // inputs, and adjacent-prefix directories all reject with
 // errACPPathOutsideWorkspace.
@@ -357,7 +357,7 @@ type fakeACPAgent struct {
 
 	// params carries the raw params JSON of every client→agent request,
 	// keyed by method (initialize / session/new / session/prompt) — the
-	// #1743 tests assert the initialize capabilities and the session/new
+	// tests assert the initialize capabilities and the session/new
 	// mcpServers shapes.
 	params map[string][]string
 
@@ -554,7 +554,7 @@ func TestRunACPSession_MockAgentStreamsTypedUpdates(t *testing.T) {
 	}
 }
 
-// TestRunACPSession_InitializeAdvertisesNoFsOrTerminal locks the #1743
+// TestRunACPSession_InitializeAdvertisesNoFsOrTerminal locks the
 // capability shrink: fs read/write and terminal are no longer advertised
 // during initialize because the client-side endpoints are unwired
 // fail-closed stubs — an agent must not be invited to depend on a surface
@@ -592,14 +592,14 @@ func TestRunACPSession_InitializeAdvertisesNoFsOrTerminal(t *testing.T) {
 		t.Fatalf("initialize params not JSON: %v (%s)", err, params[0])
 	}
 	if init.ClientCapabilities.Fs["readTextFile"] || init.ClientCapabilities.Fs["writeTextFile"] {
-		t.Errorf("fs capability advertised: %+v, want absent/false (#1743)", init.ClientCapabilities.Fs)
+		t.Errorf("fs capability advertised: %+v, want absent/false ", init.ClientCapabilities.Fs)
 	}
 	if init.ClientCapabilities.Terminal != nil && *init.ClientCapabilities.Terminal {
-		t.Errorf("terminal capability advertised: %+v, want absent/false (#1743)", init.ClientCapabilities.Terminal)
+		t.Errorf("terminal capability advertised: %+v, want absent/false ", init.ClientCapabilities.Terminal)
 	}
 }
 
-// TestRunACPSession_WiresMCPConfigIntoSessionNew locks the #1743 MCP wiring:
+// TestRunACPSession_WiresMCPConfigIntoSessionNew locks the MCP wiring:
 // a valid run-profile MCP config is parsed and passed as session/new
 // mcpServers entries, and no degraded status-change event is emitted on the
 // successful parse path.
@@ -664,13 +664,13 @@ func TestRunACPSession_WiresMCPConfigIntoSessionNew(t *testing.T) {
 		t.Errorf("mcpServers[0].env = %+v, want [{NODE_ENV test}]", got.Env)
 	}
 
-	// #1740 degradation must not fire on the successful wiring path.
+	// A degradation event must not fire on the successful wiring path.
 	if evs := emitter.eventsByType(BusEventStatusChange); len(evs) > 0 {
 		t.Errorf("status_change events emitted on successful MCP wiring: %+v", evs)
 	}
 }
 
-// TestRunACPSession_InvalidMCPConfigKeepsDegradedEvent locks the #1740
+// TestRunACPSession_InvalidMCPConfigKeepsDegradedEvent locks the degraded
 // baseline: when the MCP config JSON cannot be parsed, the run still
 // completes with an empty mcpServers list and the visible degraded
 // status-change event (reason acp_mcp_not_wired) is emitted.
@@ -703,7 +703,7 @@ func TestRunACPSession_InvalidMCPConfigKeepsDegradedEvent(t *testing.T) {
 		t.Errorf("session/new params = %s, want empty mcpServers array", params[0])
 	}
 
-	// The #1740 degraded event must still fire on the parse-failure path.
+	// The degraded event must still fire on the parse-failure path.
 	evs := emitter.eventsByType(BusEventStatusChange)
 	if len(evs) == 0 {
 		t.Fatal("missing status_change event for unparseable MCP config")
@@ -1189,9 +1189,7 @@ func isNonRecoverable(err error) bool {
 	return ok && !ps.Recoverable()
 }
 
-// TestAcpBinaryAvailable 校验根包私有助手 acpBinaryAvailable 的解析规则
-// （随 codex 家族下沉时留在根包，测试根包基础设施，#1760 codex/opencode
-// 增量）。
+// TestAcpBinaryAvailable 校验根包私有助手 acpBinaryAvailable 的解析规则。
 func TestAcpBinaryAvailable(t *testing.T) {
 	found := func(string) (string, error) { return "npx.cmd", nil }
 	missing := func(string) (string, error) { return "", errors.New("executable file not found") }
@@ -1211,8 +1209,7 @@ func TestAcpBinaryAvailable(t *testing.T) {
 }
 
 // TestAcpAdapterMetadataIsNotEmpty verifies the experimental ACP adapter has
-// non-empty metadata（#1760 acp 增量：随 acp 家族从根包
-// TestAdapterMetadataIsNotEmpty 迁入，逻辑未改）。
+// non-empty metadata。
 func TestAcpAdapterMetadataIsNotEmpty(t *testing.T) {
 	metadata := NewAcpAdapterConfig(AcpAdapterConfig{ID: "acp", Binary: "acp", DisplayName: "ACP experimental"}).Metadata()
 	if metadata.ID == "" {
@@ -1227,7 +1224,7 @@ func TestAcpAdapterMetadataIsNotEmpty(t *testing.T) {
 }
 
 // recordingEmitter / recordedEvent 是根包 event_emitter_test.go 测试桩的
-// 本地副本（#1760 acp 增量）：acp 家族归组后根包 _test 符号不可跨包引用，
+// 本地副本：acp 家族归组后根包 _test 符号不可跨包引用，
 // 与 claude 包测试内置测试桩副本的既有模式一致。
 type recordingEmitter struct {
 	mu     sync.Mutex

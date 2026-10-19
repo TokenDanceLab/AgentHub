@@ -4,8 +4,8 @@ import { vi } from 'vitest';
 
 // Shared test i18next instance (Issue #1717): isolated per-project instance
 // with real chatview + sharedWorkbench resources. The default language is
-// the helper's key-echo pseudo-language: desktop suites (AuthPage.test.tsx,
-// LoginForm, AppShell, App.v4) were written against raw-key echo, so they
+// the helper's key-echo pseudo-language: desktop suites (AppShell, App.v4)
+// were written against raw-key echo, so they
 // keep passing unchanged while the NO_I18NEXT_INSTANCE warning disappears.
 // Desktop's own translation namespace is not loaded — no desktop suite
 // asserts real translated copy for it. This setup also hosts the shared

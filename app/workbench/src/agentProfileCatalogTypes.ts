@@ -1,8 +1,8 @@
 import type { AgentState } from './pages/AgentsPage';
 
 /* ═══════════════════════════════════════════════════════════════════════
-   agentProfileCatalogTypes — residual type extract from agentProfileCatalog
-   (#652). Pure types only; no fixture data or mappers.
+   agentProfileCatalogTypes — AgentProfile catalog types.
+   Pure types only; no fixture data or mappers.
    ═══════════════════════════════════════════════════════════════════════ */
 
 export type AgentProfileVisibility = 'private' | 'team' | 'marketplace' | 'fixture';

@@ -17,11 +17,11 @@ import {
 } from './workbenchTranscriptChromeLabels';
 
 /* ═══════════════════════════════════════════════════════════════════════
-   workbenchTranscriptChromeActionMappers — pure residual action / menu /
-   side-effect slices from workbenchTranscriptChromeHelpers (#755).
+   workbenchTranscriptChromeActionMappers — action/menu planners and
+   side-effect helpers for the transcript chrome (#755).
 
    Context/multi/block action planners, menu and multi-select view models,
-   and side-effect application. No React hooks / no intentional UX change.
+   and side-effect application. No React hooks.
    exactOptionalPropertyTypes: only assign optional fields when defined.
    ═══════════════════════════════════════════════════════════════════════ */
 
@@ -50,26 +50,26 @@ export type TranscriptChromeSideEffect =
     type: 'regenerate';
     blockId: string;
     /**
-     * #2274 B-1: the producing agent task id — the only identity
+     * #2274: the producing agent task id — the only identity
      * POST /web/agent-tasks/:id/regenerate accepts. Planned only when the
      * block actually carries it (hub-stamped `agent_task.task_id`).
      */
     taskId: string;
-    /** Shown only after the regenerate request resolves successfully (#1821). */
+    /** Shown only after the regenerate request resolves successfully. */
     successMessage: string;
-    /** Shown when the regenerate request rejects (#1821). */
+    /** Shown when the regenerate request rejects. */
     failureMessage: string;
-    /** #2072 P3: i18n key for errcode-based resolution at error time. */
+    /** #2072: i18n key for errcode-based resolution at error time. */
     failureFallbackKey?: string;
   }
   | {
     type: 'approval';
     decision: ApprovalDecisionAction;
-    /** Shown only after the decision request resolves successfully (#1821). */
+    /** Shown only after the decision request resolves successfully. */
     successMessage: string;
-    /** Shown when the decision request rejects (#1821). */
+    /** Shown when the decision request rejects. */
     failureMessage: string;
-    /** #2072 P3: i18n key for errcode-based resolution at error time. */
+    /** #2072: i18n key for errcode-based resolution at error time. */
     failureFallbackKey?: string;
   }
   | { type: 'pulse'; blockId: string }
@@ -85,14 +85,14 @@ export type TranscriptChromeSideEffect =
   // Hub REST message actions (#1383). Planned only when a session id is
   // available; applied via the optional `on*Message` effect handlers. The
   // success toast rides the resolved request — a rejected request shows the
-  // failure message instead of a fake optimistic success (#1821).
+  // failure message instead of a fake optimistic success.
   | {
     type: 'pin';
     messageId: string;
     sessionId: string;
     successMessage: string;
     failureMessage: string;
-    /** #2072 P3: i18n key for errcode-based resolution at error time. */
+    /** #2072: i18n key for errcode-based resolution at error time. */
     failureFallbackKey?: string;
   }
   | {
@@ -101,7 +101,7 @@ export type TranscriptChromeSideEffect =
     sessionId: string;
     successMessage: string;
     failureMessage: string;
-    /** #2072 P3: i18n key for errcode-based resolution at error time. */
+    /** #2072: i18n key for errcode-based resolution at error time. */
     failureFallbackKey?: string;
   }
   | {
@@ -110,7 +110,7 @@ export type TranscriptChromeSideEffect =
     targetSessionIds: string[];
     successMessage: string;
     failureMessage: string;
-    /** #2072 P3: i18n key for errcode-based resolution at error time. */
+    /** #2072: i18n key for errcode-based resolution at error time. */
     failureFallbackKey?: string;
   }
   | { type: 'recall'; messageId: string; successMessage: string; failureMessage: string; failureFallbackKey?: string }
@@ -121,7 +121,7 @@ export type TranscriptChromeSideEffect =
     emoji: string;
     successMessage: string;
     failureMessage: string;
-    /** #2072 P3: i18n key for errcode-based resolution at error time. */
+    /** #2072: i18n key for errcode-based resolution at error time. */
     failureFallbackKey?: string;
   };
 
@@ -221,7 +221,7 @@ export function planContextAction(options: {
       focusComposer: true,
     });
   }
-  // Edit an already-sent user message (#1462 CF16): backfill the composer with
+  // Edit an already-sent user message (#1462): backfill the composer with
   // the message text and mark it as editing so submit routes to `editMessage`
   // instead of sending a new message.
   if (action === 'edit' && block && block.kind === 'text' && block.author.role === 'human') {
@@ -235,7 +235,7 @@ export function planContextAction(options: {
     });
   }
   if (action === 'regenerate' && block && block.kind === 'text' && block.author.role === 'agent') {
-    // #2274 B-1: regenerate's identity is the producing TASK id; the endpoint
+    // #2274: regenerate's identity is the producing TASK id; the endpoint
     // answers 404 to anything else (message id / client_msg id — the pre-fix
     // web behaviour). Without block.agentTaskId there is no server-truthful
     // identity to send, so plan nothing: a soft-hide + success toast here
@@ -397,7 +397,7 @@ export function planTranscriptBlockAction(options: {
   }
 
   if (action === 'retry' || action === 'regenerate') {
-    // #2274 B-1: same identity gate as the context-menu path — no stamped
+    // #2274: same identity gate as the context-menu path — no stamped
     // task id means no honest regenerate to plan.
     if (block.kind === 'text' && block.author.role === 'agent' && block.agentTaskId) {
       // #1821: same honest contract as the context-menu regenerate path — the
@@ -487,7 +487,7 @@ export interface TranscriptChromeEffectHandlers {
   dispatchComposer: (action: ComposerAction) => void;
   focusComposer: () => void;
   /**
-   * Regenerate port (#1821). May return a Promise: when it does, the
+   * Regenerate port. May return a Promise: when it does, the
    * soft-hide + success toast wait for resolution and a rejection surfaces
    * the failure toast instead (the block stays visible).
    */
@@ -499,7 +499,7 @@ export interface TranscriptChromeEffectHandlers {
   onRequestDeleteConfirm?: ((request: DeleteConfirmRequest) => void) | undefined;
   exitSelection: () => void;
   // Hub REST message actions (#1383) — optional; without them the side
-  // effects are no-ops and no success toast is shown (#1821).
+  // effects are no-ops and no success toast is shown.
   onPinMessage?: ((messageId: string, sessionId: string) => Promise<void> | void) | undefined;
   onUnpinMessage?: ((messageId: string, sessionId: string) => Promise<void> | void) | undefined;
   onForwardMessage?: ((messageId: string, targetSessionIds: string[]) => Promise<void> | void) | undefined;
@@ -513,7 +513,7 @@ function isThenable(value: unknown): value is Promise<unknown> {
 }
 
 /**
- * Await a handler result when it is a Promise (#1821): the success toast
+ * Await a handler result when it is a Promise: the success toast
  * fires only after resolution, and a rejection shows the failure message
  * (or the error's own message when present). Synchronous handlers keep the
  * immediate success toast.
@@ -533,7 +533,7 @@ function announceSettledAction(
   void Promise.resolve(outcome).then(
     () => showWorkbenchToast(successMessage),
     (err: unknown) => {
-      // #2072 P3: prefer errcode-based i18n resolution when available;
+      // #2072: prefer errcode-based i18n resolution when available;
       // fall back to raw err.message or the pre-translated failureMessage.
       if (t && failureFallbackKey) {
         showWorkbenchToast(t(resolveFailedToastKey(err, failureFallbackKey)));
@@ -546,10 +546,9 @@ function announceSettledAction(
 
 /**
  * #2154: i18n key for the "this shell never wired that action" announcement.
- * The key is not in the locale bundle yet (i18n resources are owned outside
- * this change and the missing key is only registered in the PR) —
- * `announceUnavailableAction` falls back to the effect's own failure copy
- * until it lands, so the feedback is never a raw key and never silence.
+ * The key ships in the chatview locale bundle; `announceUnavailableAction`
+ * still falls back to the effect's own failure copy if the key is ever
+ * missing, so the feedback is never a raw key and never silence.
  */
 export const UNAVAILABLE_ACTION_TOAST_KEY = 'toast.actionUnavailable';
 
@@ -643,7 +642,7 @@ export function applyTranscriptChromeSideEffects(
               handlers.showWorkbenchToast(effect.successMessage);
             },
             (err: unknown) => {
-              // #2072 P3: prefer errcode-based i18n resolution when available.
+              // #2072: prefer errcode-based i18n resolution when available.
               if (t && effect.failureFallbackKey) {
                 handlers.showWorkbenchToast(t(resolveFailedToastKey(err, effect.failureFallbackKey)));
               } else {
@@ -672,7 +671,7 @@ export function applyTranscriptChromeSideEffects(
         void Promise.resolve(handler(effect.decision)).then(
           () => handlers.showWorkbenchToast(effect.successMessage),
           (err: unknown) => {
-            // #2072 P3: prefer errcode-based i18n resolution when available.
+            // #2072: prefer errcode-based i18n resolution when available.
             if (t && effect.failureFallbackKey) {
               handlers.showWorkbenchToast(t(resolveFailedToastKey(err, effect.failureFallbackKey)));
             } else {
@@ -899,7 +898,7 @@ export function buildTranscriptContextMenuGroups({
     [
       // #2154: regenerate needs the shell's regenerate port — Desktop has
       // none, so the entry stays hidden instead of doing nothing on click.
-      // #2274 B-1: the entry also needs the block's stamped task id — the
+      // #2274: the entry also needs the block's stamped task id — the
       // shell's port is necessary but not sufficient: without a task id the
       // click can only fail (pre-fix web sent a message id and got 404).
       ...(isAgentText && caps.regenerate === true && Boolean(block?.agentTaskId)

@@ -4,14 +4,11 @@
 // LOCAL notification handling. Device registration with the Hub is optional
 // (injected client); the token itself is never forwarded.
 //
-// Server-side push boundary (verified lane C-1824, 2026-08-23): hub-server
-// has NO push delivery facility — no FCM/APNs/Expo push consumer, no device
-// push_token column, and registerDevice (hub-server/internal/handler/device.go
-// / shared HubRegisterDeviceRequest) carries no token field. Forwarding the
-// token would not reach any delivery path, so mobile keeps the push token
-// local and the capability boundary is documented in README (evidence table +
-// 'Push and notification capabilities'). Revisit only when the Hub side ships
-// a delivery path (device token storage + sender).
+// The Hub has no push delivery facility: no FCM/APNs/Expo push consumer, no
+// device push_token column, and registerDevice
+// (hub-server/internal/handler/device.go, registerDeviceReq) carries no
+// token field. Mobile therefore keeps the push token local. Revisit when the
+// Hub ships device token storage and a sender.
 //
 // Pure, injectable core + an expo-runtime entry that lazy-imports native deps.
 

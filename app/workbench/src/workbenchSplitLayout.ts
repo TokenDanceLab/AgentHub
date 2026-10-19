@@ -1,6 +1,6 @@
 /* ==========================================================================
    workbenchSplitLayout — pure layout tree for the split-view workspace
-   (#1997, UX F3).
+   (#1997).
 
    codeg-inspired semantics (internalized from the public-source research):
    a pure GroupLeaf / SplitNode tree with per-level ratios, same-orientation

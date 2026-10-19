@@ -11,12 +11,12 @@ describe('reduceNavigationTarget (mobile deep link / notification routing)', () 
   it('routes thread targets to the thread tab and replaces the selection', () => {
     const next = reduceNavigationTarget(base, {
       screen: 'thread',
-      threadId: 'thread-maintainer',
+      threadId: 'thread-demo',
     });
 
     expect(next).toEqual({
       activeTab: 'thread',
-      threadId: 'thread-maintainer',
+      threadId: 'thread-demo',
     });
   });
 
@@ -25,13 +25,13 @@ describe('reduceNavigationTarget (mobile deep link / notification routing)', () 
       screen: 'tasks',
       source: 'run',
       runId: 'run-agenthub',
-      threadId: 'thread-maintainer',
+      threadId: 'thread-demo',
     });
 
     expect(next).toEqual({
       activeTab: 'tasks',
       runId: 'run-agenthub',
-      threadId: 'thread-maintainer',
+      threadId: 'thread-demo',
     });
   });
 
@@ -41,13 +41,13 @@ describe('reduceNavigationTarget (mobile deep link / notification routing)', () 
       source: 'approval',
       approvalId: 'approval-agenthub',
       runId: 'run-agenthub',
-      threadId: 'thread-maintainer',
+      threadId: 'thread-demo',
     });
 
     expect(next).toEqual({
       activeTab: 'tasks',
       runId: 'run-agenthub',
-      threadId: 'thread-maintainer',
+      threadId: 'thread-demo',
       approvalSheetMode: 'review',
     });
   });

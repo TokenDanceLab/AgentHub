@@ -27,18 +27,22 @@ function readEdgeTokenFile(): string {
 }
 
 /**
- * Provides the Edge auth token to the frontend in two ways:
+ * Dev-only Edge token plumbing:
  *
- * 1. **Build-time define** (`VITE_EDGE_AUTH_TOKEN`) — seeds the initial token
- *    on first page load so the very first API call succeeds.
+ * 1. **Define** (`VITE_EDGE_AUTH_TOKEN`) — seeds the initial token so the
+ *    first API call succeeds.
  *
  * 2. **Dev server middleware** (`GET /__edge_token`) — returns the *current*
  *    token from the file on every request, so the frontend can refresh after
  *    Desktop restarts Edge with a new token without needing a Vite restart.
+ *
+ * The per-machine token must never be compiled into a distributable bundle;
+ * packaged builds obtain it at runtime through the Tauri host API.
  */
 function edgeAuthTokenPlugin(): Plugin {
   return {
     name: 'edge-auth-token',
+    apply: 'serve',
     config() {
       return {
         define: {
@@ -65,7 +69,12 @@ function devCspPlugin(): Plugin {
   };
 }
 
+const packageJson = JSON.parse(fs.readFileSync(path.join(__dirname, 'package.json'), 'utf-8')) as { version: string };
+
 export default defineConfig({
+  define: {
+    __APP_VERSION__: JSON.stringify(packageJson.version),
+  },
   plugins: [react(), edgeAuthTokenPlugin(), devCspPlugin()],
   resolve: {
     dedupe: ['react', 'react-dom'],
@@ -94,6 +103,8 @@ export default defineConfig({
         "img-src 'self' data: blob: https://avatars.githubusercontent.com https://*.example.invalid",
         // Connect covers: Edge localhost API, Hub API + WS, Desktop OIDC redirect.
         "connect-src 'self' http://127.0.0.1:* ws://127.0.0.1:* http://localhost:* ws://localhost:* https://*.example.invalid wss://*.example.invalid",
+        // BrowserPreview embeds user/deploy URLs; mirror index.html/tauri.conf.
+        "frame-src 'self' http://127.0.0.1:* http://localhost:* https:",
         "frame-ancestors 'none'",
         "form-action 'self'",
         "base-uri 'self'",

@@ -9,8 +9,7 @@ import styles from '../ContactsPage.module.css';
 import type { ContactModalTab, ContactsPane } from './types';
 
 /* ═══════════════════════════════════════════════════════════════════════
-   Shared presentational helpers for ContactsPage subviews.
-   Extracted for Phase 17 strangler slice #561.
+   Shared presentational helpers for ContactsPage subviews (#561).
    ═══════════════════════════════════════════════════════════════════════ */
 
 // ── Capability tag colors (matches AgentsPage convention) ──

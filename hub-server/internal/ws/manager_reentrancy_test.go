@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestUnregister_OnRouteDel_NoManagerReentrancy proves #2071 S2 benign:
+// TestUnregister_OnRouteDel_NoManagerReentrancy proves #2071 benign:
 // the OnRouteDel callback is invoked *after* Manager.mu is released, so a
 // callback that attempts to call Register, SetAuth, or Unregister on the
 // same Manager cannot deadlock or observe partially-mutated map state.
@@ -84,7 +84,7 @@ func TestUnregister_OnRouteDel_NoManagerReentrancy(t *testing.T) {
 // TestPingAll_Unregister_OnRouteDel_ConcurrentSafety proves that when
 // pingAll workers concurrently trigger Unregister → OnRouteDel, the
 // callbacks execute safely without corrupting Manager state or deadlocking.
-// This simulates the exact scenario from #2071 S2: multiple stale
+// This simulates the exact scenario from #2071: multiple stale
 // connections detected in one pingAll tick, each worker calling
 // c.Close(); m.Unregister(c.ID) which fires OnRouteDel.
 func TestPingAll_Unregister_OnRouteDel_ConcurrentSafety(t *testing.T) {

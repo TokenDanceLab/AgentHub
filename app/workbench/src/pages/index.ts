@@ -31,7 +31,7 @@ export type {
 export { DocsPage } from './DocsPage';
 export type { DocsPageProps, DocRow, DocsPane, DocsPageNavItem } from './DocsPage';
 
-export { ProjectsPage, DEFAULT_PROJECTS } from './ProjectsPage';
+export { ProjectsPage } from './ProjectsPage';
 export type {
   ProjectsPageProps,
   ProjectDraft,

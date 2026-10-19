@@ -45,8 +45,8 @@ func IncrementTeamRunTokenUsage(db *gorm.DB, teamRunID string, delta int64) erro
 //   - PostgreSQL: JSONB payload->>'field' + BTRIM + LOWER.
 //   - SQLite:     json_extract(payload, '$.field') + TRIM + LOWER (unit tests).
 //
-// COALESCE(...,”) maps a missing JSON key to ” so the match mirrors Go's
-// zero-value unmarshal semantics (missing next_worker → "").
+// COALESCE(..., <empty string>) maps a missing JSON key to "" so the match
+// mirrors Go's zero-value unmarshal semantics (missing next_worker → "").
 func CountTeamRouteDecisionsByActionWorkerInstructions(db *gorm.DB, teamRunID, action, worker, instructions string) (int, error) {
 	const eventType = model.TeamEventRouteDecided
 	var count int

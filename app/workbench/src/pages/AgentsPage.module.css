@@ -105,7 +105,7 @@
   box-shadow: var(--focus-ring);
 }
 
-/* #2154 P1-1: an unwired search box renders disabled — make that visible
+/* #2154: an unwired search box renders disabled — make that visible
    instead of leaving an editable-looking input that drops every keystroke. */
 .workbench-search:disabled {
   color: var(--td-ink-subtle);
@@ -457,7 +457,7 @@
   margin: 0;
 }
 
-/* Compact EmptyState — glass residual for installed empty list (#1269) */
+/* Compact EmptyState — glass-styled for installed empty list (#1269) */
 .agent-empty-compact {
   max-width: 100%;
   margin: 0;
@@ -1273,7 +1273,7 @@
   box-shadow: var(--focus-ring);
 }
 
-/* #2154 P1-1: same frozen-input gate for the three market toolbars. */
+/* #2154: same frozen-input gate for the three market toolbars. */
 .market-search:disabled {
   color: var(--td-ink-subtle);
   cursor: not-allowed;
@@ -2103,7 +2103,7 @@
   color: var(--td-plum);
 }
 
-/* #2154 P2-16: an unwired filter chip is disabled and must not pretend to be
+/* #2154: an unwired filter chip is disabled and must not pretend to be
    clickable (same treatment as .skill-chip / .permission-segment). */
 .audit-filter-bar button:disabled {
   cursor: not-allowed;
@@ -2134,7 +2134,7 @@
   color: var(--td-ink);
 }
 
-/* #2154 P2-16: interactive variant only. A row with no click handler renders
+/* #2154: interactive variant only. A row with no click handler renders
    as a plain <div> and must not borrow button affordances (pointer cursor,
    hover tint, tab focus) — the audit page already hides the export button
    when no handler exists, and rows now follow the same rule. */

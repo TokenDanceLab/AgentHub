@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestPublishCloseRace_Stress is the stress probe for issue #2071 S1.
+// TestPublishCloseRace_Stress is the stress probe for issue #2071.
 // It hammers Publish from N goroutines while a separate goroutine repeatedly
 // Close+s and re-creates the Bus, looking for panics, DATA RACE reports, or
 // pending counter leaks after Close returns.

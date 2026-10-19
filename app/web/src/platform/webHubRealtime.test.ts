@@ -6,8 +6,8 @@ import { getMessageDelegationStore, getSubagentStreamStore } from '@agenthub/wor
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createHubWS, type HubWSHandle, type HubWSOptions } from '@shared/hub/hubWS';
-import { type Transport } from '@/api/transport';
-import type { TransportStatus } from '@/api/transport';
+import { type Transport } from '@shared/transport';
+import type { TransportStatus } from '@shared/transport';
 import { useConnectionStore } from '@/stores/connectionStore';
 import { useHubStore } from '@/stores/hubStore';
 import { useToastStore } from '@shared/ui/toast';
@@ -489,7 +489,7 @@ describe('useWebHubRealtime live event ordering (#1415)', () => {
   });
 });
 
-describe('team.subagent.stream dispatch (#1478 Phase C)', () => {
+describe('team.subagent.stream dispatch (#1478)', () => {
   beforeEach(() => {
     vi.useFakeTimers();
   });
@@ -643,7 +643,7 @@ describe('team.subagent.stream dispatch (#1478 Phase C)', () => {
   });
 });
 
-describe('agent.dispatch → MessageDelegationStore (#1406 Phase 3)', () => {
+describe('agent.dispatch → MessageDelegationStore (#1406)', () => {
   beforeEach(() => {
     vi.useFakeTimers();
   });

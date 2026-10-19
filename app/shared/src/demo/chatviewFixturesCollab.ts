@@ -1,6 +1,5 @@
 /**
  * Chatview fixtures: Agent Collab group transcript.
- * Peel companion of chatviewFixtures (#1132). Pure only; zero behavior change.
  */
 
 import type { EvidenceRefStatus, TranscriptBlock } from '../transcript/types'
@@ -44,7 +43,7 @@ export const chatviewAgentCollabTranscript: TranscriptBlock[] = [
     isThinking: false,
   },
 
-  /* ── Goal registration: long RBAC task states its objective (#1998, UX F8) ── */
+  /* ── Goal registration: long RBAC task states its objective (#1998) ── */
   {
     id: 'ggoal1', kind: 'tool_call', createdAt: T(1.5), author: O('orch'),
     callId: 'call-collab-goal-create',
@@ -312,7 +311,7 @@ export const chatviewAgentCollabTranscript: TranscriptBlock[] = [
     // Themed blank — never load external white placeholder pages (#1247)
     url: 'about:blank',
   },
-  /* ── Goal closed: RBAC middleware shipped, goal complete (#1998, UX F8) ── */
+  /* ── Goal closed: RBAC middleware shipped, goal complete (#1998) ── */
   {
     id: 'ggoal2', kind: 'tool_call', createdAt: T(39), author: O('orch'),
     callId: 'call-collab-goal-update',

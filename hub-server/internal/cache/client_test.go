@@ -113,10 +113,8 @@ func TestGetOrLoad_SingleflightDedup(t *testing.T) {
 	var wg sync.WaitGroup
 	results := make([]int, 10)
 
-	// Windows flake 修复：原实现用 100ms loader sleep 作为 flight 窗口，
-	// Windows runner 调度抖动可超过该窗口，迟到 goroutine 错过 flight 触发
-	// 第二次加载。改为阻塞式 loader：释放时机由测试掌握，flight 窗口不再
-	// 依赖墙钟——释放前所有 goroutine 必然并入同一 flight。
+	// 阻塞式 loader：释放时机由测试掌握，flight 窗口不依赖墙钟——释放前
+	// 所有 goroutine 必然并入同一 flight，不会因调度抖动触发第二次加载。
 	release := make(chan struct{})
 	var started atomic.Int64
 	var arrived atomic.Int64
@@ -377,7 +375,7 @@ func TestIsOnline(t *testing.T) {
 	assert.False(t, online)
 }
 
-// TestAreOnline covers the batched presence lookup (#2154 perf lane):
+// TestAreOnline covers the batched presence lookup (#2154):
 // one pipelined round trip replaces one HLEN per user.
 func TestAreOnline(t *testing.T) {
 	c, _ := testClient(t)
@@ -1213,10 +1211,8 @@ func TestConcurrentGetOrLoad(t *testing.T) {
 
 	lc := &loadCount{}
 
-	// Windows flake 修复：原实现用 50ms loader sleep 作为 flight 窗口，
-	// Windows runner 调度抖动可超过该窗口，迟到 goroutine 错过 flight 触发
-	// 第二次加载（CI run 33346274196）。改为阻塞式 loader：释放时机由测试
-	// 掌握，缓存写入前所有 goroutine 必然并入同一 flight。
+	// 阻塞式 loader：释放时机由测试掌握，缓存写入前所有 goroutine 必然
+	// 并入同一 flight，不会因调度抖动触发第二次加载。
 	release := make(chan struct{})
 	var started atomic.Int64
 	var arrived atomic.Int64
@@ -1272,7 +1268,7 @@ func TestConcurrentGetOrLoad(t *testing.T) {
 	}
 }
 
-// TestPushPendingTargetTask_CapsAtMaxLen proves the #2119 P1 fix: both the
+// TestPushPendingTargetTask_CapsAtMaxLen proves the #2119 fix: both the
 // per-target task list and the device-level order list are capped at
 // pendingTaskQueueMaxLen entries (newest retained) so an offline target cannot
 // grow Redis without bound. Ack semantics are unaffected (LRem by value).
@@ -1356,7 +1352,7 @@ func TestPushPendingTargetTask_EmptyQueueShortCircuit(t *testing.T) {
 	require.NoError(t, c.AckPendingTargetTask(ctx, "user-empty", "t", "dev-empty", `{"x":1}`))
 }
 
-// ==================== P2 Audit #2119: Empty Hash Cleanup ====================
+// ==================== Empty Hash Cleanup ====================
 
 func TestDeleteRoute_RemovesEmptyHash(t *testing.T) {
 	c, mr := testClient(t)
@@ -1413,7 +1409,7 @@ func TestDeleteRoute_NonExistentFieldIsNoOp(t *testing.T) {
 }
 
 // TestPopPendingTasks_AtomicDrainAndClear documents the pop contract after the
-// LRange+Del race fix (#2136 P3-5): the drain and clear run as one server-side
+// LRange+Del race fix (#2136): the drain and clear run as one server-side
 // EVAL, so a task pushed by a concurrent writer lands on the fresh post-pop
 // key instead of being silently deleted. The deterministic client-visible
 // invariant: after a pop the queue is empty, and a push that arrives after the

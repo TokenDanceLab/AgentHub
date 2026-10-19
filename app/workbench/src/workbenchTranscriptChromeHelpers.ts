@@ -49,14 +49,13 @@ import {
 } from './workbenchTranscriptChromeStateHelpers';
 
 /* ═══════════════════════════════════════════════════════════════════════
-   workbenchTranscriptChromeHelpers — residual controller host + public
-   re-export barrel for transcript chrome pure slices (#615, #627, #650,
-   #755).
+   workbenchTranscriptChromeHelpers — controller host + public re-export
+   barrel for transcript chrome (#615, #627, #650, #755).
 
    Label maps, selection/state helpers, and action/menu mappers live in
    workbenchTranscriptChromeLabels / StateHelpers / ActionMappers.
    This module keeps the controller factory and stable public exports.
-   No React hooks / no intentional UX change.
+   No React hooks.
    ═══════════════════════════════════════════════════════════════════════ */
 
 export {
@@ -149,7 +148,7 @@ export {
   type BuildTranscriptMultiSelectActionsOptions,
 } from './workbenchTranscriptChromeActionMappers';
 
-/* ── residual controller factory (#650 / #755) ───────────────────────── */
+/* ── controller factory (#650 / #755) ───────────────────────── */
 
 export interface TranscriptChromeMutableRefs {
   selectionModeRef: { current: boolean };

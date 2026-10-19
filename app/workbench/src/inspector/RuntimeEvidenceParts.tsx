@@ -18,11 +18,11 @@ import {
 } from './RuntimeEvidenceHelpers';
 
 /* ═══════════════════════════════════════════════════════════════════════
-   RuntimeEvidenceParts — presentational residual slices from
+   RuntimeEvidenceParts — presentational parts for
    RuntimeEvidencePanel (#733).
 
    Section chrome, empty state, and channel row lists. CSS remains on
-   shared AgentHubWorkbench.module.css. No intentional UX change.
+   shared AgentHubWorkbench.module.css.
    ═══════════════════════════════════════════════════════════════════════ */
 
 export function RuntimeEvidenceEmptyState({

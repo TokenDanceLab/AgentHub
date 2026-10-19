@@ -8,7 +8,3 @@ func listResponse(items any) map[string]any {
 		},
 	}
 }
-
-func acceptedResponse(data map[string]any) map[string]any {
-	return data
-}

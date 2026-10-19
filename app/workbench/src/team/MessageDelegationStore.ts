@@ -1,4 +1,4 @@
-// MessageDelegationStore — #1406 Phase 3
+// MessageDelegationStore — #1406
 // Inline delegation state for the message timeline.
 //
 // Consumes EXISTING agent.* WS frames (agent.dispatch / agent.stream /
@@ -122,7 +122,7 @@ export function createMessageDelegationStore(): MessageDelegationStore {
     // useSyncExternalStore (which compares getSnapshot() via Object.is)
     // detects the change. Mutating in place would leave
     // `byMessageId === prevSnapshot` and React would skip the re-render,
-    // breaking live status transitions (#1406 Phase 3 live-update fix).
+    // breaking live status transitions (#1406 live-update fix).
     state.byTaskId = { ...state.byTaskId, [entry.taskId]: merged };
     state.byMessageId = { ...state.byMessageId, [triggerMessageId]: filtered };
 

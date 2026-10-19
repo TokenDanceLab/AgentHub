@@ -14,7 +14,7 @@ import (
 
 func TestWSIPRateLimit_AllowsWithinLimit(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	limiter := NewWSIPRateLimiter()
+	limiter := newWSIPRateLimiter()
 	t.Cleanup(limiter.Stop)
 	r := gin.New()
 	r.Use(WSIPRateLimitWithLimiter(limiter))
@@ -34,7 +34,7 @@ func TestWSIPRateLimit_AllowsWithinLimit(t *testing.T) {
 
 func TestWSIPRateLimit_BlocksOverLimit(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	limiter := NewWSIPRateLimiter()
+	limiter := newWSIPRateLimiter()
 	t.Cleanup(limiter.Stop)
 	r := gin.New()
 	r.Use(WSIPRateLimitWithLimiter(limiter))
@@ -71,7 +71,7 @@ func TestWSUserConnLimiter_AcquireAndRelease(t *testing.T) {
 
 	// One more should kick the oldest. The kick runs in a spawned goroutine,
 	// so poll for the side-effect instead of a fixed time.Sleep: a fixed sleep
-	// is flaky under CI scheduler jitter (P1: time.Sleep → poll).
+	// is flaky under CI scheduler jitter.
 	limiter.Acquire("u1", "conn-extra")
 	require.Eventually(t, func() bool { return kicked.Load() == 1 },
 		time.Second, time.Millisecond,

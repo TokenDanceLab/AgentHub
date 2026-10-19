@@ -14,8 +14,7 @@ import (
 const (
 	// DefaultRetentionWindow is how long read notifications are kept before
 	// purge. 90 days balances user scroll-back against unbounded table growth
-	// (the notifications table previously only ever grew — #2154 Ampere P2-3).
-	// Unread notifications are never purged.
+	// (#2154). Unread notifications are never purged.
 	DefaultRetentionWindow = 90 * 24 * time.Hour
 
 	// CleanupInterval is how often the background retention loop fires. 24h

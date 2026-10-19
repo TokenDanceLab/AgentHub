@@ -37,8 +37,8 @@ import type {
 } from './AgentHubWorkbenchTypes';
 
 /* ==========================================================================
-   WorkbenchFrame prop contract -- residual extract from WorkbenchFrame
-   (#637) + WorkbenchFrameParts prop contracts (#698). Pure types only.
+   WorkbenchFrame prop contract (#637) and WorkbenchFrameParts prop
+   contracts (#698). Pure types only.
 
    WorkbenchFrameProps is the frame's view of AgentHubWorkbenchProps: it
    omits the 9 conversation/message-action handlers that the frame does not
@@ -46,7 +46,7 @@ import type {
    fields (activePage/isChatPage/layout/session/transcriptChrome/profile/
    setActivePage/children). The three shared-status shapes are aliased to
    the AgentHubWorkbench* SSOT instead of being redefined, so the contract
-   stays a pure type intersection (Pick) and tsc stays green (#56-prop Step1).
+   stays a pure type intersection (Pick) and tsc stays green (#56).
    ========================================================================== */
 
 // Status/catalog shapes are aliases of the AgentHubWorkbench* SSOT — keeping
@@ -56,7 +56,7 @@ export type WorkbenchFrameWorkbenchStatus = AgentHubWorkbenchStatus;
 export type WorkbenchFrameProjectsStatus = AgentHubWorkbenchProjectsStatus;
 export type WorkbenchFrameModelCatalogItem = AgentHubWorkbenchModelCatalogItem;
 
-/* ── Split view (#1997, UX F3) ─────────────────────────────────────────
+/* ── Split view (#1997) ─────────────────────────────────────────
    Conversation-header split controls. Absent (undefined) when the honesty
    gate hides the surface (<2 conversations) — the header renders no entry. */
 
@@ -124,7 +124,7 @@ export interface ChatSidebarFrameProps {
   onConversationArchive?: ((conversationId: string, archived: boolean) => void) | undefined;
   /** Started when the user clicks the sidebar "new conversation" entry (#1819). */
   onStartNewConversation?: (() => void) | undefined;
-  /** F1 live status dots per conversation (absent = no run inventory). */
+  /** Live status dots per conversation (absent = no run inventory). */
   liveStatusByConversation?: Record<string, ConversationLiveStatus> | undefined;
   sidebarWidth: number;
   sidebarCollapsed: boolean;
@@ -160,14 +160,14 @@ export interface ChatConversationHostFrameProps {
   showComposerStatus: boolean;
   highlightedBlockId?: string | undefined;
   onHighlightEnd?: (() => void) | undefined;
-  /** Whether an agent run is currently active (stop button morph, #1462 CF13). */
+  /** Whether an agent run is currently active (stop button morph, #1462). */
   isAgentRunning?: boolean | undefined;
   /** Cancel the active agent run (stop button handler). */
   onCancelRun?: (() => void) | undefined;
-  /** Edit an already-sent message (#1462 CF16). Receives block id + new content. */
+  /** Edit an already-sent message (#1462). Receives block id + new content. */
   onEditMessage?: ((blockId: string, content: string) => Promise<void> | void) | undefined;
   /**
-   * Transcript items are loading (#1821). With an empty transcript the chat
+   * Transcript items are loading. With an empty transcript the chat
    * shows an honest loading state instead of the "no messages" empty state.
    */
   transcriptLoading?: boolean | undefined;
@@ -183,11 +183,11 @@ export interface WorkbenchRoutesFrameProps {
   agentProfilesStatus?: WorkbenchAgentProfilesStatus | undefined;
   dataMode?: string | undefined;
   contacts?: WorkbenchContactsData | undefined;
-  /** Hub contacts request failure (#1821) — the contacts page must render an
+  /** Hub contacts request failure — the contacts page must render an
    *  explicit error state instead of collapsing into an empty list. */
   contactsError?: string | undefined;
   documents?: DocRow[] | undefined;
-  /** Hub documents request failure (#1821) — the docs page must render an
+  /** Hub documents request failure — the docs page must render an
    *  explicit error state instead of collapsing into an empty list. */
   documentsError?: string | undefined;
   focusedAgentId?: string | undefined;

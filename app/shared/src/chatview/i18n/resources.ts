@@ -126,6 +126,7 @@ export const chatviewResources = {
     'card.approval.viewLegacyChanges': '查看会话变更（旧格式）',
     'card.approval.viewLegacyChangesAria': '只读查看缺少运行标识的会话变更（{{count}} 个文件）',
     'toast.approvalPendingArrived': '收到 {{count}} 条新的审批请求',
+    'toast.approvalFailed': '审批失败，请重试',
     // #1816: per-message approval mode (composer approval-mode picker).
     'composer.approvalMode.label': '审批模式',
     'composer.approvalMode.suggest': '建议（按 Agent 默认）',
@@ -142,6 +143,8 @@ export const chatviewResources = {
     'composer.mainchain.taskDraftRequired': '需填写内容',
     'composer.agentPicker.available': '选择 Agent',
     'composer.agentPicker.exhausted': '已全部提及',
+    'composer.uploadingAttachment': '正在上传 {{name}}（{{percent}}%）',
+    'composer.attachmentUploadFailed': '上传失败',
     'composer.targetPicker.available': '选择执行目标',
     'composer.targetPicker.exhausted': '无在线目标',
     'card.deploy.ready': '预览已就绪',
@@ -314,7 +317,7 @@ export const chatviewResources = {
     // Deliberately NOT a "请重试" flavour: on a shell without the port a retry
     // can never succeed, so the honest wording says the action is not wired.
     'toast.actionUnavailable': '该操作在当前端未接入',
-    // #2072 P3: errcode-specific failure messages for chatview actions.
+    // #2072: errcode-specific failure messages for chatview actions.
     'toast.editFailed.timeout': '已超过编辑时限，无法编辑',
     'toast.editFailed.notEditable': '该消息不支持编辑',
     'toast.pinFailed.limitExceeded': '置顶数已达上限，请先取消部分置顶',
@@ -361,8 +364,8 @@ export const chatviewResources = {
     'checkpoint.fileListAria': '快照文件列表',
     'checkpoint.selectFile': '选择文件查看运行前内容',
     'checkpoint.emptyContent': '该文件无文本内容预览（二进制或超出大小上限）。',
-    'checkpoint.restoreUnavailable': '恢复未接线：写回需远程证据轨道与显式批准（见架构文档恢复语义），本表面仅提供只读预览。',
-    'checkpoint.surfaceUnavailable': '当前表面无法访问快照内容（Hub-only 边界）；快照预览仅在 Desktop 本地执行表面可用。',
+    'checkpoint.restoreUnavailable': '当前端暂不支持恢复，仅提供只读预览。',
+    'checkpoint.surfaceUnavailable': '当前端无法访问快照内容；快照预览仅在 Desktop 应用中可用。',
     'checkpoint.loadFailed': '快照加载失败，请稍后重试。',
     'checkpoint.absent': '未找到该运行的快照（可能已被清理），无内容可预览。',
     'runReview.title': '运行变更（只读）',
@@ -434,6 +437,7 @@ export const chatviewResources = {
     'action.removeMention': '移除 @{label}',
     'action.stopRun': '停止运行',
     'action.removeAttachment': '移除 {name}',
+    'action.retryAttachmentUpload': '重试上传 {{name}}',
 
     // ═══ Deploy labels ═══
     'deploy.status.pending': '待部署',
@@ -525,7 +529,7 @@ export const chatviewResources = {
     'messageSearch.footerJump': '跳转',
     'composer.agentPicker': 'Agent',
     'composer.targetPicker': '执行目标',
-    // ── #1965 visible dispatch queue (queue/steer semantics, UX F7) ──
+    // ── #1965 visible dispatch queue (queue/steer semantics) ──
     // Copy contract: the queue only schedules the NEXT dispatch after the
     // active run ends; undo cancels dispatch, never the persisted message.
     'composer.queue.title': '待派发队列',
@@ -618,7 +622,7 @@ export const chatviewResources = {
     'usage.signedOut.title': '登录后可查看用量',
     'usage.signedOut.body': 'Token 用量来自 Hub 的团队运行记录。登录 TokenDance ID 后即可查看。',
     'usage.error.title': '用量数据加载失败',
-    'usage.footnote': '计数自迁移 0066 起维护；更早的运行可能未回填，显示为「—」。',
+    'usage.footnote': '计数自该功能启用后开始记录；更早的运行可能未回填，显示为「—」。',
 
     // ═══ User menu ═══
     'user.fallbackName': '用户',
@@ -644,7 +648,7 @@ export const chatviewResources = {
     // #1945: artifact content download degrade notice (Web Hub-only boundary).
     'inspector.artifactDownloadUnavailable': '下载不可用：当前端无产物内容端点。',
 
-    // ═══ Goal banner (#1998, UX F8) ═══
+    // ═══ Goal banner (#1998) ═══
     'goalBanner.aria': '会话目标',
     'goalBanner.status.active': '目标进行中',
     'goalBanner.status.blocked': '目标受阻',
@@ -713,7 +717,7 @@ export const chatviewResources = {
     'shortcut.deleteSelected': '删除选中消息',
     'shortcut.deleteSelected.detail': '框选模式下删除所选消息块（首次触发需确认）',
     'aria.transcript': '会话记录',
-    'aria.mainChainStatus': 'Demo 主链状态',
+    'aria.mainChainStatus': '主链状态',
     'aria.resizeSidebar': '调整侧边栏宽度',
     'aria.workbenchPage': '工作台页面',
     'aria.selectedAgents': '已选 Agent',
@@ -785,7 +789,7 @@ export const chatviewResources = {
     'aria.newChannel': '新建频道',
     'aria.search': '搜索',
 
-    // ═══ Split view / parallel review (#1997, UX F3) ═══
+    // ═══ Split view / parallel review (#1997) ═══
     'aria.splitMenu': '分屏视图菜单',
     'split.menuTitle': '分屏',
     'split.menuSubtitle': '并行审阅',
@@ -868,7 +872,7 @@ export const chatviewResources = {
     'oidc.loginSuccess.body': '登录流程已完成。',
     'oidc.loginSuccess.closeHint': '您可以关闭此页面并返回 AgentHub 桌面应用。',
 
-  // ── Shared UI preview surfaces (#2154 UIUX lane i18n pass) ──
+  // ── Shared UI preview surfaces (#2154) ──
   'preview.parsing': '正在解析文档...',
   'preview.parsingSlideshow': '正在解析演示文稿...',
   'preview.parsingTable': '正在解析表格...',
@@ -1030,6 +1034,7 @@ export const chatviewResources = {
     'card.approval.viewLegacyChanges': 'View conversation changes (legacy)',
     'card.approval.viewLegacyChangesAria': 'View conversation changes without run identifiers read-only ({{count}} files)',
     'toast.approvalPendingArrived': '{{count}} new approval request(s) received',
+    'toast.approvalFailed': 'Approval failed. Please retry.',
     // #1816: per-message approval mode (composer approval-mode picker).
     'composer.approvalMode.label': 'Approval mode',
     'composer.approvalMode.suggest': 'Suggest (agent default)',
@@ -1046,6 +1051,8 @@ export const chatviewResources = {
     'composer.mainchain.taskDraftRequired': 'Content required',
     'composer.agentPicker.available': 'Select agent',
     'composer.agentPicker.exhausted': 'All agents mentioned',
+    'composer.uploadingAttachment': 'Uploading {{name}} ({{percent}}%)',
+    'composer.attachmentUploadFailed': 'Upload failed',
     'composer.targetPicker.available': 'Select execution target',
     'composer.targetPicker.exhausted': 'No online targets',
     'card.deploy.ready': 'Preview Ready',
@@ -1218,7 +1225,7 @@ export const chatviewResources = {
     // #2241: dedicated copy for "this client never wired that port"
     // (UNAVAILABLE_ACTION_TOAST_KEY). Retry-flavoured copy would be a lie here.
     'toast.actionUnavailable': 'This action is not wired in this client',
-    // #2072 P3: errcode-specific failure messages for chatview actions.
+    // #2072: errcode-specific failure messages for chatview actions.
     'toast.editFailed.timeout': 'Edit window has expired',
     'toast.editFailed.notEditable': 'This message cannot be edited',
     'toast.pinFailed.limitExceeded': 'Pin limit reached; unpin some messages first',
@@ -1265,8 +1272,8 @@ export const chatviewResources = {
     'checkpoint.fileListAria': 'Snapshot file list',
     'checkpoint.selectFile': 'Select a file to view its pre-run content',
     'checkpoint.emptyContent': 'No text preview for this file (binary or over the size cap).',
-    'checkpoint.restoreUnavailable': 'Restore is not wired: write-back requires the remote-evidence track and explicit approval (see the restore semantics in the architecture docs). This surface offers read-only preview only.',
-    'checkpoint.surfaceUnavailable': 'This surface cannot reach snapshot content (Hub-only boundary); snapshot preview is available on the Desktop local-runtime surface.',
+    'checkpoint.restoreUnavailable': 'Restore is not available in this client; this is a read-only preview.',
+    'checkpoint.surfaceUnavailable': 'This client cannot access snapshot content; snapshot preview is available in the Desktop app.',
     'checkpoint.loadFailed': 'Failed to load the snapshot; try again later.',
     'checkpoint.absent': 'No snapshot found for this run (it may have been cleaned up); nothing to preview.',
     'runReview.title': 'Run changes (read-only)',
@@ -1338,6 +1345,7 @@ export const chatviewResources = {
     'action.removeMention': 'Remove @{label}',
     'action.stopRun': 'Stop',
     'action.removeAttachment': 'Remove {name}',
+    'action.retryAttachmentUpload': 'Retry upload {{name}}',
 
     // ═══ Deploy labels ═══
     'deploy.status.pending': 'Pending',
@@ -1429,7 +1437,7 @@ export const chatviewResources = {
     'messageSearch.footerJump': 'jump',
     'composer.agentPicker': 'Agent',
     'composer.targetPicker': 'Execution target',
-    // ── #1965 visible dispatch queue (queue/steer semantics, UX F7) ──
+    // ── #1965 visible dispatch queue (queue/steer semantics) ──
     'composer.queue.title': 'Dispatch queue',
     'composer.queue.summaryRunning': '{{count}} queued; dispatched in order once the current run ends',
     'composer.queue.summaryIdle': '{{count}} queued; dispatching in order',
@@ -1520,7 +1528,7 @@ export const chatviewResources = {
     'usage.signedOut.title': 'Sign in to see usage',
     'usage.signedOut.body': 'Token usage comes from Hub team-run records. Sign in with TokenDance ID to view it.',
     'usage.error.title': 'Failed to load usage',
-    'usage.footnote': 'Counters are maintained since migration 0066; earlier runs may not be backfilled and show “—”.',
+    'usage.footnote': 'Counters are recorded from when this feature was enabled; earlier runs may not be backfilled and show “—”.',
 
     // ═══ User menu ═══
     'user.fallbackName': 'User',
@@ -1546,7 +1554,7 @@ export const chatviewResources = {
     // #1945: artifact content download degrade notice (Web Hub-only boundary).
     'inspector.artifactDownloadUnavailable': 'Download unavailable: this client has no artifact content endpoint.',
 
-    // ═══ Goal banner (#1998, UX F8) ═══
+    // ═══ Goal banner (#1998) ═══
     'goalBanner.aria': 'Conversation goal',
     'goalBanner.status.active': 'Goal in progress',
     'goalBanner.status.blocked': 'Goal blocked',
@@ -1615,7 +1623,7 @@ export const chatviewResources = {
     'shortcut.deleteSelected': 'Delete selected messages',
     'shortcut.deleteSelected.detail': 'In selection mode, delete the selected blocks (first press asks for confirmation)',
     'aria.transcript': 'Transcript',
-    'aria.mainChainStatus': 'Demo main chain status',
+    'aria.mainChainStatus': 'Main chain status',
     'aria.resizeSidebar': 'Resize sidebar width',
     'aria.workbenchPage': 'Workbench page',
     'aria.selectedAgents': 'Selected agents',
@@ -1687,7 +1695,7 @@ export const chatviewResources = {
     'aria.newChannel': 'New channel',
     'aria.search': 'Search',
 
-    // ═══ Split view / parallel review (#1997, UX F3) ═══
+    // ═══ Split view / parallel review (#1997) ═══
     'aria.splitMenu': 'Split view menu',
     'split.menuTitle': 'Split view',
     'split.menuSubtitle': 'Parallel review',
@@ -1769,7 +1777,7 @@ export const chatviewResources = {
     'oidc.loginSuccess.heading': 'Login Successful',
     'oidc.loginSuccess.body': 'The login flow has completed.',
     'oidc.loginSuccess.closeHint': 'You may close this page and return to the AgentHub desktop app.',
-  // ── Shared UI preview surfaces (#2154 UIUX lane i18n pass) ──
+  // ── Shared UI preview surfaces (#2154) ──
   'preview.parsing': 'Parsing document...',
   'preview.parsingSlideshow': 'Parsing slideshow...',
   'preview.parsingTable': 'Parsing spreadsheet...',

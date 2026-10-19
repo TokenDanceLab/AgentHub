@@ -1,7 +1,7 @@
 /* ═══════════════════════════════════════════════════════════════════════
    Unit tests for ProjectPanelHelpers (ProjectSectionHead, ProjectMemberChip).
 
-   Extracted alongside #696 residual thin from ProjectPanelParts.
+   Extracted alongside #696 helper module from ProjectPanelParts.
    ═══════════════════════════════════════════════════════════════════════ */
 
 import React from 'react';

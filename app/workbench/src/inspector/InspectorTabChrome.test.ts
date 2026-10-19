@@ -9,13 +9,13 @@ import {
 describe('InspectorTabChrome', () => {
   const t = (key: string) => key;
 
-  it('exposes the three residual inspector modes', () => {
+  it('exposes the three inspector modes', () => {
     expect(getInspectorTabs(t).map((tab) => tab.mode)).toEqual([
       'overview',
       'browser',
       'files',
     ]);
-    /* P76: default primary card is overview only; browser/files open on demand. */
+    /* Default primary card is overview only; browser/files open on demand. */
     expect([...defaultVisibleTabs]).toEqual(['overview']);
   });
 

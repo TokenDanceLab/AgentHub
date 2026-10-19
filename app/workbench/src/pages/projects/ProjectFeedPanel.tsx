@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════════════════════
-   Feed panel — residual extract from ProjectPanelParts for #696.
+   Feed panel for the projects detail view (#696).
    CSS remains on shared ProjectsPage.module.css.
    ═══════════════════════════════════════════════════════════════════════ */
 

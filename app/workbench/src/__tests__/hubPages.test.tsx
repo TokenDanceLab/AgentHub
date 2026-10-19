@@ -19,7 +19,7 @@ import { AgentHubWorkbench } from '../AgentHubWorkbench';
 import {
   workbenchAgents as agents,
   workbenchTranscript as transcript,
-} from '../workbenchTestFixtures';
+} from './fixtures/workbenchTestFixtures';
 
 installWorkbenchTestHooks();
 
@@ -493,7 +493,7 @@ describe('AgentHubWorkbench', () => {
     const tasksEmpty = within(tasksPage).getByRole('region', { name: /任务列表即将接入|Task list is coming soon/i });
     expect(tasksEmpty).toBeInTheDocument();
     expect(within(tasksPage).getByText('真实任务数据源尚未接入，当前没有可展示的任务。')).toBeInTheDocument();
-    expect(within(tasksPage).queryByRole('button', { name: /B0 SQLite 迁移方案/ })).not.toBeInTheDocument();
+    expect(within(tasksPage).queryByRole('button', { name: /SQLite 迁移方案/ })).not.toBeInTheDocument();
     expect(within(tasksPage).queryByRole('button', { name: /Agent 市场卡片完善/ })).not.toBeInTheDocument();
   });
 
@@ -576,7 +576,7 @@ describe('AgentHubWorkbench', () => {
 
     const contactsPage = screen.getByRole('heading', { name: '组织内联系人' }).closest('main') || document.body;
     expect(within(contactsPage).getByText('Hub 联系人')).toBeInTheDocument();
-    expect(within(contactsPage).queryByText('maintainer')).not.toBeInTheDocument();
+    expect(within(contactsPage).queryByText('Demo User')).not.toBeInTheDocument();
 
     expect(screen.getByRole('button', { name: '新的联系人' })).toBeInTheDocument();
 
@@ -611,7 +611,7 @@ describe('AgentHubWorkbench', () => {
 
     expect(screen.getByTestId('agenthub-workbench')).toHaveAttribute('data-page', 'runs');
     expect(within(page).getByRole('heading', { name: '我负责的' })).toBeInTheDocument();
-    expect(within(page).getByRole('button', { name: /B0 SQLite 迁移方案/ })).toBeInTheDocument();
+    expect(within(page).getByRole('button', { name: /SQLite 迁移方案/ })).toBeInTheDocument();
     expect(within(page).getByRole('button', { name: /Agent 市场卡片完善/ })).toBeInTheDocument();
     expect(within(page).getByRole('button', { name: /筛选 1/ })).toBeInTheDocument();
     expect(within(page).queryAllByText('选择一条任务后可快速调整状态、负责人和分组。')).toHaveLength(0);
@@ -668,7 +668,7 @@ describe('AgentHubWorkbench', () => {
     expect(within(page).getByText('任务 CRUD 交互验收 已推进到 进行中')).toBeInTheDocument();
 
     fireEvent.click(within(page).getByRole('button', { name: '指派给我' }));
-    expect(within(page).getByRole('region', { name: '任务 CRUD 交互验收 任务详情' })).toHaveTextContent(/maintainer|用户/);
+    expect(within(page).getByRole('region', { name: '任务 CRUD 交互验收 任务详情' })).toHaveTextContent(/Demo User|用户/);
 
     fireEvent.click(within(page).getByRole('button', { name: '按项目分组' }));
     expect(within(page).getByRole('button', { name: '分组：所属项目' })).toBeInTheDocument();

@@ -31,8 +31,8 @@ import type {
 /* ═══════════════════════════════════════════════════════════════════════
    Shared ops-view presentational subpanels.
 
-   Extracted from AgentOpsViews as Phase 23 residual thin #629.
-   Further residual thin: helpers + item parts (#684).
+   Extracted from AgentOpsViews (#629).
+   Additional item parts and helpers (#684).
    CSS remains on shared AgentsPage.module.css.
    ═══════════════════════════════════════════════════════════════════════ */
 
@@ -235,7 +235,7 @@ export const AuditFilterBar: React.FC<{
 export const AuditEntriesSection: React.FC<{
   auditEntries: AuditEntry[];
   /** Optional row activation handler; rows stay non-interactive without it
-   *  (#2154 P2-16). */
+   *  (#2154). */
   onAuditRowClick?: ((entry: AuditEntry) => void) | undefined;
 }> = ({ auditEntries, onAuditRowClick }) => {
   const { t } = useTranslation(SHARED_WORKBENCH_I18N_NAMESPACE);

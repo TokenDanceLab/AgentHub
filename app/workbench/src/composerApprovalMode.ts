@@ -15,12 +15,9 @@ import type { PermissionModeOption } from '@shared/ui';
  * its option values ('acceptEdits' / 'plan') so the option icons stay
  * meaningful; 'suggest' keeps a Settings glyph.
  *
- * The three modes used to be spelled out five separate times in this file: a
- * `COMPOSER_APPROVAL_MODES` array that nothing consumed, plus four hand-written
- * if/else chains that each re-listed the same mode → picker-value → label-key
- * triple. One table is now the single source and every function below is a
- * lookup on it, so a mode can no longer be present in one mapping and missing
- * from another, and adding a mode is one row instead of five edits (#2274 C-2).
+ * `APPROVAL_MODE_ROWS` is the single source for the mode → picker-value →
+ * label-key mapping, and every function below is a lookup on it, so a mode
+ * can no longer be present in one mapping and missing from another.
  */
 
 interface ApprovalModeRow {
@@ -45,9 +42,6 @@ const APPROVAL_MODE_ROWS: readonly ApprovalModeRow[] = [
   },
   { mode: 'read-only', pickerValue: 'plan', labelKey: 'composer.approvalMode.readOnly' },
 ];
-
-/** Every mode the composer can be in, in picker order. */
-export const COMPOSER_APPROVAL_MODES: ApprovalMode[] = APPROVAL_MODE_ROWS.map((row) => row.mode);
 
 export function approvalModeToPickerValue(mode: ApprovalMode): string {
   return (APPROVAL_MODE_ROWS.find((row) => row.mode === mode) ?? SUGGEST_ROW).pickerValue;

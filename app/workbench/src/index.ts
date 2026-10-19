@@ -81,10 +81,6 @@ export {
   getDesignFileIconType,
   profileActionIconName,
 } from './designIcons';
-export {
-  RuntimeBrandIcon,
-  resolveRuntimeBrandIcon,
-} from './RuntimeBrandIcon';
 
 /* ── Types ── */
 export type { AgentHubWorkbenchProps } from './AgentHubWorkbench';
@@ -119,13 +115,6 @@ export type {
   DesignFileIconType,
   DesignNavIconName,
 } from './designIcons';
-export type {
-  RuntimeBrandIconKind,
-  RuntimeBrandIconProps,
-  RuntimeBrandIconResolution,
-  RuntimeBrandIconSize,
-  RuntimeBrandIconSource,
-} from './RuntimeBrandIcon';
 
 /* ═══ Pages ═══ */
 export {
@@ -133,7 +122,6 @@ export {
   ContactsPage,
   DocsPage,
   ProjectsPage,
-  DEFAULT_PROJECTS,
   SettingsPage,
   TasksPage,
   DevicesPage,
@@ -230,7 +218,7 @@ export * from './auxPanel';
 
 export * from './sessionImport';
 
-/* ═══ Team subagent stream (#1478 Phase C / #1406 Phase 2) ═══ */
+/* ═══ Team subagent stream (#1478 / #1406) ═══ */
 export {
   createSubagentStreamStore,
   getSubagentStreamStore,
@@ -242,7 +230,7 @@ export {
   type SubagentStreamOverlayProps,
 } from './team';
 
-/* ═══ Inline message delegation (#1406 Phase 3) ═══ */
+/* ═══ Inline message delegation (#1406) ═══ */
 export {
   InlineDelegationCard,
   type InlineDelegationCardProps,

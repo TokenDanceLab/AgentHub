@@ -7,7 +7,7 @@ import type { TasksPageProps, TaskGroup, TaskItem } from './types';
 import type { TaskReviewMergePort } from '../../workbenchBoardColumns';
 
 /* ═══════════════════════════════════════════════════════════════════════
-   review-before-merge behavior (#1999, UX F13):
+   review-before-merge behavior (#1999):
    - awaiting-review task cards carry an explicit review marker;
    - approve/merge controls render only with a real capability port on a
      desktop surface (fail-closed zero controls otherwise);

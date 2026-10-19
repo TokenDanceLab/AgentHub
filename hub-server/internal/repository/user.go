@@ -80,7 +80,7 @@ const tokenDanceSubIndexPredicate = "tokendance_sub IS NOT NULL AND tokendance_s
 // FindOrCreateByTokenDanceSub atomically finds or creates a Hub user linked to
 // a TokenDance ID sub. On conflict (existing user), nickname and avatar are
 // refreshed from the provided claims. Uses a single INSERT … ON CONFLICT
-// statement to avoid TOCTOU races on concurrent first-logins (#2102 F13).
+// statement to avoid TOCTOU races on concurrent first-logins (#2102).
 func FindOrCreateByTokenDanceSub(db *gorm.DB, sub, name, picture string) (*model.User, error) {
 	username := tokenDanceUsername(sub)
 	now := time.Now()

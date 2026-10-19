@@ -37,7 +37,7 @@
       "decision": "review_required",
       "guardrail": "workspace_write_policy",
       "input": {
-        "command": "git diff --check origin/dev/maintainer...HEAD"
+        "command": "git diff --check origin/master...HEAD"
       },
       "provider": "openai-agents-sdk-fixture",
       "reason": "write action needs AgentHub approval evidence",
@@ -82,7 +82,7 @@
       "callId": "call_apply_patch",
       "diff": "@@ docs fixture diff @@",
       "kind": "modified",
-      "path": "docs/reference/sdk-agent-strategy.md",
+      "path": "docs/reference/agent-protocols.md",
       "provider": "openai-agents-sdk-fixture",
       "sourceEventId": "openai_file_1",
       "toolName": "apply_patch"

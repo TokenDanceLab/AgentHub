@@ -19,8 +19,8 @@ import type {
 /* ═══════════════════════════════════════════════════════════════════════
    Contacts main pane shell — pane switch + avatar ProfilePopover state.
 
-   Extracted from ContactsPage as Phase 18 strangler slice #574.
-   Residual thin (Phase 24 #640): pane bodies live in ContactMainParts.
+   Extracted from ContactsPage (#574).
+   Helper module (#640): pane bodies live in ContactMainParts.
    CSS remains on shared ContactsPage.module.css.
    ═══════════════════════════════════════════════════════════════════════ */
 

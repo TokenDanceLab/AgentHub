@@ -4,7 +4,7 @@
  * Keep public names stable for web/desktop imports via @shared/hub/hubClient.
  */
 
-// ── T3.2 Team / profile / attachment types (ported from desktop∩web) ──
+// ── Team / profile / attachment types (desktop ∩ web) ──
 export interface HubAgentRunEventSummary {
   task_id: string;
   edge_run_id?: string;
@@ -451,7 +451,7 @@ export type CreateAgentProfileRequest = HubCreateAgentProfileRequest;
 export type UpdateAgentProfileRequest = HubUpdateAgentProfileRequest;
 
 
-// ── T3.3 desktop-only remainder (documents + stream event options) ──
+// ── Desktop-only remainder (documents + stream event options) ──
 export interface HubDocumentListItem {
   id: string;
   owner_id: string;
@@ -525,7 +525,7 @@ export type UpdateHubDocumentRequest = HubUpdateDocumentRequest;
 export type AgentTaskStreamEventOptions = HubAgentTaskStreamEventOptions;
 
 
-// ── T3.4 web-only task approval/artifact types ──
+// ── Web-only task approval/artifact types ──
 export interface HubAgentTaskApproval {
   approval_id: string;
   task_id?: string;

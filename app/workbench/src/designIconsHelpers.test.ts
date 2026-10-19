@@ -24,7 +24,7 @@ describe('designIconsHelpers', () => {
     expect(getDesignFileIconType('unknown-kind', 'README.unknown')).toBe('file');
   });
 
-  it('keeps file icon colors aligned to tokendance-design/desktop', () => {
+  it('keeps file icon colors aligned with the shared palette', () => {
     expect(getDesignFileIconColor('md')).toBe('var(--td-ink-muted)');
     expect(getDesignFileIconColor('css')).toBe('#1572b6');
     expect(getDesignFileIconColor('html')).toBe('#e34f26');
@@ -52,7 +52,7 @@ describe('designIconsHelpers', () => {
     expect(isDesignFileIconType('unknown-kind')).toBe(false);
   });
 
-  it('keeps icon sizing constants aligned to tokendance-design/desktop CSS', () => {
+  it('keeps icon sizing constants aligned with the shared styles', () => {
     expect(DESIGN_FILE_ICON_SIZE).toBe(17);
     expect(DESIGN_FILE_ICON_RADIUS).toBe(3);
     expect(DESIGN_NAV_ICON_SIZE).toBe(16);

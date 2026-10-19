@@ -1,5 +1,4 @@
-// Package adapters — claude-acp: the official Claude Code ACP adapter (third
-// ACP migration target, per ACP Go migration §6).
+// Package adapters — claude-acp: the official Claude Code ACP adapter.
 //
 // The existing ClaudeCodeAdapter (claude_code.go) is a mature NDJSON
 // stream-json parser (claude -p --output-format stream-json --verbose) with
@@ -30,7 +29,7 @@
 //
 // Wrapper shape: this adapter inherits BuildCommand, Metadata, Capabilities,
 // Available, ParseStream, NeedsStdin, and SetPermissionBroker from the
-// embedded AcpAdapter (#1404 wave 2 collapse). BuildCommand reads envKeys
+// embedded AcpAdapter. BuildCommand reads envKeys
 // live from the parent env on the embedded AcpAdapter (no per-wrapper env
 // field). The PreflightCheck override is retained because the read-only
 // TestClaudeACPAdapterPreflightFailsFast constructs a raw wrapper without the
@@ -38,8 +37,8 @@
 // failure; the override guarantees that behavior regardless of construction
 // path.
 //
-// #1760 acp 增量：共享 ACP 机制随 acp 家族归组到子包 adapters/acp
-// （AcpAdapter/NewAcpAdapterConfig/DefaultNpxPath），经 acp.Xxx 限定引用。
+// 共享 ACP 机制（AcpAdapter/NewAcpAdapterConfig/DefaultNpxPath）在
+// adapters/acp，经 acp.Xxx 限定引用。
 package claude
 
 import (

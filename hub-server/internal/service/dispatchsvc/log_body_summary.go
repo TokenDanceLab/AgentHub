@@ -6,7 +6,7 @@ package dispatchsvc
 // summary that preserves troubleshooting signal (length, encoding shape,
 // leading tokens) without persisting potentially sensitive task context or
 // error payloads verbatim. Used by dispatchToEdgeHTTP for non-success Edge
-// responses (#2120 slice 1).
+// responses (#2120).
 //
 // Why not hash? A hex digest carries no shape signal (JSON vs HTML vs plain,
 // truncation, leading keyword) and is useless for triage. A sanitized prefix

@@ -17,17 +17,24 @@ func (e *ProcessExecutor) publishStructuredOutput(wg *sync.WaitGroup, run store.
 		adapters.NewPayloadLimitEmitter(adapters.NewBusEventEmitter(e.bus), e.maxStructuredPayloadBytes),
 		scope,
 	)
-	emitter = newHubCallbackEmitter(e, run.ID, emitter)
+	emitter = &hubCallbackEmitter{executor: e, runID: run.ID, inner: emitter}
 	hubEmitter := emitter
-	emitter = coalesceEmitter(emitter, newRuntimeEvidenceEmitter(e.store, run, emitter))
-	transcriptEmitter := newThreadTranscriptEmitter(e.store, run, emitter)
-	emitter = coalesceEmitter(emitter, transcriptEmitter)
+	// The constructors return concrete pointers that may be nil (store lacks
+	// store.Writer, or no inner emitter). Test the pointer before converting
+	// to the interface: a nil *T inside an interface is not nil.
+	if next := newRuntimeEvidenceEmitter(e.store, run, emitter); next != nil {
+		emitter = next
+	}
+	var transcriptEmitter *threadTranscriptEmitter
+	if next := newThreadTranscriptEmitter(e.store, run, emitter); next != nil {
+		transcriptEmitter = next
+		emitter = next
+	}
 
 	// Wrap emitter with budget monitoring: emits run.agent.context_warning
 	// when token usage exceeds the auto-compaction threshold (85%).
 	budget, hasBudget := budgetFromParserContext(ctx)
-	wrapPlan := planStructuredEmitterWraps(hasBudget)
-	if wrapPlan.ApplyBudget {
+	if hasBudget {
 		emitter = adapters.NewBudgetAwareEmitter(emitter, budget, scope)
 	}
 
@@ -64,12 +71,11 @@ func (e *ProcessExecutor) publishStructuredOutput(wg *sync.WaitGroup, run store.
 		_ = closer.Close()
 	}
 
-	parsePlan := planStructuredParsePost(err, transcriptEmitter != nil)
-	if parsePlan.RecordError {
+	if err != nil {
 		slog.Error("structured output parse error", "runId", run.ID, "error", err)
 		*parseErr = err
 	}
-	if parsePlan.Flush {
+	if transcriptEmitter != nil {
 		transcriptEmitter.Flush()
 	}
 }

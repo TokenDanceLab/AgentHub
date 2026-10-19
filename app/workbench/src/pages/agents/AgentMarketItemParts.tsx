@@ -2,7 +2,7 @@ import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { SHARED_WORKBENCH_I18N_NAMESPACE } from '@shared/i18n';
 import { DesignNavIcon } from '../../designIcons';
-import { RuntimeBrandIcon } from '../../RuntimeBrandIcon';
+import { RuntimeBrandIcon } from '@shared/ui';
 import {
   EmptyState,
   resolveEmptyStateCopy,
@@ -24,11 +24,11 @@ import {
 import type { MarketTemplate, MCPMarketItem, SkillMarketItem } from './types';
 
 /* ═══════════════════════════════════════════════════════════════════════
-   AgentMarketItemParts — presentational residual slices from
+   AgentMarketItemParts — presentational parts for
    AgentMarketParts (#671).
 
    Cards, list rows, filter chrome, and compact empty states. CSS stays on
-   AgentsPage.module.css. No intentional UX change.
+   AgentsPage.module.css.
    ═══════════════════════════════════════════════════════════════════════ */
 
 export type MarketFilterToolbarProps<T extends string = string> = {
@@ -59,7 +59,7 @@ export function MarketFilterToolbar<T extends string>({
         type="search"
         placeholder={searchPlaceholder}
         value={searchQuery}
-        // #2154 P1-1: the three market toolbars are assembled without
+        // #2154: the three market toolbars are assembled without
         // onSearchChange today, which made this a frozen input. Disable it (and
         // say why) instead of rendering an editable box that ignores keystrokes.
         disabled={!onSearchChange}

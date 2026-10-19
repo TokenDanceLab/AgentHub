@@ -2,6 +2,7 @@ package debug
 
 import (
 	"context"
+	"crypto/subtle"
 	"encoding/json"
 	"github.com/agenthub/pkg/safego"
 	"log/slog"
@@ -96,7 +97,7 @@ func BasicAuth(user, pass string) func(r *http.Request) bool {
 		if !ok {
 			return false
 		}
-		return constantTimeEqual(u, user) && constantTimeEqual(p, pass)
+		return subtle.ConstantTimeCompare([]byte(u), []byte(user)) == 1 && subtle.ConstantTimeCompare([]byte(p), []byte(pass)) == 1
 	}
 }
 
@@ -107,7 +108,7 @@ func BearerAuth(token string) func(r *http.Request) bool {
 		if !strings.HasPrefix(auth, "Bearer ") {
 			return false
 		}
-		return constantTimeEqual(strings.TrimPrefix(auth, "Bearer "), token)
+		return subtle.ConstantTimeCompare([]byte(strings.TrimPrefix(auth, "Bearer ")), []byte(token)) == 1
 	}
 }
 
@@ -288,15 +289,4 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 	enc := json.NewEncoder(w)
 	enc.SetIndent("", "  ")
 	_ = enc.Encode(v)
-}
-
-func constantTimeEqual(a, b string) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	var result byte
-	for i := 0; i < len(a); i++ {
-		result |= a[i] ^ b[i]
-	}
-	return result == 0
 }

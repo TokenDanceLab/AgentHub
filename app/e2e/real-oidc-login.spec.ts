@@ -4,7 +4,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 /**
- * AgentHub real OIDC browser E2E — 真浏览器 × 真本地栈（#1839 B2）。
+ * AgentHub real OIDC browser E2E — 真浏览器 × 真本地栈。
  *
  * 与 chat-real.spec.ts（dev-secret 自签 JWT 旁路 + API 级断言）互补：
  * 本 spec 走真实的 TokenDance ID OIDC Authorization Code + PKCE 浏览器
@@ -19,7 +19,8 @@ import { fileURLToPath } from 'node:url';
  *     --project=chromium real-oidc-login.spec.ts
  *
  * 证据等级：observed-local（real_tested=true，本地单机真栈）。
- * CI 状态：不进 CI（与 playwright.real.config.ts 同语义，仅本地真栈运行）。
+ * CI 状态：非 PR 检查；由 dispatch-only 的 real-e2e-stack lane
+ * （checks.yml → scripts/e2e/run-real-e2e-lane.sh）运行。
  */
 
 interface RealE2ECredentials {
@@ -101,8 +102,8 @@ const credentials = loadCredentials();
 
 /**
  * 本机离线环境无法加载 Cloudflare Turnstile CDN 脚本；abort 触发前端组件的
- * 错误分支从而允许提交。服务端 Turnstile 校验未配置 secret 时恒通过
- * （TokenDance ID 源码注释明示），故此处理不构成任何安全旁路。
+ * 错误分支从而允许提交。本 lane 使用的本地 ID 实例未配置 Turnstile challenge，
+ * 因此该处理只影响测试环境。
  */
 async function blockTurnstileCdn(context: BrowserContext): Promise<void> {
   await context.route('**/challenges.cloudflare.com/**', (route) => route.abort());
@@ -217,7 +218,7 @@ test.describe('真实 OIDC 浏览器登录与聊天动线', () => {
   test.beforeEach(async () => {
     test.skip(!credentials, 'missing test credentials: run bash scripts/e2e/provision-real-e2e-stack.sh first');
     if (credentials && !(await stackIsUp(credentials))) {
-      test.skip(true, 'local real stack not up: start TokenDance ID :3000 / hub :8080 / web :5174 (start.sh) first');
+      test.skip(true, 'local real stack not up: start TokenDance ID :3000 / hub :8080 / web :5174 first');
     }
   });
 

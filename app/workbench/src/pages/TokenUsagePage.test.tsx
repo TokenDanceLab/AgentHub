@@ -64,13 +64,13 @@ describe('TokenUsagePage', () => {
     expect(screen.getByTestId('usage-team-team-1')).toBeInTheDocument();
     expect(screen.getByTestId('usage-team-team-2')).toBeInTheDocument();
     // Total tile shows only recorded counters, formatted through the shared
-    // token formatter (128_400 → 128.4K) — #2154 P3-3.
+    // token formatter (128_400 → 128.4K) — #2154.
     expect(screen.getByTestId('usage-total')).toHaveTextContent('128.4K');
     expect(screen.getByTestId('usage-run-tokens-run-1')).toHaveTextContent('128,400');
     // Unrecorded counter renders an honest em dash.
     expect(screen.getByTestId('usage-run-tokens-run-2')).toHaveTextContent('—');
     // The backfill footnote keeps the dash honest.
-    expect(screen.getByText(/计数自迁移 0066 起维护/)).toBeInTheDocument();
+    expect(screen.getByText(/计数自该功能启用后开始记录/)).toBeInTheDocument();
   });
 
   it('renders em dashes for aggregates with no recorded counters (#1856)', () => {
@@ -100,7 +100,7 @@ describe('usage helpers', () => {
     expect(hasRecordedTokens([{ id: 't', name: 'T', runs: [{ id: 'r', status: 'failed' }] }])).toBe(false);
   });
 
-  it('compacts token counts with the shared formatter (#2154 P3-3)', () => {
+  it('compacts token counts with the shared formatter (#2154)', () => {
     // The page-local formatTokenCount is deleted: tiles and the status strip
     // must share one unit convention (uppercase K/M, one decimal).
     expect(formatTokens(999)).toBe('999');

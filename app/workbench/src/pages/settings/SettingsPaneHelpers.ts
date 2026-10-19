@@ -3,10 +3,10 @@ import type { LocalCliDiscoveryItem } from '@shared/platform';
 import type { StatePanelKind } from './types';
 
 /* ═══════════════════════════════════════════════════════════════════════
-   SettingsPaneHelpers — pure residual slices from SettingsPanes (#686).
+   SettingsPaneHelpers — pure helpers for SettingsPanes (#686).
 
    CLI discovery meta lines, state-panel icon/class
-   packing, and state preview specs. No React / no intentional UX change.
+   packing, and state preview specs. No React.
    ═══════════════════════════════════════════════════════════════════════ */
 
 
