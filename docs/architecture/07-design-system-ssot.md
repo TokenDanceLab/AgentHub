@@ -92,7 +92,6 @@ Applied first to AuxPanel and TerminalPanel. Respect `prefers-reduced-motion`.
 | Gate assertions | `app/{desktop,web}/scripts/assert-visual-qa-shell.mjs` · `assert:visual:qa:shell` |
 | Optional 2x capture | `visual:qa:shell:2x` / `VISUAL_QA_DPR=2` · files suffix `@2x` |
 | Pass bar | `visual:qa:shell` 截图证据 + PR 人工审阅；不维护分数 rubric |
-| Optional multi-scene battery | `app/web/scripts/visual-qa.mjs` — 可选补充脚本，不用于合并门禁 |
 
 窄视口只用于补充非空白与横向溢出合同；不得把补充窄视口写成两端统一断点，也不得用它替代 1440×810 的标准截图审阅。
 

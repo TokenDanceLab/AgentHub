@@ -15,8 +15,6 @@
  *   VISUAL_QA_DPR (default 1; set 2 for Retina capture #1308)
  *   AGENTHUB_WEB_E2E_PORT (default 5174)
  *   WEB_QA_URL / AGENTHUB_WEB_QA_URL — skip vite spawn when set
- *
- * Optional / legacy multi-scene battery: visual-qa.mjs (NOT the merge gate).
  */
 import { chromium } from '@playwright/test';
 import { spawn } from 'node:child_process';
