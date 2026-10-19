@@ -1,0 +1,69 @@
+/* ═════════════════════════════════════════════════════════════════════
+   shadcn/ui + Tailwind v4 bridge.
+
+   Design-token SSOT stays where it was: tokens-base.css (scale) and
+   themes.css (per-theme colors). This file only teaches Tailwind/shadcn the
+   names those tokens already use, so a shadcn component dropped next to an
+   existing CSS-Module component picks up the same palette, radius and type.
+
+   Preflight is deliberately NOT imported. It resets margins, headings, lists
+   and form controls globally, which would silently restyle the components
+   still on CSS Modules during the migration. The one preflight rule shadcn
+   actually depends on — a zero-width solid border so `border` utilities show
+   a real border — is re-declared in the base layer below.
+   ═════════════════════════════════════════════════════════════════════ */
+
+@layer theme, base, components, utilities;
+
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/utilities.css" layer(utilities);
+@import "tw-animate-css";
+
+/* Components live in sibling workspace packages; Tailwind has to be told. */
+@source "../";
+@source "../../../workbench/src";
+@source "../../../web/src";
+@source "../../../desktop/src";
+
+/* The app switches themes with data-theme on the root element, not a class. */
+@custom-variant dark (&:is([data-theme="dark"] *));
+
+@layer base {
+  *,
+  ::before,
+  ::after {
+    border: 0 solid;
+    border-color: var(--border);
+  }
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --radius-xs: var(--r-xs);
+  --radius-sm: var(--r-sm);
+  --radius-md: var(--r-md);
+  --radius-lg: var(--r-lg);
+  --radius-xl: var(--r-xl);
+
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-mono);
+}
