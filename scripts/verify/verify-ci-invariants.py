@@ -50,6 +50,7 @@ POLICY = {
             "go-hub-static": {"Security scan (gosec)": ("verify-gosec-gates.sh",)},
             "validate": {
                 "Secret guard": ("check-secrets.sh",),
+                "Lint Python gates (ruff)": ("ruff check",),
                 "Self-test security gates": (
                     "test_verify_vulnerability_gates.sh",
                     "test_verify_gosec_gates.sh",

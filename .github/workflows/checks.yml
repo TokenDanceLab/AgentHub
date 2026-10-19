@@ -1976,6 +1976,11 @@ jobs:
           PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: bash scripts/verify/verify-commit-messages.sh "$BASE_REF" "$PR_HEAD_SHA"
 
+      - name: Lint Python gates (ruff)
+        run: |
+          python -m pip install --quiet ruff==0.17.1
+          python -m ruff check .
+
       - name: Secret guard
         shell: bash
         env:
