@@ -3,6 +3,7 @@ import { useCallback, useMemo, useState, useSyncExternalStore } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AgentHubWorkbench } from '@agenthub/workbench';
 import { fetchAllPages } from '@shared/hub/paginate';
+import { errorMessage } from '@shared/errors';
 import { webQueryKeys } from '@shared/stores/queryKeys';
 import { CHATVIEW_I18N_NAMESPACE } from '@shared/chatview/i18n/resources';
 import type { AgentConfig, ContactMember, ProjectDraft, ProjectInfo, SkillMarketItem, MCPMarketItem } from '@agenthub/workbench';
@@ -419,11 +420,6 @@ function WebWorkbenchRoot() {
       />
     </>
   );
-}
-
-function errorMessage(error: unknown, fallback: string): string {
-  if (error instanceof Error && error.message.trim()) return error.message;
-  return fallback;
 }
 
 function normalizeHubSkillToMarketItem(raw: Record<string, unknown>): SkillMarketItem {

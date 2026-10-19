@@ -27,16 +27,6 @@ import {
   useWebSessionAutoMarkRead,
 } from './useWebWorkbenchModel';
 import { webTranscript } from './webPlatform';
-import { errorMessage } from './webWorkbenchError';
-
-describe('webWorkbenchError', () => {
-  it('prefers Error.message, then string, then fallback', () => {
-    expect(errorMessage(new Error('boom'), 'fallback')).toBe('boom');
-    expect(errorMessage('  string-error  ', 'fallback')).toBe('  string-error  ');
-    expect(errorMessage(null, 'fallback')).toBe('fallback');
-    expect(errorMessage(new Error('   '), 'fallback')).toBe('fallback');
-  });
-});
 
 describe('useWebWorkbenchModel helpers', () => {
   it('maps Hub contacts into shared workbench contacts', () => {

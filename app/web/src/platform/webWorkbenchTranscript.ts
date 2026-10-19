@@ -17,7 +17,7 @@ import {
 } from '@shared/transcript';
 import type { FileDiff } from '@shared/types/chat';
 import { webHubEmptyTranscript } from './webPlatform';
-import { errorMessage } from './webWorkbenchError';
+import { errorMessage } from '@shared/errors';
 
 export function resolveWebRuntimeEvidence(transcript: TranscriptBlock[]): RuntimeEvidenceSnapshot {
   const runId = resolveCurrentTranscriptRunId(transcript);

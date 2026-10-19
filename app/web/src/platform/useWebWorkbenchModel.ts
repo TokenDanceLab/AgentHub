@@ -88,7 +88,7 @@ import {
   resolveWebTranscriptMessages,
   resolveWebWorkbenchTranscript,
 } from './webWorkbenchTranscript';
-import { errorMessage } from './webWorkbenchError';
+import { errorMessage } from '@shared/errors';
 
 const hubClient = createHubClient({ getToken: getAccessToken });
 

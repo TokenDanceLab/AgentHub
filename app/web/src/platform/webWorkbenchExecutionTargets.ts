@@ -2,7 +2,7 @@ import type { WorkbenchDataMode } from '@shared/demo';
 import { isWorkbenchRealDataMode } from '@shared/demo';
 import type { TranscriptBlock } from '@shared/transcript';
 import type { ExecutionTargetInventoryItem } from '@/api/executionTargetQueries';
-import { errorMessage } from './webWorkbenchError';
+import { errorMessage } from '@shared/errors';
 
 export type WebExecutionTargetStatusState =
   | 'hidden'
