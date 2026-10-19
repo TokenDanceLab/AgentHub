@@ -2,7 +2,6 @@ import { createElement } from 'react';
 import type { ComposerAction } from '@shared/composer';
 import type { WorkbenchConversation } from '@shared/platform';
 import type { ApprovalDecisionAction, TranscriptBlock } from '@shared/transcript';
-import { AppError } from '@shared/errors';
 import { resolveFailedToastKey } from '@shared/chatview/failedToastKey';
 import type { ContextMenuItem, MultiSelectBarAction } from './floating';
 import { ForwardConversationPicker } from './floating/ForwardConversationPicker';

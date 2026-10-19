@@ -1,6 +1,6 @@
 import React from 'react';
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
-import { beforeAll, describe, expect, it, vi } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 import { SHARED_WORKBENCH_I18N_NAMESPACE } from '@shared/i18n';
 import { createTestI18n, useTestI18nLanguage } from '@shared/testing/i18n';
 import type { AgentHubPlatform } from '@shared/platform';

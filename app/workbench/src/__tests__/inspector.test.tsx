@@ -533,11 +533,6 @@ describe('AgentHubWorkbench', () => {
         name: 'migrations/0007_chat_threads.sql 只读预览',
       })
     ).toBeInTheDocument();
-    const preview = screen.getByRole('region', {
-      name: 'migrations/0007_chat_threads.sql 只读预览',
-    });
-    // preview textContent check skipped — file preview rendering structure changed
-
     fireEvent.click(screen.getByRole('tab', { name: 'Diff' }));
     expect(screen.getByText(/diff --git a\/migrations\/0007_chat_threads.sql/)).toBeInTheDocument();
   });

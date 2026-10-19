@@ -264,7 +264,7 @@ function diffProposalEvidenceGuardReasons(input: {
   return reasons;
 }
 
-export type InspectorTranslate = (key: string | string[], options?: any) => string;
+export type InspectorTranslate = (key: string | string[], options?: Record<string, unknown>) => string;
 
 export function evidenceStatusLabel(t: InspectorTranslate, status: EvidenceRefStatus | undefined): string {
   switch (status) {
@@ -296,7 +296,7 @@ function normalizeDiffProposalReviewStatus(status: string | undefined): DiffProp
   }
 }
 
-export function buildRuntimeEvidenceInspectorModel<Ns extends string>(
+export function buildRuntimeEvidenceInspectorModel(
   evidence: RuntimeEvidenceSnapshot,
   t: InspectorTranslate,
 ): RuntimeEvidenceInspectorModel {

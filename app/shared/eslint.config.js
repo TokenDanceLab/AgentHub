@@ -40,4 +40,11 @@ export default tseslint.config(
       "react-hooks/rules-of-hooks": "off",
     },
   },
+  {
+    // Storybook stories call hooks inside their `render` functions.
+    files: ["**/*.stories.*"],
+    rules: {
+      "react-hooks/rules-of-hooks": "off",
+    },
+  },
 );
