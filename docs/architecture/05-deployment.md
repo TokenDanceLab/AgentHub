@@ -20,7 +20,7 @@
 | `hub-server/deployments/{Dockerfile,docker-entrypoint.sh,README.md}` | Hub 镜像构建输入 |
 | `scripts/dev/devserver.sh` | 维护者远程测试环境入口（sync/start/stop/status/test/integration；在远端启动依赖容器、Hub 和 Edge） |
 | `scripts/verify/verify-deployment-shape.py` | 部署形状 SSOT 门禁 |
-| `.github/workflows/cd-pr-check.yml` | PR 前置：compose 形状 + Dockerfile + 构建 dry run |
+| `.github/workflows/cd-pr-check.yml` | PR 前置：compose 形状 SSOT + `docker compose config` 插值 + 镜像构建 dry run |
 
 `verify-deployment-shape.py` fail-closed：`hub-server/deployments/` 下出现任何 compose 文件，或 `deployments/production/` 出现第二份手维护 compose，即 FAIL。
 
