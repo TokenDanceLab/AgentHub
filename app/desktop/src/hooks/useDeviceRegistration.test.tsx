@@ -2,6 +2,7 @@ import { renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { HubClient } from '@/api/hubClient';
 import { DEVICE_ID_KEY } from '@shared/api/deviceId';
+import { version as packageVersion } from '../../package.json';
 import { useDeviceRegistration } from './useDeviceRegistration';
 
 describe('useDeviceRegistration', () => {
@@ -29,7 +30,7 @@ describe('useDeviceRegistration', () => {
     expect(localStorage.getItem(DEVICE_ID_KEY)).toBe('00000000-0000-4000-8000-00000000d001');
     expect(hubClient.registerDevice).toHaveBeenCalledWith({
       device_id: '00000000-0000-4000-8000-00000000d001',
-      app_version: '0.6.1',
+      app_version: packageVersion,
       capabilities: ['local_edge', 'agent.dispatch', 'agent.control'],
     });
     expect(result.current.deviceId).toBe('00000000-0000-4000-8000-00000000d001');
