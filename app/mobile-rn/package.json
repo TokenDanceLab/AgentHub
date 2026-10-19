@@ -21,10 +21,8 @@
     "lint": "pnpm --dir .. exec eslint mobile-rn/src",
     "doctor": "expo-doctor",
     "native:check": "node scripts/native-readiness.mjs",
-    "verify:brand": "node scripts/verify-brand-assets.mjs",
-    "verify:boundaries": "node scripts/verify-boundaries.mjs",
     "visual:qa": "node scripts/visual-qa.mjs",
-    "verify": "pnpm typecheck && pnpm lint && pnpm verify:brand && pnpm verify:boundaries && pnpm test",
+    "verify": "pnpm typecheck && pnpm lint && pnpm test",
     "verify:qa": "pnpm verify && pnpm run doctor && pnpm run native:check && pnpm run mock:hub:check && pnpm visual:qa"
   },
   "expo": {

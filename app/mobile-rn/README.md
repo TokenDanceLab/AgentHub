@@ -44,7 +44,7 @@ corepack pnpm ios
 
 | Gate | Command | What it proves | What it does not prove |
 |---|---|---|---|
-| Static RN boundary | `corepack pnpm verify` | Typecheck, lint, brand assets, import boundaries, and unit tests pass for current source (incl. shared auth-core session flows, deep-link/notification intent routing). | Native device behavior, live Hub, real login, push delivery, or packaged release. |
+| Static RN boundary | `corepack pnpm verify` | Typecheck, lint (import boundaries via `pnpm lint:boundaries`), brand/Metro config tests, and unit tests pass for current source (incl. shared auth-core session flows, deep-link/notification intent routing). | Native device behavior, live Hub, real login, push delivery, or packaged release. |
 | Mock Hub contract | `corepack pnpm mock:hub:check` | Local simulator endpoints and typed update stream shape are coherent. | Real Hub availability or auth. |
 | Expo Web visual QA | `corepack pnpm visual:qa` | 5177 browser preview layout, i18n, privacy text, and interaction geometry remain stable. | Native renderer, device APIs, or backend correctness. |
 | Native readiness shape | `corepack pnpm native:check` | Expo config and development profiles are no-secret and structurally valid. | Install/open proof, SecureStore persistence, notifications, media picker behavior, or real OIDC. |
