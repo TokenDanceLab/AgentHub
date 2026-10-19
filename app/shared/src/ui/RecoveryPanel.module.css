@@ -96,7 +96,7 @@
 }
 
 /* minimal tier (≤420) — deep compact below the mobile shell; SSOT:
-   styles/tokens-base.css + styles/breakpoints.ts (#1827). */
+   styles/tokens-base.css "Responsive Breakpoints" (#1827). */
 @media (width <= 420px) {
   .actions {
     grid-template-columns: 1fr;

@@ -751,7 +751,7 @@
 }
 
 /* compact tier (≤720) — legacy 700 folded up; SSOT: styles/tokens-base.css +
-   styles/breakpoints.ts (#1827). */
+   tokens-base.css (#1827). */
 @media (width <= 720px) {
   .page {
     min-width: 0;
