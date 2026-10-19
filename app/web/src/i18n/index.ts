@@ -43,24 +43,12 @@ i18n.use(initReactI18next).init({
   resources: {
     zh: {
       common: zhCommon,
-
-
       [SHARED_WORKBENCH_I18N_NAMESPACE]: sharedWorkbenchResources.zh,
-
-
-
-
       [CHATVIEW_I18N_NAMESPACE]: chatviewResources.zh,
     },
     en: {
       common: enCommon,
-
-
       [SHARED_WORKBENCH_I18N_NAMESPACE]: sharedWorkbenchResources.en,
-
-
-
-
       [CHATVIEW_I18N_NAMESPACE]: chatviewResources.en,
     },
   },

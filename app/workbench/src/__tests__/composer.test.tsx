@@ -4,7 +4,7 @@
 // Shared vi.mock registration + suite hooks for the #1763 AgentHubWorkbench
 // test shards. Must stay the first import so mock factories register before
 // the component tree (and its virtua/@lobehub/icons deps) is evaluated.
-import { installWorkbenchTestHooks } from './helpers';
+import { installWorkbenchTestHooks, openRailPage } from './helpers';
 
 import {
   fireEvent,
@@ -378,7 +378,7 @@ describe('AgentHubWorkbench', () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: '设置' }));
+    await openRailPage('设置');
     fireEvent.click(screen.getByRole('button', { name: '本地开发' }));
     fireEvent.click(screen.getByRole('button', { name: 'Ctrl+Enter 发送' }));
     expect(window.localStorage.getItem('agenthub.workbench.composerSubmitBehavior')).toBe('ctrl-enter-send');

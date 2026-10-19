@@ -7,7 +7,7 @@
  * @lobehub/icons) are evaluated.
  */
 import React from 'react';
-import { cleanup, fireEvent, screen, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, screen, within } from '@testing-library/react';
 import { afterEach, beforeAll, vi } from 'vitest';
 
 // Workbench chrome + transcript copy resolve through the shared test
@@ -16,6 +16,18 @@ import { useTestI18nLanguage } from '@shared/testing/i18n';
 
 beforeAll(async () => {
   await useTestI18nLanguage('zh');
+  // Route views are code-split; warm the module cache so the lazy chunk
+  // resolves inside the act() flush of openRailPage instead of a real I/O tick.
+  await Promise.all([
+    import('../routes/WorkbenchAgentsRouteView'),
+    import('../routes/WorkbenchContactsRouteView'),
+    import('../routes/WorkbenchDevicesRouteView'),
+    import('../routes/WorkbenchDocsRouteView'),
+    import('../routes/WorkbenchProjectsRouteView'),
+    import('../routes/WorkbenchSettingsRouteView'),
+    import('../routes/WorkbenchTasksRouteView'),
+    import('../routes/WorkbenchUsageRouteView'),
+  ]);
 });
 
 // jsdom has no layout engine, so virtua cannot measure the viewport/rows and
@@ -103,6 +115,16 @@ export function installWorkbenchTestHooks(): void {
     window.localStorage.removeItem('agenthub.workbench.inspectorWidth');
     window.localStorage.removeItem('agenthub.workbench.inspectorCollapsed');
     window.localStorage.removeItem('agenthub.workbench.engineeringColumnByConversation.v1');
+  });
+}
+
+/**
+ * Navigates the rail to a page view. Route views are lazy chunks, so the click
+ * is flushed through act() and assertions can stay synchronous afterwards.
+ */
+export async function openRailPage(name: string): Promise<void> {
+  await act(async () => {
+    fireEvent.click(screen.getByRole('button', { name }));
   });
 }
 

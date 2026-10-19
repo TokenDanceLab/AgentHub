@@ -1,14 +1,6 @@
 import React, { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { CHATVIEW_I18N_NAMESPACE } from '@shared/chatview/i18n/resources';
-import { WorkbenchAgentsRouteView } from './routes/WorkbenchAgentsRouteView';
-import { WorkbenchContactsRouteView } from './routes/WorkbenchContactsRouteView';
-import { WorkbenchDevicesRouteView } from './routes/WorkbenchDevicesRouteView';
-import { WorkbenchDocsRouteView } from './routes/WorkbenchDocsRouteView';
-import { WorkbenchProjectsRouteView } from './routes/WorkbenchProjectsRouteView';
-import { WorkbenchSettingsRouteView } from './routes/WorkbenchSettingsRouteView';
-import { WorkbenchTasksRouteView } from './routes/WorkbenchTasksRouteView';
-import { WorkbenchUsageRouteView } from './routes/WorkbenchUsageRouteView';
 import { PageErrorBoundary } from './PageErrorBoundary';
 import { useWorkbenchAgentsRoute } from './routes/useWorkbenchAgentsRoute';
 import { useWorkbenchContactsRoute } from './routes/useWorkbenchContactsRoute';
@@ -23,7 +15,46 @@ import type { WorkbenchRoutesProps } from './routes/workbenchRoutesTypes';
 import type { WorkbenchProfileSource } from './profileRegistry';
 import styles from './AgentHubWorkbench.module.css';
 
-// ── Static page imports (no React.lazy — lazy 在 jsdom 测试中无法同步解析) ──
+const WorkbenchAgentsRouteView = React.lazy(() =>
+  import('./routes/WorkbenchAgentsRouteView').then((mod) => ({
+    default: mod.WorkbenchAgentsRouteView,
+  })),
+);
+const WorkbenchContactsRouteView = React.lazy(() =>
+  import('./routes/WorkbenchContactsRouteView').then((mod) => ({
+    default: mod.WorkbenchContactsRouteView,
+  })),
+);
+const WorkbenchDevicesRouteView = React.lazy(() =>
+  import('./routes/WorkbenchDevicesRouteView').then((mod) => ({
+    default: mod.WorkbenchDevicesRouteView,
+  })),
+);
+const WorkbenchDocsRouteView = React.lazy(() =>
+  import('./routes/WorkbenchDocsRouteView').then((mod) => ({
+    default: mod.WorkbenchDocsRouteView,
+  })),
+);
+const WorkbenchProjectsRouteView = React.lazy(() =>
+  import('./routes/WorkbenchProjectsRouteView').then((mod) => ({
+    default: mod.WorkbenchProjectsRouteView,
+  })),
+);
+const WorkbenchSettingsRouteView = React.lazy(() =>
+  import('./routes/WorkbenchSettingsRouteView').then((mod) => ({
+    default: mod.WorkbenchSettingsRouteView,
+  })),
+);
+const WorkbenchTasksRouteView = React.lazy(() =>
+  import('./routes/WorkbenchTasksRouteView').then((mod) => ({
+    default: mod.WorkbenchTasksRouteView,
+  })),
+);
+const WorkbenchUsageRouteView = React.lazy(() =>
+  import('./routes/WorkbenchUsageRouteView').then((mod) => ({
+    default: mod.WorkbenchUsageRouteView,
+  })),
+);
 
 export type {
   WorkbenchAgentProfilesStatus,
@@ -34,33 +65,8 @@ export type { WorkbenchContactsActions, WorkbenchContactsData } from './routes/u
 export type { WorkbenchDocumentsActions } from './routes/useWorkbenchDocsRoute';
 export type { WorkbenchProjectsStatus } from './routes/useWorkbenchProjectsRoute';
 
-/* ═══════════════════════════════════════════════════════════════════════
-   #21 性能：route hook 条件化（保留状态的最小方案）
-
-   问题：所有 6 个 route hook 曾在 WorkbenchRoutes 中无条件执行 —— 不管
-   active page 是哪一页，agents/projects/contacts/docs/tasks/settings 的
-   hook 每次渲染都跑。
-
-   约束排查：
-   - hooks 规则禁条件调用；route hook 内 "inactive 提前 return" 会让同一实例
-     的 hook 数量在页面切换时变化（0 ↔ N），违反规则。
-   - lazy mount（activePage === 'x' && <Route/>）会改变 unmount 行为：
-     useWorkbenchAgentsRoute 持有未保存的 agent 草稿（agentDrafts）、
-     useWorkbenchTasksRoute 持有任务编辑草稿、useWorkbenchProjectsRoute 持有
-     hub 项目缓存与分页游标 —— 切页即丢，属回归，不可用。
-
-   方案：把 runs/projects/docs 三个 route 的 hook 移入独立、常驻挂载的
-   gate 组件（React.memo + active 标志）：
-   - hook 调用无条件（组件挂载期 hook 数量恒定），状态跨页面切换保留；
-   - inactive 时只渲染 null（视图挂载语义与原来 switch 一致）；
-   - WorkbenchRoutes 因无关原因重渲染时，gate props（数据引用 + 原始值 +
-     useMemo 的 profiles）稳定 → memo 跳过 → hook 不再空转；
-   - 各 route 内部状态变化也只触发自身 gate 重渲染，不再带动其余 hook。
-   agents/contacts/settings 保留在 WorkbenchRoutes：agents+contacts 输出是
-   profileSources 的输入（agentsRoute.agentConfigs / contactsData.members），
-   settings 输出 realDataMode 供 3 个 hook 复用；三者热路径均已 useMemo，
-   未 memo 化的残余仅为闭包工厂分配（µs 级）。
-   ═══════════════════════════════════════════════════════════════════════ */
+// Route hooks stay mounted across page switches so in-progress drafts and cached
+// data survive navigation; the gates only skip rendering when inactive.
 
 interface WorkbenchTasksRouteGateProps {
   /** 当前是否为该 route 的 active page（rail 上为 'runs'）。 */
@@ -280,7 +286,7 @@ export function WorkbenchRoutes({
     activePage === 'settings';
 
   return (
-    <>
+    <React.Suspense fallback={null}>
       {activePage === 'contacts' && (
         <WorkbenchContactsRouteView contactsRoute={contactsRoute} />
       )}
@@ -369,6 +375,6 @@ export function WorkbenchRoutes({
           {t('routes.unconfigured', { page: activePage })}
         </div>
       )}
-    </>
+    </React.Suspense>
   );
 }
