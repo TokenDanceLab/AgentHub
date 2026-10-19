@@ -84,15 +84,6 @@ func (l *wsIPLimiter) getLimiter(ip string) *rate.Limiter {
 	return limiter
 }
 
-// Reset drops all per-IP token buckets so the limiter starts fresh. Tests use
-// this between subtests when reusing a single instance, though constructing a
-// new instance per test is preferred.
-func (l *wsIPLimiter) Reset() {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	l.limiters = make(map[string]*ipEntry)
-}
-
 // cleanup removes limiters not used in the last 10 minutes.
 func (l *wsIPLimiter) cleanup() {
 	ticker := time.NewTicker(5 * time.Minute)
