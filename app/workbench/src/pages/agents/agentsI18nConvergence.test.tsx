@@ -8,7 +8,7 @@
 
 import React from 'react';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
-import { render, screen, within } from '../../__tests__/setup';
+import { render, screen } from '../../__tests__/setup';
 import { AgentMarketView, MCPMarketView, SkillMarketView } from './AgentMarketViews';
 import { MarketFeaturedSection } from './AgentMarketParts';
 import {

@@ -388,7 +388,7 @@ export const ConversationHost = React.memo(function ConversationHost({
     const current = pendingIntentsByConversationRef.current[conversationId] ?? [];
     const next = mutate(current);
     if (next === current) return;
-    if (next.length === 0) delete pendingIntentsByConversationRef.current[conversationId];
+    if (next.length === 0) Reflect.deleteProperty(pendingIntentsByConversationRef.current, conversationId);
     else pendingIntentsByConversationRef.current[conversationId] = next;
     bumpPendingIntentsVersion((version) => version + 1);
   }, []);

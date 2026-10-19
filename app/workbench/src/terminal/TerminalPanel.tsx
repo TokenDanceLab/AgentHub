@@ -248,7 +248,7 @@ export const TerminalPanel: React.FC<TerminalPanelProps> = ({
     // Focus on a non-tab stop (e.g. the close button) is not part of the
     // roving strip — arrow keys should not hijack it (#1835 review).
     if (activeIndex < 0) return;
-    let nextIndex: number | null = null;
+    let nextIndex: number;
     switch (event.key) {
       case 'ArrowRight':
         nextIndex = (activeIndex + 1) % tabButtons.length;
