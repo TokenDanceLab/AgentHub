@@ -264,7 +264,11 @@ function diffProposalEvidenceGuardReasons(input: {
   return reasons;
 }
 
-export type InspectorTranslate = (key: string | string[], options?: Record<string, unknown>) => string;
+// The inspector never reads the options bag; it only forwards it to i18next.
+// Any concrete shape (TOptions, object, Record) makes TFunction's overload set
+// unassignable under exactOptionalPropertyTypes, so the facade stays `any`.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type InspectorTranslate = (key: string | string[], options?: any) => string;
 
 export function evidenceStatusLabel(t: InspectorTranslate, status: EvidenceRefStatus | undefined): string {
   switch (status) {

@@ -327,4 +327,3 @@ export function getSurfaceByDesktopSectionId(sectionId: string): SurfaceMetadata
     (surface) => 'desktopSectionId' in surface && surface.desktopSectionId === sectionId,
   );
 }
-
