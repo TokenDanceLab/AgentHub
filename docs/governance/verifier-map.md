@@ -33,7 +33,7 @@
 
 ## 边界
 
-- 本表登记每个相关 PR 真执行的门禁，以及在 job 列显式标注的 dispatch/manual 门禁（后者不阻塞 PR）。手工脚本（`verify-oidc-flow.py`、`verify-login-e2e-readiness.py`）和发布前检查不列入常规门禁，证据记录在对应 PR 或 release 说明中。
+- 本表登记每个相关 PR 真执行的门禁，以及在 job 列显式标注的 dispatch/manual 门禁（后者不阻塞 PR）。手工脚本（`verify-oidc-flow.py`）和发布前检查不列入常规门禁，证据记录在对应 PR 或 release 说明中。
 - `verify-ci-invariants.py` 只做结构断言（required job/step、硬阻断、脚本存在、release environment 与 OIDC dispatch 边界）；workflow 语法和 shell 解析由 actionlint 负责，不在这里维护 workflow 解释器。
 - 覆盖率由测试 job 直接产出，不设基线 ratchet；Edge lint 为 advisory（owner：edge maintainers），已登记的 lint 债务清零后移除 `continue-on-error`，与 `go-hub-static` 一样阻塞合并。Hub lint 经 `go-hub-static` / `go-hub` 阻塞合并。
 - 新增门禁必须说明它替代了哪个旧门禁，或证明现有测试/契约检查无法覆盖；没有 CI 执行点的脚本不算门禁。
