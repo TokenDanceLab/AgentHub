@@ -39,8 +39,7 @@ pub struct LocalCliDiscoveryItem {
 #[serde(rename_all = "camelCase")]
 pub struct LocalCliDiscoveryManifest {
     pub mode: String,
-    pub readiness_manifest: String,
-    pub readiness_script: String,
+    pub readiness_doc: String,
     pub generated_at: Option<String>,
     pub items: Vec<LocalCliDiscoveryItem>,
 }
@@ -98,8 +97,7 @@ pub async fn get_edge_auth_token(
 fn build_local_cli_discovery() -> LocalCliDiscoveryManifest {
     LocalCliDiscoveryManifest {
         mode: "no-spend-discovery".to_string(),
-        readiness_manifest: "docs/governance/README.md".to_string(),
-        readiness_script: "scripts/verify/verify-edge-cli-real-readiness.py".to_string(),
+        readiness_doc: "docs/developer-quickstart.md".to_string(),
         generated_at: None,
         items: vec![
             discover_cli("codex", "Codex CLI", "codex", "AGENTHUB_CODEX_PATH"),
@@ -291,11 +289,7 @@ mod tests {
         let manifest = build_local_cli_discovery();
 
         assert_eq!(manifest.mode, "no-spend-discovery");
-        assert_eq!(manifest.readiness_manifest, "docs/governance/README.md");
-        assert_eq!(
-            manifest.readiness_script,
-            "scripts/verify/verify-edge-cli-real-readiness.py"
-        );
+        assert_eq!(manifest.readiness_doc, "docs/developer-quickstart.md");
         assert_eq!(manifest.items.len(), 3);
         assert!(manifest.items.iter().all(|item| item.no_spend));
         assert!(manifest

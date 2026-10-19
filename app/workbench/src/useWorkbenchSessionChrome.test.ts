@@ -474,8 +474,7 @@ describe('useWorkbenchSessionChrome', () => {
   it('loads local CLI discovery on desktop settings and clears it elsewhere', async () => {
     const discovery: LocalCliDiscoveryManifest = {
       mode: 'no-spend-discovery',
-      readinessManifest: '.tmp/evidence/manifest.json',
-      readinessScript: 'scripts/verify.py',
+      readinessDoc: '.tmp/evidence/manifest.json',
       generatedAt: '2026-08-19T00:00:00.000Z',
       items: [
         { id: 'codex', name: 'Codex CLI', installed: true, version: '1.2.3', path: '/usr/bin/codex', noSpend: true },

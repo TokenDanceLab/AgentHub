@@ -339,8 +339,7 @@ describe('createDesktopPlatform', () => {
     const platform = createDesktopPlatform({
       getLocalCliDiscovery: vi.fn().mockResolvedValue({
         mode: 'no-spend-discovery',
-        readinessManifest: 'docs/governance/README.md',
-        readinessScript: 'scripts/verify/verify-edge-cli-real-readiness.py',
+        readinessDoc: 'docs/developer-quickstart.md',
         generatedAt: null,
         items: [
           {
@@ -367,8 +366,7 @@ describe('createDesktopPlatform', () => {
 
     expect(discovery).toEqual(expect.objectContaining({
       mode: 'no-spend-discovery',
-      readinessManifest: 'docs/governance/README.md',
-      readinessScript: 'scripts/verify/verify-edge-cli-real-readiness.py',
+      readinessDoc: 'docs/developer-quickstart.md',
     }));
     expect(discovery.items[0]).toEqual(expect.objectContaining({
       id: 'codex',
