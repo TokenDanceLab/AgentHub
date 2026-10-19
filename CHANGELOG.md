@@ -2,6 +2,24 @@
 
 已发布版本的 longform release notes（破坏性变更、升级注意、release gate 结论及其他重大变更）在这里；commit 级明细由 git-cliff 生成到 [GitHub Releases](https://github.com/TokenDanceLab/AgentHub/releases)。
 
+## v0.7.0 (2026-10-20)
+
+### 破坏性变更
+
+无。自 v0.6.1 起约 590 个提交中没有 BREAKING 标记；HTTP/WS 协议、错误码与数据库迁移保持向后兼容，升级不需要手工迁移步骤。
+
+### 主要内容
+
+- **前端设计系统换代**：Tailwind v4 + shadcn token 桥、vendored primitives；聊天转录、输入区、壳层、Inspector 按新视觉重构，旧的玻璃拟态与重复 chrome 删除。
+- **工作台 UX**：会话分屏与并行 review、会话级目标横幅、Tasks 看板与双向深链、run 内可见派发队列、checkpoint 时间线、全局底部状态栏、产物卡直达预览。
+- **可靠性与安全**：WS seq gap 检测与自动重同步、JWT 密钥轮换调度器、特权动作审计链、OIDC 错误码前后端 SSOT、限流与错误面显式化。
+- **桌面端**：relay 命令与设备凭据 ack、自托管字体（去掉 Google Fonts 外呼）并收紧 CSP。
+
+### 升级注意
+
+- 桌面端按 `RELEASE_UNSIGNED_OK=true` 以未签名方式发布：Windows 首次安装会有 SmartScreen 提示，更新元数据自签名；macOS DMG/公证不在本次范围。
+- 发布 tag 前须由维护者记录本次安全风险评审（`RELEASE_RISK_REVIEWED=v0.7.0`），否则 release gate 按设计冻结。
+
 ## v0.6.1 (2026-08-12)
 
 ### 破坏性变更
