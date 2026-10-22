@@ -6,6 +6,7 @@ package app
 
 import (
 	"context"
+	"io"
 	"net"
 	"net/http"
 	"testing"
@@ -36,6 +37,13 @@ func adminClient() *http.Client {
 	return &http.Client{Timeout: 2 * time.Second}
 }
 
+func closeAdminResponse(t *testing.T, resp *http.Response) {
+	t.Helper()
+	_, err := io.Copy(io.Discard, resp.Body)
+	require.NoError(t, err)
+	require.NoError(t, resp.Body.Close())
+}
+
 func shutdownAdminTestApp(t *testing.T, a *App) {
 	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
@@ -60,20 +68,20 @@ func TestAdminServerMetricsAvailableWithoutDebugCredentials(t *testing.T) {
 	// metrics 可用。
 	resp, err := client.Get("http://" + addr + "/metrics")
 	require.NoError(t, err)
-	resp.Body.Close()
+	closeAdminResponse(t, resp)
 	require.Equal(t, http.StatusOK, resp.StatusCode, "metrics must be available without debug credentials")
 
 	// health 端点存在（依赖缺失时聚合 503 是正确语义——端点存活即可）。
 	resp, err = client.Get("http://" + addr + "/health")
 	require.NoError(t, err)
-	resp.Body.Close()
+	closeAdminResponse(t, resp)
 	require.NotEqual(t, http.StatusNotFound, resp.StatusCode, "health endpoint must exist without debug credentials")
 
 	// debug 能力 fail-closed：路由不存在。
 	for _, path := range []string{"/debug/pprof/", "/debug/config", "/debug/state"} {
 		resp, err = client.Get("http://" + addr + path)
 		require.NoError(t, err)
-		resp.Body.Close()
+		closeAdminResponse(t, resp)
 		require.Equal(t, http.StatusNotFound, resp.StatusCode, "%s must be absent (fail-closed) without credentials", path)
 	}
 }
@@ -95,7 +103,7 @@ func TestAdminServerDebugCapabilitiesWithCredentials(t *testing.T) {
 	req, _ := http.NewRequest(http.MethodGet, "http://"+addr+"/debug/pprof/", nil)
 	resp, err := client.Do(req)
 	require.NoError(t, err)
-	resp.Body.Close()
+	closeAdminResponse(t, resp)
 	require.Equal(t, http.StatusUnauthorized, resp.StatusCode, "pprof without credentials must 401")
 
 	// 带认证 → 200。
@@ -103,13 +111,13 @@ func TestAdminServerDebugCapabilitiesWithCredentials(t *testing.T) {
 	req.SetBasicAuth("admin", "secret")
 	resp, err = client.Do(req)
 	require.NoError(t, err)
-	resp.Body.Close()
+	closeAdminResponse(t, resp)
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 
 	// metrics 无认证可用（独立于 debug Auth）。
 	resp, err = client.Get("http://" + addr + "/metrics")
 	require.NoError(t, err)
-	resp.Body.Close()
+	closeAdminResponse(t, resp)
 	require.Equal(t, http.StatusOK, resp.StatusCode, "metrics must not require debug credentials")
 }
 

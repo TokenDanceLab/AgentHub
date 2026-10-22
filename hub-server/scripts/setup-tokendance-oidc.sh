@@ -54,7 +54,7 @@ banner "TokenDance ID OIDC Client Setup"
 # ── Check prerequisites ──────────────────────────
 if ! command -v go &>/dev/null; then
     echo -e "${RED}[!] Go is not installed.${NC}"
-    echo '    Install Go 1.26+ from https://go.dev/dl/'
+    echo '    Install Go 1.27.3 from https://go.dev/dl/'
     exit 1
 fi
 

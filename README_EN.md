@@ -9,7 +9,7 @@
 
   [![CI](https://img.shields.io/github/actions/workflow/status/TokenDanceLab/AgentHub/checks.yml?branch=master&style=flat-square&label=CI)](https://github.com/TokenDanceLab/AgentHub/actions/workflows/checks.yml)
   [![release](https://img.shields.io/github/v/release/TokenDanceLab/AgentHub?style=flat-square)](https://github.com/TokenDanceLab/AgentHub/releases)
-  ![go](https://img.shields.io/badge/go-1.26+-00ADD8?style=flat-square&logo=go)
+  ![go](https://img.shields.io/badge/go-1.27.3-00ADD8?style=flat-square&logo=go)
   ![react](https://img.shields.io/badge/react-19-61DAFB?style=flat-square&logo=react)
   ![tauri](https://img.shields.io/badge/tauri-2-FFC131?style=flat-square&logo=tauri&logoColor=black)
   [![license](https://img.shields.io/badge/license-Apache--2.0-lightgrey?style=flat-square)](https://github.com/TokenDanceLab/AgentHub/blob/master/LICENSE)
@@ -53,7 +53,7 @@ AgentHub lets you collaborate with human teammates and AI agents in the same gro
 
 ## Quick Start
 
-Minimal local bootstrap (5 steps). Requires OpenSSL, Docker, Go 1.26+, Node 24+/corepack, pnpm 10+.
+Minimal local bootstrap (5 steps). Requires OpenSSL, Docker, Go 1.27.3, Node 24+/corepack, pnpm 10+.
 
 Terminal A (infrastructure + Hub):
 
