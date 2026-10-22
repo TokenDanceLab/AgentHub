@@ -32,7 +32,7 @@ concurrency:
 
 env:
   GO_VERSION: "1.27.3"
-  GOLANGCI_LINT_VERSION: "v2.12.2"
+  GOLANGCI_LINT_VERSION: "v2.15.0"
   NODE_VERSION: "24"
   PNPM_VERSION: "10.32.1"
 
@@ -93,12 +93,12 @@ jobs:
           path: |
             ~/go/bin/staticcheck
             ~/go/bin/gosec
-          key: sa-tools-gosec-2.28.0-staticcheck-2026.1
+          key: sa-tools-gosec-2.29.0-staticcheck-2026.2.2
 
       - name: Install gosec
         run: |
           if [ ! -x ~/go/bin/gosec ]; then
-            go install github.com/securego/gosec/v2/cmd/gosec@v2.28.0
+            go install github.com/securego/gosec/v2/cmd/gosec@v2.29.0
           fi
 
       - name: Security scan (gosec)
@@ -111,7 +111,7 @@ jobs:
       - name: staticcheck
         run: |
           if [ ! -x ~/go/bin/staticcheck ]; then
-            go install honnef.co/go/tools/cmd/staticcheck@2026.1
+            go install honnef.co/go/tools/cmd/staticcheck@2026.2.2
           fi
           staticcheck ./... 2>&1
 
@@ -355,12 +355,12 @@ jobs:
           path: |
             ~/go/bin/staticcheck
             ~/go/bin/gosec
-          key: sa-tools-gosec-2.28.0-staticcheck-2026.1
+          key: sa-tools-gosec-2.29.0-staticcheck-2026.2.2
 
       - name: Install gosec
         run: |
           if [ ! -x ~/go/bin/gosec ]; then
-            go install github.com/securego/gosec/v2/cmd/gosec@v2.28.0
+            go install github.com/securego/gosec/v2/cmd/gosec@v2.29.0
           fi
 
       - name: Security scan (gosec)
@@ -373,7 +373,7 @@ jobs:
       - name: staticcheck
         run: |
           if [ ! -x ~/go/bin/staticcheck ]; then
-            go install honnef.co/go/tools/cmd/staticcheck@2026.1
+            go install honnef.co/go/tools/cmd/staticcheck@2026.2.2
           fi
           staticcheck ./... 2>&1
 

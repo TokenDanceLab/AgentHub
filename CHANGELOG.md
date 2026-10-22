@@ -7,6 +7,7 @@
 ### 安全更新
 
 - Go toolchain、Hub/Edge 模块与 Docker builder 升至 `1.27.3`，覆盖 `GO-2026-6809` / `CVE-2026-111943` 等 `1.26.10` 之前修复的 stdlib 风险；`govulncheck` 对 Hub/Edge 均为 0 个可达漏洞。
+- 前端构建链升至 Vite `6.4.5`、Storybook `8.6.19`；Tauri Rust 依赖补齐 `RUSTSEC-2026-0381/0382/0383` 的上游修复版本。
 - Hub Server 发布镜像现在把发布 tag 注入二进制 `Version`，不再把可发布镜像报告为 `version=dev`。
 
 ### 升级注意
