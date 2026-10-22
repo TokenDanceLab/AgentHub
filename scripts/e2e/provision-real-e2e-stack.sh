@@ -78,6 +78,7 @@ import urllib.request
 issuer = os.environ["ACCOUNT_ISSUER"].strip().rstrip("/")
 hub = os.environ["HUB_BASE_URL"].strip().rstrip("/")
 redirect_uri = os.environ["WEB_CALLBACK_URL"].strip()
+user_agent = "AgentHub-Real-E2E/1"
 
 
 def fail(message):
@@ -87,7 +88,10 @@ def fail(message):
 
 def get_json(url, label):
     try:
-        request = urllib.request.Request(url, headers={"Accept": "application/json"})
+        request = urllib.request.Request(
+            url,
+            headers={"Accept": "application/json", "User-Agent": user_agent},
+        )
         with urllib.request.urlopen(request, timeout=15) as response:
             return json.load(response)
     except (urllib.error.URLError, ValueError, OSError):
@@ -177,7 +181,7 @@ try:
     request = urllib.request.Request(
         hub + "/client/auth/oidc/authorize",
         data=payload,
-        headers={"Content-Type": "application/json"},
+        headers={"Content-Type": "application/json", "User-Agent": user_agent},
         method="POST",
     )
     with urllib.request.urlopen(request, timeout=15) as response:
@@ -233,7 +237,7 @@ try:
     request = urllib.request.Request(
         hub + "/client/auth/oidc/callback",
         data=negative,
-        headers={"Content-Type": "application/json"},
+        headers={"Content-Type": "application/json", "User-Agent": user_agent},
         method="POST",
     )
     urllib.request.urlopen(request, timeout=15)

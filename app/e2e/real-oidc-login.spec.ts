@@ -137,12 +137,13 @@ async function performRealOidcLogin(
   }, { timeout: 20_000 }).toBe(accountOrigin);
 
   // TokenDance Account 的两步登录表单；test identity 不得依赖 MFA/passkey。
-  await expect(page.locator('#login-email')).toBeVisible({ timeout: 15_000 });
-  await page.locator('#login-email').fill(email);
+  const emailInput = page.getByLabel(/^(Email|邮箱)$/i);
+  await expect(emailInput).toBeVisible({ timeout: 15_000 });
+  await emailInput.fill(email);
   const next = page.getByRole('button', { name: /^(Next|下一步)$/i });
   await expect(next).toBeEnabled({ timeout: 10_000 });
   await next.click();
-  await page.locator('#login-secret').fill(password);
+  await page.locator('input[type="password"]').fill(password);
   const submitLogin = page.getByRole('button', { name: /^(Sign in|登录)$/i });
   await expect(submitLogin).toBeEnabled({ timeout: 20_000 });
   await submitLogin.click();
