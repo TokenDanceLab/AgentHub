@@ -3,9 +3,9 @@
 # AgentHub 真实全栈 E2E lane
 #
 # 职责：
-#   1. 全栈 preflight：TokenDance ID / hub / edge / web 健康探测。
-#   2. 测试账号供给（委托 provision-real-e2e-stack.sh：运行期随机账号，
-#      凭据落 tests/artifacts/real-e2e-account.env，gitignored chmod 600）。
+#   1. 全栈 preflight：external TokenDance Account issuer / hub / edge / web。
+#   2. 外部测试身份预检（委托 provision-real-e2e-stack.sh；不启动、读取或
+#      clone 内部 Account，operator 凭据只落 gitignored chmod 600 artifact）。
 #   3. 跑真实栈 spec（playwright.real.config.ts chromium）——默认不带位置
 #      过滤，运行 testMatch 全部 spec（chat-real / real-oidc-login /
 #      private-url-preview / golden-flows）；设 AGENTHUB_E2E_SPEC_TARGET 可只跑单个 spec。
@@ -24,9 +24,9 @@
 #   - playwright exit 0 但无通过行（全 spec skipped / report 缺失或
 #     解析失败）时，manifest status 降级为 no-evidence（real_tested=false），
 #     lane 以 FAIL 收口，绝不以 passed 呈现。
-#   - 证据等级：成功跑完整 spec 记为 observed-local（本地单机真栈）；
+#   - 证据等级：真实 Account OIDC 登录记为 approved-real；
 #     只有 chat-real 且仅做 backend-api 校验时，manifest 记为
-#     evidence_level=backend-api、real_tested=false。approved-real /
+#     evidence_level=backend-api、real_tested=false。observed-local 和
 #     packaged-release 不在本 lane 覆盖。
 #
 # 输出行契约（与 wsl-full-stack-e2e.sh 对齐）：
@@ -36,23 +36,23 @@
 #   bash scripts/e2e/run-real-e2e-lane.sh
 #
 # 环境变量（除注明外均有默认，不设也能跑）：
-#   AGENTHUB_E2E_ID_BASE_URL / _HUB_BASE_URL / _EDGE_BASE_URL / _WEB_BASE_URL
-#   AGENTHUB_E2E_ID_CLIENT_ID / _ID_CLIENT_SECRET （直供 client 凭据，跳过启动器提取）
-#   AGENTHUB_E2E_START_SH （hub OIDC 凭据提取源，**无默认值**；未设置时走 _ID_CLIENT_ID/SECRET 直供）
-#   AGENTHUB_E2E_ID_DB （ID sqlite，provision 阶段必填）
+#   AGENTHUB_E2E_ACCOUNT_ISSUER / _HUB_BASE_URL / _EDGE_BASE_URL / _WEB_BASE_URL
+#   AGENTHUB_E2E_USER_EMAIL / _USER_PASSWORD / _PARTNER_EMAIL / _PARTNER_PASSWORD
 #   AGENTHUB_JWT_SECRET （运行中 Hub 的签名密钥，**无默认值**；chat-real.spec.ts
 #     的 mintTestJWT 必填，从环境读取；凭据文件不保存签名密钥）
 #   AGENTHUB_E2E_SPEC_TARGET （只跑指定 spec 文件名，如 real-oidc-login.spec.ts；
 #                             不设 = 不带位置过滤，跑 playwright.real.config.ts
 #                             testMatch 全部 spec）
+#   AGENTHUB_E2E_REQUIRE_EDGE （默认 1；只验证 browser→Hub OIDC/授权链路时可设 0）
 #   AGENTHUB_E2E_PLAYWRIGHT_EXTRA_ARGS （追加给 playwright 的参数）
 # ─────────────────────────────────────────────────────────────
 set -uo pipefail  # 不用 -e：provision/playwright 退出码需显式处理
 
-ID_BASE_URL="${AGENTHUB_E2E_ID_BASE_URL:-http://127.0.0.1:3000}"
+ACCOUNT_BASE_URL="${AGENTHUB_E2E_ACCOUNT_ISSUER:-${AGENTHUB_ACCOUNT_OIDC_ISSUER_URL:-http://127.0.0.1:3000}}"
 HUB_BASE_URL="${AGENTHUB_E2E_HUB_BASE_URL:-http://127.0.0.1:8080}"
 EDGE_BASE_URL="${AGENTHUB_E2E_EDGE_BASE_URL:-http://127.0.0.1:3210}"
 WEB_BASE_URL="${AGENTHUB_E2E_WEB_BASE_URL:-http://127.0.0.1:5174}"
+REQUIRE_EDGE="${AGENTHUB_E2E_REQUIRE_EDGE:-1}"
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 ARTIFACT_DIR="$REPO_ROOT/tests/artifacts"
@@ -64,7 +64,7 @@ SPEC_TARGET="${AGENTHUB_E2E_SPEC_TARGET:-}"
 # manifest 里的展示标签：空目标用 sentinel，避免 scope/command 出现空值。
 SPEC_LABEL="${SPEC_TARGET:-all-testMatch}"
 
-ID_STATE="down"; HUB_STATE="down"; EDGE_STATE="down"; WEB_STATE="down"
+ACCOUNT_STATE="down"; HUB_STATE="down"; EDGE_STATE="down"; WEB_STATE="down"
 PW_RC=""
 MANIFEST_PATH=""
 
@@ -85,12 +85,12 @@ verify_manifest() {
 probe() { curl -sf -m 4 "$1" >/dev/null 2>&1; }
 
 stack_status() {
-  local id=down hub=down edge=down web=down
-  probe "$ID_BASE_URL/.well-known/openid-configuration" && id=up
+  local account=down hub=down edge=down web=down
+  probe "$ACCOUNT_BASE_URL/.well-known/openid-configuration" && account=up
   probe "$HUB_BASE_URL/health" && hub=up
   probe "$EDGE_BASE_URL/v1/health" && edge=up
   probe "$WEB_BASE_URL/workbench/" && web=up
-  ID_STATE="$id"; HUB_STATE="$hub"; EDGE_STATE="$edge"; WEB_STATE="$web"
+  ACCOUNT_STATE="$account"; HUB_STATE="$hub"; EDGE_STATE="$edge"; WEB_STATE="$web"
 }
 
 # ── evidence manifest（六字段合同）──────────────────────────
@@ -106,11 +106,11 @@ emit_manifest() { # 请求 status -> stdout "最终status|manifest路径"（pass
   )" \
   MANIFEST_ARTIFACT_DIR="$ARTIFACT_DIR" \
   MANIFEST_SPEC_TARGET="$SPEC_LABEL" \
-  MANIFEST_ID_BASE_URL="$ID_BASE_URL" \
+  MANIFEST_ACCOUNT_BASE_URL="$ACCOUNT_BASE_URL" \
   MANIFEST_HUB_BASE_URL="$HUB_BASE_URL" \
   MANIFEST_EDGE_BASE_URL="$EDGE_BASE_URL" \
   MANIFEST_WEB_BASE_URL="$WEB_BASE_URL" \
-  MANIFEST_ID_STATE="$ID_STATE" \
+  MANIFEST_ACCOUNT_STATE="$ACCOUNT_STATE" \
   MANIFEST_HUB_STATE="$HUB_STATE" \
   MANIFEST_EDGE_STATE="$EDGE_STATE" \
   MANIFEST_WEB_STATE="$WEB_STATE" \
@@ -191,10 +191,10 @@ if report_path and requested in ("passed", "failed"):
             # chat-real mints a session JWT from the running Hub secret instead
             # of completing an OIDC login; it is API evidence, not login evidence.
             login_spec = file_name != "chat-real.spec.ts"
-            evidence_level = "observed-local" if login_spec else "backend-api"
+            evidence_level = "approved-real" if login_spec else "backend-api"
             real_tested = outcome == "passed" and login_spec
             if real_tested:
-                claim = "真实栈（本地单机真栈）上完成 OIDC 登录并通过；observed-local 证据"
+                claim = "真实 Account issuer 和真实浏览器 OIDC 登录通过；approved-real 证据"
             elif outcome == "passed":
                 claim = "真实栈 API 流程通过；使用本地签发的会话 JWT，不计为 OIDC 登录证据"
             else:
@@ -245,15 +245,16 @@ if requested == "passed":
         and all(row["evidence_level"] == "backend-api" for row in rows)
     )
     if real_tested:
+        evidence_level = "approved-real"
         if spec_target == "all-testMatch" and not narrowed:
-            claim = ("真实全栈（PG/Redis/TokenDance ID/hub/edge/web）上 playwright.real.config.ts "
+            claim = ("真实全栈（PG/Redis/TokenDance Account/hub/edge/web）上 playwright.real.config.ts "
                      "testMatch 全部 spec 全绿，且至少一个 OIDC 登录 spec 通过；"
-                     "evidence_level=observed-local（本地单机真栈）")
+                     "evidence_level=approved-real（外部 Account issuer）")
         else:
             narrowed_note = "（含额外 Playwright 过滤参数）" if narrowed else ""
-            claim = ("真实全栈（PG/Redis/TokenDance ID/hub/edge/web）上仅 "
+            claim = ("真实全栈（PG/Redis/TokenDance Account/hub/edge/web）上仅 "
                      + spec_target + " 的选中用例全绿" + narrowed_note
-                     + "；scope 不覆盖其余 testMatch spec；evidence_level=observed-local（本地单机真栈）")
+                     + "；scope 不覆盖其余 testMatch spec；evidence_level=approved-real（外部 Account issuer）")
     elif api_only:
         # backend-api 证据不是 OIDC 登录证据，但也不是 no-evidence：
         # real_tested=false + evidence_level=backend-api 如实表达 API 流程通过。
@@ -290,7 +291,7 @@ if requested == "passed":
         }]
 elif requested == "blocked":
     real_tested = False
-    claim = ("全栈未齐（id/hub/edge/web 探测见 stack 段），未执行真实登录；"
+    claim = ("全栈未齐（account/hub/edge/web 探测见 stack 段），未执行真实登录；"
              "blocked 状态如实记录，未编造登录证据")
     rows = [{
         "name": "stack-preflight",
@@ -301,10 +302,10 @@ elif requested == "blocked":
         "status": "blocked",
         "exit_code": 2,
         "duration_ms": 0,
-        "command": "probe id/.well-known/openid-configuration hub/health edge/v1/health web/workbench/",
+        "command": "probe account/.well-known/openid-configuration hub/health edge/v1/health web/workbench/",
         "working_directory": ".",
-        "evidence": "id=%s hub=%s edge=%s web=%s" % (
-            os.environ["MANIFEST_ID_STATE"], os.environ["MANIFEST_HUB_STATE"],
+        "evidence": "account=%s hub=%s edge=%s web=%s" % (
+            os.environ["MANIFEST_ACCOUNT_STATE"], os.environ["MANIFEST_HUB_STATE"],
             os.environ["MANIFEST_EDGE_STATE"], os.environ["MANIFEST_WEB_STATE"]),
     }]
 else:  # failed
@@ -343,14 +344,14 @@ manifest = {
     "planned_evidence_levels": [evidence_level],
     # ── 上下文 ─────────────────────────────────────────────────
     "stack": {
-        "id": {"base_url": os.environ["MANIFEST_ID_BASE_URL"], "state": os.environ["MANIFEST_ID_STATE"], "login": "real-browser-oidc-authorization-code-pkce"},
+        "account": {"base_url": os.environ["MANIFEST_ACCOUNT_BASE_URL"], "state": os.environ["MANIFEST_ACCOUNT_STATE"], "login": "real-browser-oidc-authorization-code-pkce"},
         "hub": {"base_url": os.environ["MANIFEST_HUB_BASE_URL"], "state": os.environ["MANIFEST_HUB_STATE"]},
         "edge": {"base_url": os.environ["MANIFEST_EDGE_BASE_URL"], "state": os.environ["MANIFEST_EDGE_STATE"]},
         "web": {"base_url": os.environ["MANIFEST_WEB_BASE_URL"], "state": os.environ["MANIFEST_WEB_STATE"]},
         "backend_services": ["postgres:16", "redis:7"],
     },
     "secret_handling": {
-        "account_mode": "runtime-random-test-identities (provision-real-e2e-stack.sh)",
+        "account_mode": "operator-supplied external identities (provision-real-e2e-stack.sh)",
         "credentials_path": "tests/artifacts/real-e2e-account.env (chmod 600, gitignored)",
         "manifest_secrets": "none",
     },
@@ -377,38 +378,37 @@ main() {
   # 本次运行起点：emit_manifest 只采信此时间之后产出的证据文件，
   # 防止 tests/artifacts 上一次运行的残留被误归为本次证据。
   RUN_STARTED_AT="$(date +%s)"
-  info "preflight: id=$ID_BASE_URL hub=$HUB_BASE_URL edge=$EDGE_BASE_URL web=$WEB_BASE_URL"
+  info "preflight: account=$ACCOUNT_BASE_URL hub=$HUB_BASE_URL edge=$EDGE_BASE_URL web=$WEB_BASE_URL"
   stack_status
-  info "stack state: id=$ID_STATE hub=$HUB_STATE edge=$EDGE_STATE web=$WEB_STATE"
+  info "stack state: account=$ACCOUNT_STATE hub=$HUB_STATE edge=$EDGE_STATE web=$WEB_STATE"
 
-  if [ "$ID_STATE" != "up" ] || [ "$HUB_STATE" != "up" ] || [ "$EDGE_STATE" != "up" ] || [ "$WEB_STATE" != "up" ]; then
+  if [ "$ACCOUNT_STATE" != "up" ] || [ "$HUB_STATE" != "up" ] || [ "$WEB_STATE" != "up" ] || \
+     { [ "$REQUIRE_EDGE" != "0" ] && [ "$EDGE_STATE" != "up" ]; }; then
     emit_out="$(emit_manifest blocked)"
     MANIFEST_PATH="${emit_out#*|}"
     verify_manifest "$MANIFEST_PATH"
-    die_blocked "full stack incomplete (id=$ID_STATE hub=$HUB_STATE edge=$EDGE_STATE web=$WEB_STATE); manifest=$MANIFEST_PATH"
+    die_blocked "full stack incomplete (account=$ACCOUNT_STATE hub=$HUB_STATE edge=$EDGE_STATE web=$WEB_STATE); manifest=$MANIFEST_PATH"
   fi
-  pass "full stack healthy (id/hub/edge/web)"
+  pass "full stack healthy (account/hub/edge/web)"
 
-  info "provisioning real test accounts"
-  # 复用既有账号凭据（上次运行落盘）：TokenDance ID 注册限流
-  # register_per_hour=3（每 IP/小时，运行期 Redis 计数），一次 lane 需 2 个
-  # 账号——复用 + 登录再验证让重跑零注册；首跑才注册。（凭据文件 gitignored，
-  # chmod 600，仅同机 lane 可见。）
+  info "validating operator-supplied external Account identities"
+  # 本 lane 不创建 Account 用户或 client。凭据由 operator 提供，仅写入
+  # gitignored chmod 600 的本机 artifact，供同机 Playwright 读取。
   ACC_ENV="$ARTIFACT_DIR/real-e2e-account.env"
   if [ -f "$ACC_ENV" ]; then
     set -a
     # shellcheck disable=SC1090
     . "$ACC_ENV"
     set +a
-    info "reusing test accounts from $ACC_ENV (login re-verified in provision step)"
+    info "reusing operator-supplied Account identities from $ACC_ENV"
   fi
   if ! bash "$REPO_ROOT/scripts/e2e/provision-real-e2e-stack.sh"; then
     emit_out="$(emit_manifest failed)"
     MANIFEST_PATH="${emit_out#*|}"
     verify_manifest "$MANIFEST_PATH"
-    die_failed "account provisioning failed (manifest=$MANIFEST_PATH); see output above"
+    die_failed "external Account preflight failed (manifest=$MANIFEST_PATH); see output above"
   fi
-  pass "test accounts provisioned (credentials in tests/artifacts/real-e2e-account.env, gitignored)"
+  pass "external Account identities accepted (credentials in tests/artifacts/real-e2e-account.env, gitignored)"
 
   info "running real spec(s) (chromium, playwright.real.config.ts): ${SPEC_LABEL}"
   cd "$REPO_ROOT/app/web" || die_failed "app/web not found"

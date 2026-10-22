@@ -3,7 +3,7 @@
 // Do NOT add new Hub REST methods here; add them to app/shared/src/hub/hubClient.ts first.
 
 import { HUB_URL } from '@/config';
-import { AppError } from '@shared/errors';
+import { AppError, isTerminalHubAuthError } from '@shared/errors';
 import {
   createHubClient as createSharedHubClient,
   type ExecutionTarget,
@@ -35,22 +35,33 @@ export interface HubClientOptions extends SharedHubClientOptions {
  */
 async function tauriProxyFallback(
   url: string,
+  allowedOrigin: string,
   options: RequestInit,
   headers: Record<string, string>,
   _originalError: unknown,
 ): Promise<{ used: true; value: unknown } | { used: false }> {
   const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
   if (!isTauri) return { used: false };
+  let requestOrigin: string;
+  try {
+    requestOrigin = new URL(url).origin;
+  } catch {
+    return { used: false };
+  }
+  if (requestOrigin !== allowedOrigin) {
+    console.warn('[hubClient] refusing Tauri proxy fallback to non-Hub origin');
+    return { used: false };
+  }
 
   try {
     const { invoke } = await import('@tauri-apps/api/core');
     const body = typeof options.body === 'string' ? options.body : '';
-    console.debug('[hubClient] tauri proxy fallback →', options.method || 'POST', url);
+    console.debug('[hubClient] tauri proxy fallback →', options.method || 'POST', requestOrigin);
     const resp = await invoke<{ status: number; body: string; headers: Record<string, string> }>(
       'proxy_http_post',
       { url, body, headers },
     );
-    console.debug('[hubClient] tauri proxy response', resp.status, url);
+    console.debug('[hubClient] tauri proxy response', resp.status, requestOrigin);
 
     // Parse the response body
     let parsed: unknown;
@@ -110,7 +121,7 @@ async function tauriProxyFallback(
  * WebView2 `fetch()` throws (e.g. HTTP_PROXY env vars not honored). Browser
  * builds (no `__TAURI_INTERNALS__`) short-circuit inside tauriProxyFallback.
  */
-function createDesktopFetch(userFetch?: typeof fetch): typeof fetch {
+function createDesktopFetch(allowedOrigin: string, userFetch?: typeof fetch): typeof fetch {
   return async (input, init) => {
     try {
       return await (userFetch ?? globalThis.fetch)(input, init);
@@ -127,7 +138,13 @@ function createDesktopFetch(userFetch?: typeof fetch): typeof fetch {
       } else if (h && typeof h === 'object') {
         Object.assign(headers, h);
       }
-      const tauriResult = await tauriProxyFallback(url, init ?? {}, headers, fetchErr);
+      const tauriResult = await tauriProxyFallback(
+        url,
+        allowedOrigin,
+        init ?? {},
+        headers,
+        fetchErr,
+      );
       if (!tauriResult.used) throw fetchErr;
       // Reconstruct a Response-like object for shared unwrap path.
       const body = JSON.stringify(
@@ -182,7 +199,7 @@ async function refreshHubAccessTokenOnce(): Promise<string | null> {
       // the refresh call reuses the same Tauri-aware desktop fetch path.
       const refreshClient = createSharedHubClient({
         baseUrl: HUB_URL.replace(/\/+$/, ''),
-        fetch: createDesktopFetch(),
+        fetch: createDesktopFetch(new URL(HUB_URL).origin),
       });
       const res = await refreshClient.refresh(refreshToken);
       await saveStoredHubAccessToken(res.access_token);
@@ -196,8 +213,10 @@ async function refreshHubAccessTokenOnce(): Promise<string | null> {
       return res.access_token;
     } catch (err) {
       cachedRefreshedToken = null;
-      // Refresh token invalid/expired — clear it so we don't retry a dead token.
-      await clearStoredHubRefreshToken();
+      if (isTerminalHubAuthError(err)) {
+        // Only an explicit 401/403 proves the stored refresh token is dead.
+        await clearStoredHubRefreshToken();
+      }
       console.warn('[hubClient] 401 token refresh failed:', err);
       return null;
     } finally {
@@ -214,12 +233,13 @@ async function refreshHubAccessTokenOnce(): Promise<string | null> {
  */
 export function createHubClient(opts: HubClientOptions = {}): SharedHubClient {
   const baseUrl = (opts.baseUrl || HUB_URL).replace(/\/+$/, '');
+  const hubOrigin = new URL(baseUrl).origin;
   const { getToken: userGetToken, ...restOpts } = opts;
 
   const client = createSharedHubClient({
     ...restOpts,
     baseUrl,
-    fetch: createDesktopFetch(opts.fetch),
+    fetch: createDesktopFetch(hubOrigin, opts.fetch),
     onRefreshToken: opts.onRefreshToken ?? refreshHubAccessTokenOnce,
     ...(userGetToken
       ? { getToken: () => getCachedRefreshedAccessToken() ?? userGetToken() }

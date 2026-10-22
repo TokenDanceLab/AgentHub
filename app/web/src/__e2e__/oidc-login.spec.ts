@@ -6,7 +6,7 @@ import path from 'node:path';
  * AgentHub Web — OIDC Login E2E Tests
  *
  * The Web app uses sessionStorage-based PKCE flow with a callback route
- * (/auth/tokendance/callback) for browser OIDC login.
+ * (/auth/account/callback) for browser OIDC login.
  *
  * These tests mock the Hub API to verify the complete login lifecycle:
  * authorize → redirect → callback → token exchange → authenticated session.
@@ -14,7 +14,8 @@ import path from 'node:path';
 
 const WEB_E2E_PORT = Number(process.env.AGENTHUB_WEB_E2E_PORT ?? 5174);
 const WEB_E2E_ORIGIN = `http://127.0.0.1:${WEB_E2E_PORT}`;
-const WEB_CALLBACK_PATH = '/auth/tokendance/callback';
+const WEB_CALLBACK_PATH = '/auth/account/callback';
+const ACCOUNT_ISSUER = 'https://account.example.test';
 
 // ── Test helpers ──────────────────────────────────
 
@@ -24,6 +25,7 @@ interface MockOIDCParams {
   authError?: string;
   tokenError?: string;
   deviceId?: string;
+  issuer?: string;
 }
 
 async function mockOIDCFlow(page: import('@playwright/test').Page, params: MockOIDCParams = {}) {
@@ -32,6 +34,7 @@ async function mockOIDCFlow(page: import('@playwright/test').Page, params: MockO
     authError,
     tokenError,
     deviceId = '00000000-0000-0000-0000-000000000002',
+    issuer = ACCOUNT_ISSUER,
   } = params;
 
   let authCallCount = 0;
@@ -50,19 +53,20 @@ async function mockOIDCFlow(page: import('@playwright/test').Page, params: MockO
     }
 
     const body = route.request().postDataJSON();
-    const authUrl = new URL('https://id.example.com/oidc/authorize');
+    const authUrl = new URL(`${ACCOUNT_ISSUER}/oauth/authorize`);
     authUrl.searchParams.set('response_type', 'code');
     authUrl.searchParams.set('client_id', 'c_test_client');
     authUrl.searchParams.set('redirect_uri', body.redirect_uri || buildWebRedirectUri());
-    authUrl.searchParams.set('scope', 'openid profile email');
+    authUrl.searchParams.set('scope', 'openid profile');
     authUrl.searchParams.set('state', state);
+    authUrl.searchParams.set('nonce', 'web-test-nonce');
     authUrl.searchParams.set('code_challenge', body.code_challenge);
     authUrl.searchParams.set('code_challenge_method', 'S256');
 
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: JSON.stringify({ state, authorization_url: authUrl.toString() }),
+      body: JSON.stringify({ state, authorization_url: authUrl.toString(), issuer }),
     });
   });
 
@@ -106,6 +110,14 @@ async function mockOIDCFlow(page: import('@playwright/test').Page, params: MockO
 
 function buildWebRedirectUri(): string {
   return `${WEB_E2E_ORIGIN}${WEB_CALLBACK_PATH}`;
+}
+
+function buildCallbackUrl(state: string, code: string, issuer = ACCOUNT_ISSUER): string {
+  const url = new URL(`${WEB_E2E_ORIGIN}${WEB_CALLBACK_PATH}`);
+  url.searchParams.set('code', code);
+  url.searchParams.set('state', state);
+  url.searchParams.set('iss', issuer);
+  return `${url.pathname}${url.search}`;
 }
 
 interface LoginE2EConfig {
@@ -331,7 +343,7 @@ function validateEvidenceManifest(manifest: LoginE2EEvidenceManifest): void {
 async function waitForHubAccessToken(page: import('@playwright/test').Page): Promise<string> {
   await expect.poll(async () => page.evaluate(() => sessionStorage.getItem('agenthub_hub_token')), {
     timeout: 180_000,
-    message: 'waiting for Hub-issued session after approved TokenDanceID login',
+    message: 'waiting for Hub-issued session after TokenDance Account login',
   }).not.toBeNull();
   const token = await page.evaluate(() => sessionStorage.getItem('agenthub_hub_token'));
   return String(token);
@@ -353,8 +365,9 @@ test.describe('Web OIDC Login — Happy Path', () => {
     await page.goto('/');
     await page.waitForLoadState('networkidle');
 
-    // The TokenDance ID login button should be present
-    const loginBtn = page.getByRole('button', { name: /TokenDance|ID.*登录|登录.*TokenDance|Continue with/i });
+    const loginBtn = page.getByRole('button', {
+      name: /Continue with TokenDance Account|使用 TokenDance Account 登录/i,
+    });
     const visible = await loginBtn.isVisible({ timeout: 5000 }).catch(() => false);
     // If the button isn't visible, the app may show a different auth view
     // (already authenticated state), which is also valid
@@ -363,13 +376,15 @@ test.describe('Web OIDC Login — Happy Path', () => {
     }
   });
 
-  test('clicking TokenDance ID login redirects to TokenDance ID', async ({ page }) => {
+  test('clicking Account login redirects to TokenDance Account', async ({ page }) => {
     await mockOIDCFlow(page);
 
     await page.goto('/');
     await page.waitForLoadState('networkidle');
 
-    const loginBtn = page.getByRole('button', { name: /TokenDance|ID.*登录|登录.*TokenDance|Continue with/i });
+    const loginBtn = page.getByRole('button', {
+      name: /Continue with TokenDance Account|使用 TokenDance Account 登录/i,
+    });
 
     if (await loginBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
       // Click the button — the app will call window.location.assign()
@@ -384,18 +399,18 @@ test.describe('Web OIDC Login — Happy Path', () => {
 
     // Plant pending PKCE data in sessionStorage
     await page.goto('/');
-    await page.evaluate((redirectUri) => {
+    await page.evaluate(({ redirectUri, issuer }) => {
       sessionStorage.setItem('agenthub_oidc_pkce_pending', JSON.stringify({
         state: 'web-test-state-mock-12345',
         codeVerifier: 'web-test-code-verifier-base64url',
         deviceId: '00000000-0000-0000-0000-000000000002',
         redirectUri,
+        issuer,
         createdAt: Date.now(),
       }));
-    }, buildWebRedirectUri());
+    }, { redirectUri: buildWebRedirectUri(), issuer: ACCOUNT_ISSUER });
 
-    // Simulate TokenDance ID redirect back to our callback URL
-    await page.goto(`${WEB_CALLBACK_PATH}?code=web-test-auth-code-67890&state=web-test-state-mock-12345`);
+    await page.goto(buildCallbackUrl('web-test-state-mock-12345', 'web-test-auth-code-67890'));
     await page.waitForTimeout(3000);
   });
 
@@ -404,7 +419,7 @@ test.describe('Web OIDC Login — Happy Path', () => {
 
     await page.goto('/');
     await page.evaluate(() => {
-      sessionStorage.setItem('agenthub_token_source', 'tokendance');
+      sessionStorage.setItem('agenthub_token_source', 'account');
       sessionStorage.setItem('agenthub_hub_token', 'web-test-access-token-mock');
     });
 
@@ -419,42 +434,69 @@ test.describe('Web OIDC Login — Error Handling', () => {
     await mockOIDCFlow(page);
 
     await page.goto('/');
-    await page.evaluate((redirectUri) => {
+    await page.evaluate(({ redirectUri, issuer }) => {
       sessionStorage.setItem('agenthub_oidc_pkce_pending', JSON.stringify({
         state: 'honest-state',
         codeVerifier: 'test-code-verifier-base64url',
         deviceId: '00000000-0000-0000-0000-000000000002',
         redirectUri,
+        issuer,
         createdAt: Date.now(),
       }));
-    }, buildWebRedirectUri());
+    }, { redirectUri: buildWebRedirectUri(), issuer: ACCOUNT_ISSUER });
 
-    // Attacker-modified callback URL
-    await page.goto(`${WEB_CALLBACK_PATH}?code=evil-code&state=attacker-state`);
+    await page.goto(buildCallbackUrl('attacker-state', 'evil-code'));
     await page.waitForTimeout(2000);
 
     // URL should be cleaned
-    expect(page.url()).not.toContain('/auth/tokendance/callback');
+    expect(page.url()).not.toContain('/auth/account/callback');
+  });
+
+  test('rejects a callback whose RFC 9207 issuer differs from the pinned issuer', async ({ page }) => {
+    const flow = await mockOIDCFlow(page);
+
+    await page.goto('/');
+    await page.evaluate(({ redirectUri, issuer }) => {
+      sessionStorage.setItem('agenthub_oidc_pkce_pending', JSON.stringify({
+        state: 'web-test-state-mock-12345',
+        codeVerifier: 'test-code-verifier-base64url',
+        deviceId: '00000000-0000-0000-0000-000000000002',
+        redirectUri,
+        issuer,
+        createdAt: Date.now(),
+      }));
+    }, { redirectUri: buildWebRedirectUri(), issuer: ACCOUNT_ISSUER });
+
+    await page.goto(buildCallbackUrl(
+      'web-test-state-mock-12345',
+      'issuer-mismatch-code',
+      'https://wrong-account.example.test',
+    ));
+    await page.waitForTimeout(1000);
+
+    expect(flow.tokenCallCount()).toBe(0);
+    expect(page.url()).not.toContain('/auth/account/callback');
   });
 
   test('handles expired PKCE (over 10 minutes)', async ({ page }) => {
     await mockOIDCFlow(page);
 
     await page.goto('/');
-    await page.evaluate((redirectUri) => {
+    await page.evaluate(({ redirectUri, issuer }) => {
       sessionStorage.setItem('agenthub_oidc_pkce_pending', JSON.stringify({
         state: 'web-expired-test',
         codeVerifier: 'test-code-verifier-base64url',
         deviceId: '00000000-0000-0000-0000-000000000002',
         redirectUri,
+        issuer,
         createdAt: Date.now() - 11 * 60 * 1000,
       }));
-    }, buildWebRedirectUri());
+    }, { redirectUri: buildWebRedirectUri(), issuer: ACCOUNT_ISSUER });
 
-    await page.goto(`${WEB_CALLBACK_PATH}?code=some-code&state=web-expired-test`);
+    await page.goto(buildCallbackUrl('web-expired-test', 'some-code'));
     await page.waitForTimeout(2000);
 
-    expect(page.url()).not.toContain('/auth/tokendance/callback');
+    expect(page.url()).not.toContain('/auth/account/callback');
   });
 
   test('handles orphan callback (no pending PKCE)', async ({ page }) => {
@@ -463,10 +505,10 @@ test.describe('Web OIDC Login — Error Handling', () => {
     await page.goto('/');
     // No pending PKCE sessionStorage data
 
-    await page.goto(`${WEB_CALLBACK_PATH}?code=orphan-code&state=orphan-state`);
+    await page.goto(buildCallbackUrl('orphan-state', 'orphan-code'));
     await page.waitForTimeout(2000);
 
-    expect(page.url()).not.toContain('/auth/tokendance/callback');
+    expect(page.url()).not.toContain('/auth/account/callback');
   });
 
   test('handles authorize API failure gracefully', async ({ page }) => {
@@ -475,7 +517,9 @@ test.describe('Web OIDC Login — Error Handling', () => {
     await page.goto('/');
     await page.waitForLoadState('networkidle');
 
-    const loginBtn = page.getByRole('button', { name: /TokenDance|ID.*登录|登录.*TokenDance|Continue with/i });
+    const loginBtn = page.getByRole('button', {
+      name: /Continue with TokenDance Account|使用 TokenDance Account 登录/i,
+    });
     if (await loginBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
       await loginBtn.click();
       await page.waitForTimeout(2000);
@@ -486,20 +530,21 @@ test.describe('Web OIDC Login — Error Handling', () => {
     await mockOIDCFlow(page, { tokenError: 'Invalid authorization code' });
 
     await page.goto('/');
-    await page.evaluate((redirectUri) => {
+    await page.evaluate(({ redirectUri, issuer }) => {
       sessionStorage.setItem('agenthub_oidc_pkce_pending', JSON.stringify({
         state: 'web-test-state-mock-12345',
         codeVerifier: 'test-code-verifier-base64url',
         deviceId: '00000000-0000-0000-0000-000000000002',
         redirectUri,
+        issuer,
         createdAt: Date.now(),
       }));
-    }, buildWebRedirectUri());
+    }, { redirectUri: buildWebRedirectUri(), issuer: ACCOUNT_ISSUER });
 
-    await page.goto(`${WEB_CALLBACK_PATH}?code=bad-code&state=web-test-state-mock-12345`);
+    await page.goto(buildCallbackUrl('web-test-state-mock-12345', 'bad-code'));
     await page.waitForTimeout(3000);
 
-    expect(page.url()).not.toContain('/auth/tokendance/callback');
+    expect(page.url()).not.toContain('/auth/account/callback');
   });
 });
 
@@ -514,17 +559,18 @@ test.describe('Web OIDC Login — Logout', () => {
     });
 
     await page.goto('/');
-    await page.evaluate((redirectUri) => {
+    await page.evaluate(({ redirectUri, issuer }) => {
       sessionStorage.setItem('agenthub_oidc_pkce_pending', JSON.stringify({
         state: 'web-test-state-mock-12345',
         codeVerifier: 'test-code-verifier-base64url',
         deviceId: '00000000-0000-0000-0000-000000000002',
         redirectUri,
+        issuer,
         createdAt: Date.now(),
       }));
-    }, buildWebRedirectUri());
+    }, { redirectUri: buildWebRedirectUri(), issuer: ACCOUNT_ISSUER });
 
-    await page.goto(`${WEB_CALLBACK_PATH}?code=web-test-auth-code&state=web-test-state-mock-12345`);
+    await page.goto(buildCallbackUrl('web-test-state-mock-12345', 'web-test-auth-code'));
     await expect.poll(oidcFlow.tokenCallCount).toBe(1);
     await expect.poll(() => page.evaluate(() => sessionStorage.getItem('agenthub_hub_token')))
       .toBe('web-test-access-token-mock');
@@ -550,7 +596,7 @@ test.describe('Web OIDC Login — Real Mode Approval Gate', () => {
   test('rejects unapproved real mode even when endpoints are present', () => {
     expect(() => readRealLoginConfig({
       AGENTHUB_LOGIN_E2E_OAUTH_CLIENT_ID: 'agenthub-test-client',
-      AGENTHUB_LOGIN_E2E_CALLBACK_URL: 'http://localhost:5174/auth/tokendance/callback',
+      AGENTHUB_LOGIN_E2E_CALLBACK_URL: 'http://localhost:5174/auth/account/callback',
       AGENTHUB_LOGIN_E2E_HUB_BASE_URL: 'http://127.0.0.1:8080',
       AGENTHUB_LOGIN_E2E_WEB_URL: 'http://127.0.0.1:5174',
       AGENTHUB_LOGIN_E2E_TEST_ACCOUNT_INDICATOR: 'disposable-test-account',
@@ -563,7 +609,7 @@ test.describe('Web OIDC Login — Real Mode Approval Gate', () => {
   test('rejects unsafe token-like input without printing the token value', () => {
     expect(() => readRealLoginConfig({
       AGENTHUB_LOGIN_E2E_OAUTH_CLIENT_ID: 'sk-test-secret-value-123456',
-      AGENTHUB_LOGIN_E2E_CALLBACK_URL: 'http://localhost:5174/auth/tokendance/callback',
+      AGENTHUB_LOGIN_E2E_CALLBACK_URL: 'http://localhost:5174/auth/account/callback',
       AGENTHUB_LOGIN_E2E_HUB_BASE_URL: 'http://127.0.0.1:8080',
       AGENTHUB_LOGIN_E2E_WEB_URL: 'http://127.0.0.1:5174',
       AGENTHUB_LOGIN_E2E_TEST_ACCOUNT_INDICATOR: 'disposable-test-account',
@@ -578,7 +624,7 @@ test.describe('Web OIDC Login — Real Mode Approval Gate', () => {
   test('rejects direct Web-to-LocalEdge topology', () => {
     expect(() => readRealLoginConfig({
       AGENTHUB_LOGIN_E2E_OAUTH_CLIENT_ID: 'agenthub-test-client',
-      AGENTHUB_LOGIN_E2E_CALLBACK_URL: 'http://localhost:5174/auth/tokendance/callback',
+      AGENTHUB_LOGIN_E2E_CALLBACK_URL: 'http://localhost:5174/auth/account/callback',
       AGENTHUB_LOGIN_E2E_HUB_BASE_URL: 'http://127.0.0.1:8080',
       AGENTHUB_LOGIN_E2E_WEB_URL: LOCAL_EDGE_URL,
       AGENTHUB_LOGIN_E2E_TEST_ACCOUNT_INDICATOR: 'disposable-test-account',
@@ -599,7 +645,7 @@ test.describe('Web OIDC Login — Real Mode Approval Gate', () => {
     for (const webUrl of loopbackCases) {
       expect(() => readRealLoginConfig({
         AGENTHUB_LOGIN_E2E_OAUTH_CLIENT_ID: 'agenthub-test-client',
-        AGENTHUB_LOGIN_E2E_CALLBACK_URL: 'http://localhost:5174/auth/tokendance/callback',
+        AGENTHUB_LOGIN_E2E_CALLBACK_URL: 'http://localhost:5174/auth/account/callback',
         AGENTHUB_LOGIN_E2E_HUB_BASE_URL: 'http://127.0.0.1:8080',
         AGENTHUB_LOGIN_E2E_WEB_URL: webUrl,
         AGENTHUB_LOGIN_E2E_TEST_ACCOUNT_INDICATOR: 'disposable-test-account',
@@ -616,7 +662,7 @@ test.describe('Web OIDC Login — Real Mode Approval Gate', () => {
     for (const artifactRoot of ['.tmp/../outside/artifacts', '.tmpx/login-e2e', 'tmp-old/login-e2e', path.resolve(process.cwd(), '.tmp-sibling/login-e2e')]) {
       expect(() => readRealLoginConfig({
         AGENTHUB_LOGIN_E2E_OAUTH_CLIENT_ID: 'agenthub-test-client',
-        AGENTHUB_LOGIN_E2E_CALLBACK_URL: 'http://localhost:5174/auth/tokendance/callback',
+        AGENTHUB_LOGIN_E2E_CALLBACK_URL: 'http://localhost:5174/auth/account/callback',
         AGENTHUB_LOGIN_E2E_HUB_BASE_URL: 'http://127.0.0.1:8080',
         AGENTHUB_LOGIN_E2E_WEB_URL: 'http://127.0.0.1:5174',
         AGENTHUB_LOGIN_E2E_TEST_ACCOUNT_INDICATOR: 'disposable-test-account',
@@ -684,13 +730,15 @@ test.describe('Web OIDC Login — Real Mode Approval Gate', () => {
 });
 
 test.describe('Web OIDC Login — Approved Real Login And Remote Dispatch', () => {
-  test.skip(!hasApprovedRealLoginEnv(), 'real TokenDanceID login E2E requires explicit env approval and a disposable/test account');
+  test.skip(!hasApprovedRealLoginEnv(), 'real TokenDance Account login E2E requires explicit env approval and a disposable/test account');
 
   test('proves Hub session, target inventory, selected Desktop target, dispatch, and replay evidence', async ({ page, request }) => {
     const config = readRealLoginConfig();
 
     await page.goto(config.webUrl, { waitUntil: 'networkidle' });
-    const loginBtn = page.getByRole('button', { name: /TokenDance|ID.*登录|登录.*TokenDance|Continue with/i });
+    const loginBtn = page.getByRole('button', {
+      name: /Continue with TokenDance Account|使用 TokenDance Account 登录/i,
+    });
     if (await loginBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
       await loginBtn.click();
     }

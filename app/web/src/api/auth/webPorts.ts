@@ -26,20 +26,25 @@ import type {
   OidcCallbackResult,
 } from '@shared/api/auth';
 
-const TOKEN_SOURCE_KEY = 'agenthub_token_source'; // "tokendance" | "hub"
+const TOKEN_SOURCE_KEY = 'agenthub_token_source'; // "account" | "hub"
 const OIDC_PENDING_KEY = 'agenthub_oidc_pkce_pending';
 const APP_BASE_PATH = import.meta.env.BASE_URL || '/';
 const OIDC_CALLBACK_PATH = import.meta.env.VITE_OIDC_CALLBACK_PATH
-  || `${APP_BASE_PATH === '/' ? '' : APP_BASE_PATH.replace(/\/$/, '')}/auth/tokendance/callback`;
+  || `${APP_BASE_PATH === '/' ? '' : APP_BASE_PATH.replace(/\/$/, '')}/auth/account/callback`;
 
 function readTokenSource(): HubTokenSource {
   try {
     if (typeof localStorage !== 'undefined') {
       localStorage.removeItem(TOKEN_SOURCE_KEY);
     }
-    return (typeof sessionStorage !== 'undefined'
+    const source = typeof sessionStorage !== 'undefined'
       ? sessionStorage.getItem(TOKEN_SOURCE_KEY)
-      : null) as HubTokenSource;
+      : null;
+    if (source === 'account' || source === 'hub') return source;
+    if (source) {
+      sessionStorage.removeItem(TOKEN_SOURCE_KEY);
+    }
+    return null;
   } catch {
     return null;
   }
@@ -67,8 +72,9 @@ function readBrowserCallback(): OidcCallbackResult | null {
   if (url.pathname !== OIDC_CALLBACK_PATH) return null;
   const code = url.searchParams.get('code')?.trim();
   const state = url.searchParams.get('state')?.trim();
-  if (!code || !state) return null;
-  return { code, state };
+  const iss = url.searchParams.get('iss')?.trim();
+  if (!code || !state || !iss) return null;
+  return { code, state, iss };
 }
 
 function leaveCallbackRoute(): void {
@@ -104,7 +110,7 @@ export function createWebHubAuthPorts(): HubAuthPorts {
         if (!raw) return null;
         try {
           const parsed = JSON.parse(raw) as BrowserOIDCPending;
-          if (!parsed.state || !parsed.codeVerifier || !parsed.deviceId || !parsed.redirectUri) return null;
+          if (!parsed.state || !parsed.codeVerifier || !parsed.deviceId || !parsed.redirectUri || !parsed.issuer) return null;
           return parsed;
         } catch {
           return null;
@@ -118,7 +124,7 @@ export function createWebHubAuthPorts(): HubAuthPorts {
     callbackChannel: {
       async start() {
         if (typeof window === 'undefined') {
-          throw new Error('TokenDance ID login requires a browser window.');
+          throw new Error('Account login requires a browser window.');
         }
         const redirectUri = `${window.location.origin}${OIDC_CALLBACK_PATH}`;
         return {
@@ -134,7 +140,7 @@ export function createWebHubAuthPorts(): HubAuthPorts {
     redirectOpener: {
       async open(authorizationUrl: string) {
         if (typeof window === 'undefined') {
-          throw new Error('TokenDance ID login requires a browser window.');
+          throw new Error('Account login requires a browser window.');
         }
         window.location.assign(authorizationUrl);
       },

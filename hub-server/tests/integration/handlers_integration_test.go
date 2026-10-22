@@ -13,7 +13,7 @@ import (
 
 func TestOIDCAuthorize_ReturnsAuthURL(t *testing.T) {
 	resp := do("POST", "/client/auth/oidc/authorize", map[string]string{
-		"code_challenge":        "test_challenge_abc1234567890def1234567890",
+		"code_challenge":        "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
 		"code_challenge_method": "S256",
 		"device_type":           "web",
 		"device_id":             "dddddddd-dddd-dddd-dddd-dddddddddd01",
@@ -29,6 +29,9 @@ func TestOIDCAuthorize_ReturnsAuthURL(t *testing.T) {
 	authURL := extract(r.Data, "authorization_url")
 	if authURL == "" {
 		t.Fatal("expected non-empty authorization_url")
+	}
+	if issuer := extract(r.Data, "issuer"); issuer != accountOIDCIssuer {
+		t.Fatalf("issuer = %q, want %q", issuer, accountOIDCIssuer)
 	}
 }
 

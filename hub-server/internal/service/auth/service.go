@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"gorm.io/gorm"
 
@@ -40,6 +41,11 @@ type Service struct {
 	cacheClient authCache
 }
 
+var (
+	errRefreshClaimLost        = errors.New("refresh rotation claim was lost")
+	errRefreshIdentityInactive = errors.New("refresh identity is no longer active")
+)
+
 func NewService(db *gorm.DB, jwtCfg config.JWTConfig, cacheClient authCache) *Service {
 	return &Service{db: db, jwtCfg: jwtCfg, cacheClient: cacheClient}
 }
@@ -48,24 +54,55 @@ func NewService(db *gorm.DB, jwtCfg config.JWTConfig, cacheClient authCache) *Se
 // and rotates the refresh token (#134: old one is revoked, new one is issued).
 func (s *Service) RefreshToken(ctx context.Context, rawRefreshToken string) (*LoginResponse, error) {
 	tokenHash := jwtutil.HashRefreshToken(rawRefreshToken)
-	rt, err := repository.FindRefreshTokenByHash(s.db, tokenHash)
+	rt, err := repository.FindRefreshTokenForRotation(s.db, tokenHash)
 	if err != nil {
+		if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, err
+		}
 		return nil, errcode.AuthRefreshInvalid
 	}
+	if err := s.validateRefreshPresentation(ctx, rt, tokenHash); err != nil {
+		return nil, err
+	}
+	accessToken, rawRefresh, err := s.generateRefreshRotation(rt)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.rotateRefreshToken(rt, tokenHash, rawRefresh); err != nil {
+		if isRefreshRotationRejection(err) {
+			if errors.Is(err, errRefreshClaimLost) {
+				s.recordRefreshReuse("rotation rejected", rt)
+			}
+			return nil, errcode.AuthRefreshInvalid
+		}
+		return nil, err
+	}
+	s.blacklistRotatedToken(ctx, tokenHash, rt.ExpiresAt)
+	return &LoginResponse{
+		AccessToken:  accessToken,
+		RefreshToken: rawRefresh,
+		ExpiresIn:    int64(s.jwtCfg.AccessTTL.Seconds()),
+	}, nil
+}
+
+func (s *Service) validateRefreshPresentation(
+	ctx context.Context,
+	rt *model.RefreshToken,
+	tokenHash string,
+) error {
 	if rt.Revoked {
 		// Reuse of a revoked refresh-token row — e.g. a stolen token presented
 		// after logout. The response stays AuthRefreshInvalid and does not
 		// cascade-revoke other sessions. The raw token and its hash are never
 		// logged; only non-secret dimensions are (#134).
-		slog.Warn("refresh token reuse: revoked token presented",
-			"user_id", rt.UserID, "device_type", rt.DeviceType)
-		if metrics.RefreshTokenReuseTotal != nil {
-			metrics.RefreshTokenReuseTotal.Inc()
-		}
-		return nil, errcode.AuthRefreshInvalid
+		s.recordRefreshReuse("revoked token presented", rt)
+		return errcode.AuthRefreshInvalid
 	}
 	if time.Now().After(rt.ExpiresAt) {
-		return nil, errcode.AuthRefreshInvalid
+		return errcode.AuthRefreshInvalid
+	}
+	if rt.UserIdentityID == nil || *rt.UserIdentityID == "" {
+		return errcode.AuthRefreshInvalid
 	}
 
 	// Check Redis blacklist: the token hash itself (set during rotation),
@@ -74,79 +111,91 @@ func (s *Service) RefreshToken(ctx context.Context, rawRefreshToken string) (*Lo
 	// Any hit means the token was revoked through Redis before the DB
 	// commit completed, closing the race window. Redis errors apply the
 	// fail-open/fail-closed policy (see enforceRefreshBlacklist, #2053).
-	if err := s.enforceRefreshBlacklist(ctx, tokenHash); err != nil {
-		return nil, err
-	}
-	deviceKey := rt.UserID + ":" + rt.DeviceID
-	if err := s.enforceRefreshBlacklist(ctx, deviceKey); err != nil {
-		return nil, err
-	}
+	keys := []string{tokenHash, rt.UserID + ":" + rt.DeviceID}
 	if rt.DeviceType != "" {
-		deviceTypeKey := rt.UserID + ":" + rt.DeviceID + ":" + rt.DeviceType
-		if err := s.enforceRefreshBlacklist(ctx, deviceTypeKey); err != nil {
-			return nil, err
+		keys = append(keys, rt.UserID+":"+rt.DeviceID+":"+rt.DeviceType)
+	}
+	for _, key := range keys {
+		if err := s.enforceRefreshBlacklist(ctx, key); err != nil {
+			return err
 		}
 	}
+	return nil
+}
 
-	// Rotate step 1 — atomic claim: flip THIS row to revoked with a
-	// conditional UPDATE. Concurrent presentations of the same token race
-	// here; only the winner proceeds and losers are rejected as reuse.
-	claimed, err := repository.ClaimRefreshTokenForRotation(s.db, tokenHash)
-	if err != nil {
-		return nil, err
+func (s *Service) recordRefreshReuse(reason string, rt *model.RefreshToken) {
+	slog.Warn("refresh token reuse: "+reason,
+		"user_id", rt.UserID, "device_type", rt.DeviceType)
+	if metrics.RefreshTokenReuseTotal != nil {
+		metrics.RefreshTokenReuseTotal.Inc()
 	}
-	if !claimed {
-		slog.Warn("refresh token reuse: concurrent rotation lost the claim",
-			"user_id", rt.UserID, "device_type", rt.DeviceType)
-		if metrics.RefreshTokenReuseTotal != nil {
-			metrics.RefreshTokenReuseTotal.Inc()
-		}
-		return nil, errcode.AuthRefreshInvalid
-	}
+}
 
-	// Rotate step 2 — revoke any remaining tokens on the device.
-	if err := repository.RevokeRefreshTokensByUserDevice(s.db, rt.UserID, rt.DeviceID); err != nil {
-		return nil, err
-	}
-
-	// Blacklist the old token hash in Redis for the remaining TTL (#134).
-	remainingTTL := time.Until(rt.ExpiresAt)
-	if remainingTTL > 0 {
-		if err := s.cacheClient.BlacklistRefreshToken(ctx, tokenHash, remainingTTL); err != nil {
-			slog.Warn("refresh token: failed to blacklist in Redis, fallback to DB-only", "error", err)
-		}
-	}
-
-	// Issue a new access token.
+func (s *Service) generateRefreshRotation(rt *model.RefreshToken) (string, string, error) {
+	// Generate both replacement tokens before the transaction so a generator
+	// failure cannot consume the presented refresh token.
 	accessToken, err := jwtutil.GenerateAccessToken(rt.UserID, rt.DeviceType, rt.DeviceID,
 		s.jwtCfg.Secret, s.jwtCfg.AccessTTL)
 	if err != nil {
-		return nil, err
+		return "", "", err
 	}
-
-	// Issue a new refresh token.
 	rawRefresh, err := jwtutil.GenerateRefreshToken()
 	if err != nil {
-		return nil, err
+		return "", "", err
 	}
+	return accessToken, rawRefresh, nil
+}
 
-	newTokenHash := jwtutil.HashRefreshToken(rawRefresh)
-	newRT := &model.RefreshToken{
-		UserID:     rt.UserID,
-		DeviceType: rt.DeviceType,
-		DeviceID:   rt.DeviceID,
-		TokenHash:  newTokenHash,
-		ExpiresAt:  time.Now().Add(s.jwtCfg.RefreshTTL),
-	}
-	if err := repository.UpsertRefreshToken(s.db, newRT); err != nil {
-		return nil, err
-	}
+func (s *Service) rotateRefreshToken(rt *model.RefreshToken, tokenHash, rawRefresh string) error {
+	// Claim, device-wide revoke, and replacement upsert commit together. The
+	// exact identity row is locked active until commit, closing the race where
+	// retirement could land between authorization and new-token insertion.
+	return s.db.Transaction(func(tx *gorm.DB) error {
+		active, err := repository.LockActiveRefreshIdentity(tx, *rt.UserIdentityID)
+		if err != nil {
+			return err
+		}
+		if !active {
+			return errRefreshIdentityInactive
+		}
+		claimed, err := repository.ClaimRefreshTokenForRotation(tx, tokenHash)
+		if err != nil {
+			return err
+		}
+		if !claimed {
+			return errRefreshClaimLost
+		}
+		if err := repository.RevokeRefreshTokensByUserDevice(tx, rt.UserID, rt.DeviceID); err != nil {
+			return err
+		}
+		newRT := &model.RefreshToken{
+			UserID:         rt.UserID,
+			DeviceType:     rt.DeviceType,
+			DeviceID:       rt.DeviceID,
+			UserIdentityID: rt.UserIdentityID,
+			TokenHash:      jwtutil.HashRefreshToken(rawRefresh),
+			ExpiresAt:      time.Now().Add(s.jwtCfg.RefreshTTL),
+		}
+		return repository.UpsertRefreshToken(tx, newRT)
+	})
+}
 
-	return &LoginResponse{
-		AccessToken:  accessToken,
-		RefreshToken: rawRefresh,
-		ExpiresIn:    int64(s.jwtCfg.AccessTTL.Seconds()),
-	}, nil
+func isRefreshRotationRejection(err error) bool {
+	return errors.Is(err, errRefreshClaimLost) ||
+		errors.Is(err, errRefreshIdentityInactive) ||
+		errors.Is(err, gorm.ErrRecordNotFound)
+}
+
+func (s *Service) blacklistRotatedToken(ctx context.Context, tokenHash string, expiresAt time.Time) {
+	// The DB transaction is the source of truth. Redis only closes the window
+	// where another process may still have the old row cached.
+	remainingTTL := time.Until(expiresAt)
+	if remainingTTL <= 0 {
+		return
+	}
+	if err := s.cacheClient.BlacklistRefreshToken(ctx, tokenHash, remainingTTL); err != nil {
+		slog.Warn("refresh token: failed to blacklist in Redis, fallback to DB-only", "error", err)
+	}
 }
 
 // enforceRefreshBlacklist checks one refresh-blacklist key and rejects the
@@ -236,7 +285,7 @@ func (s *Service) UpdateProfile(ctx context.Context, userID, nickname, avatarURL
 	}
 	if nickname != "" {
 		nickname = strings.TrimSpace(nickname)
-		if len(nickname) < 1 || len(nickname) > 50 {
+		if count := utf8.RuneCountInString(nickname); count < 1 || count > 64 {
 			return nil, errcode.UserInvalidParam
 		}
 		user.Nickname = nickname
@@ -257,7 +306,7 @@ func (s *Service) UpdateProfile(ctx context.Context, userID, nickname, avatarURL
 // validateAvatarURL checks that the given URL is well-formed and uses an
 // allowed scheme (http or https).
 func validateAvatarURL(raw string) error {
-	if len(raw) > 2048 {
+	if utf8.RuneCountInString(raw) > 512 {
 		return errors.New("avatar URL too long")
 	}
 	u, err := url.Parse(raw)

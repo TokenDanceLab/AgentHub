@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net"
+	"net/url"
 	"os"
 	"slices"
 	"strings"
@@ -158,31 +160,126 @@ func (c *Config) validateJWT() error {
 	return nil
 }
 
-func (c *Config) validateTokenDanceID() error {
-	// TokenDance ID config is optional; validate only when explicitly configured
-	if c.TokenDanceID.ClientID != "" {
-		if c.TokenDanceID.IssuerURL == "" {
-			return fmt.Errorf("tokendance_id.issuer_url is required when tokendance_id.client_id is set")
+func (c *Config) validateAccountOIDC() error {
+	production := isProductionEnv(c.Server.Env)
+	if err := rejectRetiredAccountProviderEnv(production); err != nil {
+		return err
+	}
+	if !accountOIDCConfigured(c.AccountOIDC) {
+		if production {
+			return errors.New("account_oidc must be configured in production")
 		}
-		if c.TokenDanceID.ClientSecret == "" {
-			return fmt.Errorf("tokendance_id.client_secret is required when tokendance_id.client_id is set")
-		}
-		if c.TokenDanceID.RedirectURI == "" {
-			return fmt.Errorf("tokendance_id.redirect_uri is required when tokendance_id.client_id is set")
-		}
-		// OIDC client_secret must meet the same strength bar as JWT secrets:
-		// 32-char minimum and no known hardcoded/placeholder values. The
-		// seed SQL default (agenthub-dev-secret-change-me) and the
-		// .env.example documented placeholders must be rejected so an
-		// operator cannot accidentally run production with the seed value.
-		if len(c.TokenDanceID.ClientSecret) < 32 {
-			return fmt.Errorf("tokendance_id.client_secret too short: minimum 32 characters required (got %d)", len(c.TokenDanceID.ClientSecret))
-		}
-		if isKnownWeakSecret(c.TokenDanceID.ClientSecret) {
-			return errors.New("tokendance_id.client_secret must be a strong, non-default value; the seed SQL default and documented dev placeholders are rejected")
+		return nil
+	}
+	if err := validateAccountOIDCClient(c.AccountOIDC, production); err != nil {
+		return err
+	}
+	return validateAccountOIDCRedirectURIs(c.AccountOIDC.RedirectURI, c.AccountOIDC.AllowedRedirectURIs)
+}
+
+func rejectRetiredAccountProviderEnv(production bool) error {
+	if !production {
+		return nil
+	}
+	for _, key := range os.Environ() {
+		name, _, _ := strings.Cut(key, "=")
+		if strings.HasPrefix(name, "AGENTHUB_TOKENDANCE_ID_") {
+			return fmt.Errorf("retired %s must not be set in production; use AGENTHUB_ACCOUNT_OIDC_*", name)
 		}
 	}
 	return nil
+}
+
+func accountOIDCConfigured(cfg AccountOIDCConfig) bool {
+	return cfg.IssuerURL != "" ||
+		cfg.ClientID != "" ||
+		cfg.ClientSecret != "" ||
+		cfg.RedirectURI != "" ||
+		len(cfg.AllowedRedirectURIs) > 0
+}
+
+func validateAccountOIDCClient(cfg AccountOIDCConfig, production bool) error {
+	if cfg.ClientID == "" {
+		return errors.New("account_oidc.client_id is required when any Account OIDC field is set")
+	}
+	if cfg.IssuerURL == "" {
+		return errors.New("account_oidc.issuer_url is required when account_oidc.client_id is set")
+	}
+	if err := validateAccountOIDCIssuer(cfg.IssuerURL, production); err != nil {
+		return err
+	}
+	if cfg.ClientSecret == "" {
+		return errors.New("account_oidc.client_secret is required when account_oidc.client_id is set")
+	}
+	if len(cfg.ClientSecret) < 32 {
+		return fmt.Errorf("account_oidc.client_secret too short: minimum 32 characters required (got %d)", len(cfg.ClientSecret))
+	}
+	if isKnownWeakSecret(cfg.ClientSecret) {
+		return errors.New("account_oidc.client_secret must be a strong, non-default value; documented placeholders are rejected")
+	}
+	if cfg.RedirectURI == "" {
+		return errors.New("account_oidc.redirect_uri is required when account_oidc.client_id is set")
+	}
+	return nil
+}
+
+func validateAccountOIDCIssuer(rawURL string, production bool) error {
+	issuer, err := url.Parse(strings.TrimSpace(rawURL))
+	if err != nil || issuer.Scheme == "" || issuer.Host == "" || issuer.User != nil || issuer.RawQuery != "" || issuer.Fragment != "" {
+		return errors.New("account_oidc.issuer_url must be an absolute issuer URL without credentials, query or fragment")
+	}
+	if !isHTTPSOrLoopbackHTTP(issuer.Scheme, issuer.Hostname()) {
+		return errors.New("account_oidc.issuer_url must use https outside loopback development")
+	}
+	if production && isNonPublicIssuerHostname(issuer.Hostname()) {
+		return errors.New("account_oidc.issuer_url must be a public host in production")
+	}
+	return nil
+}
+
+func validateAccountOIDCRedirectURIs(primary string, additional []string) error {
+	allowed := append([]string{primary}, additional...)
+	seen := make(map[string]struct{}, len(allowed))
+	for _, raw := range allowed {
+		raw = strings.TrimSpace(raw)
+		if raw == "" {
+			continue
+		}
+		u, parseErr := url.Parse(raw)
+		if parseErr != nil || u.Scheme == "" || u.Host == "" || u.User != nil || u.Fragment != "" {
+			return fmt.Errorf("account_oidc redirect URI is invalid: %q", raw)
+		}
+		if !isHTTPSOrLoopbackHTTP(u.Scheme, u.Hostname()) {
+			return fmt.Errorf("account_oidc redirect URI must use https outside loopback: %q", raw)
+		}
+		normalized := u.String()
+		if _, exists := seen[normalized]; exists {
+			return fmt.Errorf("account_oidc redirect URI is duplicated: %q", raw)
+		}
+		seen[normalized] = struct{}{}
+	}
+	return nil
+}
+
+func isLoopbackHostname(host string) bool {
+	return host == "localhost" || host == "127.0.0.1" || host == "::1"
+}
+
+func isHTTPSOrLoopbackHTTP(scheme, host string) bool {
+	return scheme == "https" || (scheme == "http" && isLoopbackHostname(host))
+}
+
+func isNonPublicIssuerHostname(host string) bool {
+	host = strings.TrimSuffix(strings.ToLower(strings.TrimSpace(host)), ".")
+	if host == "localhost" || strings.HasSuffix(host, ".localhost") {
+		return true
+	}
+	ip := net.ParseIP(host)
+	if ip == nil {
+		return false
+	}
+	return !ip.IsGlobalUnicast() || ip.IsPrivate() || ip.IsLoopback() ||
+		ip.IsLinkLocalUnicast() || ip.IsUnspecified() || ip.IsMulticast()
 }
 
 // isProductionEnv reports whether the given server.env value denotes a

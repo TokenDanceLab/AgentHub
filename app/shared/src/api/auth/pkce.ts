@@ -1,5 +1,5 @@
 /**
- * PKCE (RFC 7636) helpers for the TokenDance ID OIDC flow (issue #1537).
+ * PKCE (RFC 7636) helpers for the TokenDance Account OIDC flow (issue #1537).
  * Pure browser-crypto implementation shared by Web and Desktop.
  */
 

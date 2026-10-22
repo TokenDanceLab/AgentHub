@@ -98,8 +98,8 @@ func ParseToken(tokenString, secret string) (*Claims, error) {
 		return []byte(secret), nil
 	},
 		jwt.WithValidMethods([]string{"HS256"}),
-		// 30s clock-skew leeway, aligned with capability tokens
-		// (tokendance.go) and edge-side validation. Without it,
+		// 30s clock-skew leeway, aligned with capability tokens and
+		// edge-side validation. Without it,
 		// product session JWTs reject earlier than capability tokens under
 		// NTP skew between Hub and clients.
 		jwt.WithLeeway(30*time.Second),

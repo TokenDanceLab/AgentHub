@@ -117,7 +117,8 @@ async function installGeometryMockHub(page: Page): Promise<void> {
       url.origin.includes('localhost:8080') ||
       url.origin.includes('127.0.0.1:8080') ||
       url.hostname.includes('hub.example.invalid') ||
-      url.hostname.includes('api.hub.example.invalid');
+      url.hostname.includes('api.hub.example.invalid') ||
+      url.hostname.includes('hub.example.invalid');
 
     if (!isHub) {
       return route.continue();

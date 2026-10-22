@@ -43,21 +43,21 @@ func TestWebSocketHandlerRejectsMissingAuthenticatedContextBeforeUpgrade(t *test
 	}
 }
 
-func TestWebSocketRouteRejectsTokenDanceBearerBeforeUpgrade(t *testing.T) {
-	token, issuer, audience, jwks := makeTokenDanceWebSocketTokenWithJWKS(t)
-	jwksServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(jwks))
-	}))
-	t.Cleanup(jwksServer.Close)
-
+func TestWebSocketRouteRejectsExternalAccountBearerBeforeUpgrade(t *testing.T) {
+	key := oidcfixture.NewKey(t)
+	token := oidcfixture.SignToken(
+		t,
+		key.Private,
+		key.Kid,
+		"https://account.example",
+		"agenthub-client",
+		"account-user-ws",
+		"",
+		"",
+	)
 	manager := hubws.NewManager()
 	wsURL := newMiddlewareWebSocketTestServer(t, manager, &config.Config{
 		JWT: config.JWTConfig{Secret: testWSSecret},
-		TokenDanceID: config.TokenDanceIDConfig{
-			IssuerURL: issuer,
-			ClientID:  audience,
-		},
 	})
 
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
@@ -69,7 +69,7 @@ func TestWebSocketRouteRejectsTokenDanceBearerBeforeUpgrade(t *testing.T) {
 		conn.Close(websocket.StatusNormalClosure, "")
 	}
 	if err == nil {
-		t.Fatal("expected TokenDance bearer route handshake to fail before WebSocket upgrade")
+		t.Fatal("expected Account provider bearer handshake to fail before WebSocket upgrade")
 	}
 	if resp == nil {
 		t.Fatalf("expected HTTP response for rejected upgrade, got err=%v", err)
@@ -77,8 +77,8 @@ func TestWebSocketRouteRejectsTokenDanceBearerBeforeUpgrade(t *testing.T) {
 	if resp.StatusCode != http.StatusUnauthorized {
 		t.Fatalf("status = %d, want %d", resp.StatusCode, http.StatusUnauthorized)
 	}
-	if got := manager.FindByUserDevice("tokendance-user-ws", "tokendance_bearer"); got != nil {
-		t.Fatal("TokenDance bearer must not register through the WebSocket route")
+	if got := manager.FindByUserDevice("account-user-ws", "account"); got != nil {
+		t.Fatal("Account provider bearer must not register through the WebSocket route")
 	}
 }
 
@@ -242,7 +242,7 @@ func TestWebSocketTypingAllowsSessionMemberCallback(t *testing.T) {
 				"members":    strings.Join(memberIDs, ","),
 			}
 		})
-	}, nil)
+	})
 	conn := dialWebSocketWithBearer(t, wsURL, token)
 	defer conn.Close(websocket.StatusNormalClosure, "")
 
@@ -286,7 +286,7 @@ func TestWebSocketTypingRejectsNonMemberBeforeCallback(t *testing.T) {
 		h.SetOnTyping(func(userID, sessionID string, memberIDs []string) {
 			called <- struct{}{}
 		})
-	}, nil)
+	})
 	conn := dialWebSocketWithBearer(t, wsURL, token)
 	defer conn.Close(websocket.StatusNormalClosure, "")
 
@@ -314,10 +314,10 @@ func newWebSocketTestServer(t *testing.T, manager *hubws.Manager) string {
 }
 
 func newMiddlewareWebSocketTestServer(t *testing.T, manager *hubws.Manager, cfg *config.Config) string {
-	return newConfiguredMiddlewareWebSocketTestServer(t, manager, cfg, nil, nil)
+	return newConfiguredMiddlewareWebSocketTestServer(t, manager, cfg, nil)
 }
 
-func newConfiguredMiddlewareWebSocketTestServer(t *testing.T, manager *hubws.Manager, cfg *config.Config, configure func(*handler.WebSocketHandler), tdVerifier *jwtutil.TokenDanceVerifier) string {
+func newConfiguredMiddlewareWebSocketTestServer(t *testing.T, manager *hubws.Manager, cfg *config.Config, configure func(*handler.WebSocketHandler)) string {
 	t.Helper()
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
@@ -325,7 +325,7 @@ func newConfiguredMiddlewareWebSocketTestServer(t *testing.T, manager *hubws.Man
 	if configure != nil {
 		configure(h)
 	}
-	r.GET("/client/ws", middleware.NewAuthMiddleware(cfg, middleware.AuthDependencies{}, tdVerifier).WSHandler(), h.ServeWS)
+	r.GET("/client/ws", middleware.NewAuthMiddleware(cfg, middleware.AuthDependencies{}).WSHandler(), h.ServeWS)
 	server := httptest.NewServer(r)
 	t.Cleanup(server.Close)
 	return "ws" + strings.TrimPrefix(server.URL, "http") + "/client/ws"
@@ -371,13 +371,4 @@ func readFrame(t *testing.T, conn *websocket.Conn) *hubws.Frame {
 		t.Fatalf("parse frame: %v", err)
 	}
 	return frame
-}
-
-func makeTokenDanceWebSocketTokenWithJWKS(t *testing.T) (token, issuer, audience, jwks string) {
-	t.Helper()
-	key := oidcfixture.NewKey(t)
-	issuer = "https://id.example"
-	audience = "agenthub-client"
-	token = oidcfixture.SignToken(t, key.Private, key.Kid, issuer, audience, "tokendance-user-ws", "", "")
-	return token, issuer, audience, key.JWKS
 }

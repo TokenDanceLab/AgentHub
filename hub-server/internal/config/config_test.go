@@ -591,114 +591,51 @@ func TestLoadUploadAllowedMimeTypesDefaultExcludesOctetStream(t *testing.T) {
 	}
 }
 
-func TestEnvOverrideTokenDanceIDCanonicalNames(t *testing.T) {
-	path := writeTempConfig(t, validJWTYAML+`
-tokendance_id:
-  issuer_url: ""
-  jwks_uri: ""
-  client_id: ""
-  client_secret: ""
-  redirect_uri: ""
-`)
-	t.Setenv("AGENTHUB_JWT_SECRET", "tokendance-env-secret-padded-to-minimum-32-chars..")
-	t.Setenv("AGENTHUB_TOKENDANCE_ID_ISSUER_URL", "https://id.example")
-	t.Setenv("AGENTHUB_TOKENDANCE_ID_JWKS_URI", "https://id.example/oidc/jwks")
-	t.Setenv("AGENTHUB_TOKENDANCE_ID_CLIENT_ID", "agenthub-client")
-	t.Setenv("AGENTHUB_TOKENDANCE_ID_CLIENT_SECRET", "agenthub-secret")
-	t.Setenv("AGENTHUB_TOKENDANCE_ID_REDIRECT_URI", "https://hub.example/client/auth/oidc/callback")
-	t.Setenv("AGENTHUB_TOKENDANCE_ID_ALLOWED_REDIRECT_URIS", "https://hub.example/auth/tokendance/callback, http://127.0.0.1/callback")
-
-	cfg, err := Load(path)
-	if err != nil {
-		t.Fatalf("Load() error = %v", err)
-	}
-	if cfg.TokenDanceID.IssuerURL != "https://id.example" {
-		t.Errorf("IssuerURL = %q", cfg.TokenDanceID.IssuerURL)
-	}
-	if cfg.TokenDanceID.JWKSURI != "https://id.example/oidc/jwks" {
-		t.Errorf("JWKSURI = %q", cfg.TokenDanceID.JWKSURI)
-	}
-	if cfg.TokenDanceID.ClientID != "agenthub-client" {
-		t.Errorf("ClientID = %q", cfg.TokenDanceID.ClientID)
-	}
-	if cfg.TokenDanceID.ClientSecret != "agenthub-secret" {
-		t.Errorf("ClientSecret = %q", cfg.TokenDanceID.ClientSecret)
-	}
-	if cfg.TokenDanceID.RedirectURI != "https://hub.example/client/auth/oidc/callback" {
-		t.Errorf("RedirectURI = %q", cfg.TokenDanceID.RedirectURI)
-	}
-	if len(cfg.TokenDanceID.AllowedRedirectURIs) != 2 {
-		t.Fatalf("AllowedRedirectURIs len = %d, want 2", len(cfg.TokenDanceID.AllowedRedirectURIs))
-	}
-	if cfg.TokenDanceID.AllowedRedirectURIs[0] != "https://hub.example/auth/tokendance/callback" {
-		t.Errorf("AllowedRedirectURIs[0] = %q", cfg.TokenDanceID.AllowedRedirectURIs[0])
-	}
-	if cfg.TokenDanceID.AllowedRedirectURIs[1] != "http://127.0.0.1/callback" {
-		t.Errorf("AllowedRedirectURIs[1] = %q", cfg.TokenDanceID.AllowedRedirectURIs[1])
-	}
-}
-
-func TestEnvOverrideTokenDanceIDCanonicalNamesWithoutYAMLSection(t *testing.T) {
+func TestEnvOverrideAccountOIDC(t *testing.T) {
 	path := writeTempConfig(t, validJWTYAML)
-	t.Setenv("AGENTHUB_JWT_SECRET", "tokendance-env-secret-padded-to-minimum-32-chars..")
-	t.Setenv("AGENTHUB_TOKENDANCE_ID_ISSUER_URL", "https://id.example")
-	t.Setenv("AGENTHUB_TOKENDANCE_ID_CLIENT_ID", "agenthub-client")
-	t.Setenv("AGENTHUB_TOKENDANCE_ID_CLIENT_SECRET", "agenthub-secret")
-	t.Setenv("AGENTHUB_TOKENDANCE_ID_REDIRECT_URI", "https://hub.example/client/auth/oidc/callback")
+	t.Setenv("AGENTHUB_JWT_SECRET", "account-oidc-env-secret-padded-to-minimum-32-chars..")
+	t.Setenv("AGENTHUB_ACCOUNT_OIDC_ISSUER_URL", "https://account.example")
+	t.Setenv("AGENTHUB_ACCOUNT_OIDC_CLIENT_ID", "agenthub-account")
+	t.Setenv("AGENTHUB_ACCOUNT_OIDC_CLIENT_SECRET", "account-oidc-secret-with-at-least-32-characters")
+	t.Setenv("AGENTHUB_ACCOUNT_OIDC_REDIRECT_URI", "https://hub.example/workbench/auth/account/callback")
+	t.Setenv("AGENTHUB_ACCOUNT_OIDC_ALLOWED_REDIRECT_URIS", "http://127.0.0.1:45817/callback")
 
 	cfg, err := Load(path)
 	if err != nil {
 		t.Fatalf("Load() error = %v", err)
 	}
-	if cfg.TokenDanceID.IssuerURL != "https://id.example" {
-		t.Errorf("IssuerURL = %q", cfg.TokenDanceID.IssuerURL)
+	if cfg.AccountOIDC.IssuerURL != "https://account.example" {
+		t.Errorf("IssuerURL = %q", cfg.AccountOIDC.IssuerURL)
 	}
-	if cfg.TokenDanceID.JWKSURI != "https://id.example/oidc/jwks" {
-		t.Errorf("JWKSURI = %q", cfg.TokenDanceID.JWKSURI)
+	if cfg.AccountOIDC.ClientID != "agenthub-account" {
+		t.Errorf("ClientID = %q", cfg.AccountOIDC.ClientID)
 	}
-	if cfg.TokenDanceID.ClientID != "agenthub-client" {
-		t.Errorf("ClientID = %q", cfg.TokenDanceID.ClientID)
+	if cfg.AccountOIDC.ClientSecret != "account-oidc-secret-with-at-least-32-characters" {
+		t.Errorf("ClientSecret mismatch")
 	}
-	if cfg.TokenDanceID.ClientSecret != "agenthub-secret" {
-		t.Errorf("ClientSecret = %q", cfg.TokenDanceID.ClientSecret)
+	if cfg.AccountOIDC.RedirectURI != "https://hub.example/workbench/auth/account/callback" {
+		t.Errorf("RedirectURI = %q", cfg.AccountOIDC.RedirectURI)
 	}
-	if cfg.TokenDanceID.RedirectURI != "https://hub.example/client/auth/oidc/callback" {
-		t.Errorf("RedirectURI = %q", cfg.TokenDanceID.RedirectURI)
+	if len(cfg.AccountOIDC.AllowedRedirectURIs) != 1 ||
+		cfg.AccountOIDC.AllowedRedirectURIs[0] != "http://127.0.0.1:45817/callback" {
+		t.Errorf("AllowedRedirectURIs = %#v", cfg.AccountOIDC.AllowedRedirectURIs)
 	}
 }
 
-func TestEnvOverrideTokenDanceIDLegacyNamesStillWork(t *testing.T) {
-	path := writeTempConfig(t, validJWTYAML+`
-tokendance_id:
-  issuer_url: ""
-  client_id: ""
-  client_secret: ""
-  redirect_uri: ""
-`)
-	t.Setenv("AGENTHUB_JWT_SECRET", "tokendance-legacy-secret-padded-to-minimum-32-chars..")
-	t.Setenv("AGENTHUB_TOKENDANCE_ISSUER_URL", "https://legacy-id.example")
-	t.Setenv("AGENTHUB_TOKENDANCE_CLIENT_ID", "legacy-client")
-	t.Setenv("AGENTHUB_TOKENDANCE_CLIENT_SECRET", "legacy-secret")
-	t.Setenv("AGENTHUB_TOKENDANCE_REDIRECT_URI", "https://legacy.example/callback")
+func TestLegacyTokenDanceEnvNamesAreIgnored(t *testing.T) {
+	path := writeTempConfig(t, validJWTYAML)
+	t.Setenv("AGENTHUB_JWT_SECRET", "account-oidc-env-secret-padded-to-minimum-32-chars..")
+	t.Setenv("AGENTHUB_TOKENDANCE_ID_ISSUER_URL", "https://id.example")
+	t.Setenv("AGENTHUB_TOKENDANCE_ID_CLIENT_ID", "legacy-client")
+	t.Setenv("AGENTHUB_TOKENDANCE_ID_CLIENT_SECRET", "legacy-secret-value-with-at-least-32-chars")
+	t.Setenv("AGENTHUB_TOKENDANCE_ID_REDIRECT_URI", "https://legacy.example/callback")
 
 	cfg, err := Load(path)
 	if err != nil {
 		t.Fatalf("Load() error = %v", err)
 	}
-	if cfg.TokenDanceID.IssuerURL != "https://legacy-id.example" {
-		t.Errorf("IssuerURL = %q", cfg.TokenDanceID.IssuerURL)
-	}
-	if cfg.TokenDanceID.JWKSURI != "https://legacy-id.example/oidc/jwks" {
-		t.Errorf("JWKSURI = %q", cfg.TokenDanceID.JWKSURI)
-	}
-	if cfg.TokenDanceID.ClientID != "legacy-client" {
-		t.Errorf("ClientID = %q", cfg.TokenDanceID.ClientID)
-	}
-	if cfg.TokenDanceID.ClientSecret != "legacy-secret" {
-		t.Errorf("ClientSecret = %q", cfg.TokenDanceID.ClientSecret)
-	}
-	if cfg.TokenDanceID.RedirectURI != "https://legacy.example/callback" {
-		t.Errorf("RedirectURI = %q", cfg.TokenDanceID.RedirectURI)
+	if cfg.AccountOIDC.ClientID != "" || cfg.AccountOIDC.IssuerURL != "" {
+		t.Fatalf("legacy TokenDance env names must not configure Account OIDC: %#v", cfg.AccountOIDC)
 	}
 }
 
@@ -806,104 +743,156 @@ func TestValidateRejectsInvalidAgentTeamGuardrails(t *testing.T) {
 	}
 }
 
-func TestValidateTokenDanceIDRequiresRedirectURI(t *testing.T) {
-	cfg := &Config{
+func accountOIDCBaseConfig() *Config {
+	return &Config{
 		DB: DBConfig{
-			Host:            "localhost",
-			Port:            5432,
-			User:            "agenthub",
-			Name:            "agenthub",
-			MaxOpenConns:    2,
-			MaxIdleConns:    1,
-			ConnMaxLifetime: 30 * time.Minute,
-			ConnMaxIdleTime: 5 * time.Minute,
+			Host: "localhost", Port: 5432, User: "agenthub", Name: "agenthub",
+			MaxOpenConns: 2, MaxIdleConns: 1,
+			ConnMaxLifetime: 30 * time.Minute, ConnMaxIdleTime: 5 * time.Minute,
 		},
-		Redis: RedisConfig{
-			Host: "localhost",
-			Port: 6379,
+		Redis: RedisConfig{Host: "localhost", Port: 6379},
+		JWT:   JWTConfig{Secret: "strong-agenthub-secret-padded-to-minimum-32-chars.."},
+		AccountOIDC: AccountOIDCConfig{
+			IssuerURL:    "https://account.example",
+			ClientID:     "agenthub-account",
+			ClientSecret: "account-oidc-secret-with-at-least-32-characters",
+			RedirectURI:  "https://hub.example/workbench/auth/account/callback",
 		},
-		JWT: JWTConfig{
-			Secret: "strong-agenthub-secret-padded-to-minimum-32-chars..",
-		},
-		TokenDanceID: TokenDanceIDConfig{
-			IssuerURL:    "https://id.example",
-			ClientID:     "agenthub-client",
-			ClientSecret: "agenthub-secret",
-		},
-	}
-
-	err := cfg.Validate()
-	if err == nil {
-		t.Fatal("expected missing TokenDance ID redirect URI to be rejected")
-	}
-	if !strings.Contains(err.Error(), "tokendance_id.redirect_uri") {
-		t.Fatalf("Validate() error = %q, want tokendance_id.redirect_uri", err.Error())
 	}
 }
 
-func TestValidateTokenDanceIDRejectsShortClientSecret(t *testing.T) {
-	cfg := &Config{
-		DB: DBConfig{
-			Host:            "localhost",
-			Port:            5432,
-			User:            "agenthub",
-			Name:            "agenthub",
-			MaxOpenConns:    2,
-			MaxIdleConns:    1,
-			ConnMaxLifetime: 30 * time.Minute,
-			ConnMaxIdleTime: 5 * time.Minute,
-		},
-		Redis: RedisConfig{Host: "localhost", Port: 6379},
-		JWT: JWTConfig{
-			Secret: "strong-agenthub-secret-padded-to-minimum-32-chars..",
-		},
-		TokenDanceID: TokenDanceIDConfig{
-			IssuerURL:    "https://id.example",
-			ClientID:     "agenthub-client",
-			ClientSecret: "short-but-present-secret",
-			RedirectURI:  "http://127.0.0.1/callback",
-		},
-	}
+func TestValidateAccountOIDCRequiresRedirectURI(t *testing.T) {
+	cfg := accountOIDCBaseConfig()
+	cfg.AccountOIDC.RedirectURI = ""
 
 	err := cfg.Validate()
 	if err == nil {
-		t.Fatal("expected short TokenDance ID client secret to be rejected")
+		t.Fatal("expected missing Account redirect URI to be rejected")
 	}
-	if !strings.Contains(err.Error(), "tokendance_id.client_secret too short") {
-		t.Fatalf("Validate() error = %q, want tokendance_id.client_secret too short", err.Error())
+	if !strings.Contains(err.Error(), "account_oidc.redirect_uri") {
+		t.Fatalf("Validate() error = %q, want account_oidc.redirect_uri", err.Error())
 	}
 }
 
-func TestValidateTokenDanceIDRejectsSeedSecret(t *testing.T) {
-	cfg := &Config{
-		DB: DBConfig{
-			Host:            "localhost",
-			Port:            5432,
-			User:            "agenthub",
-			Name:            "agenthub",
-			MaxOpenConns:    2,
-			MaxIdleConns:    1,
-			ConnMaxLifetime: 30 * time.Minute,
-			ConnMaxIdleTime: 5 * time.Minute,
-		},
-		Redis: RedisConfig{Host: "localhost", Port: 6379},
-		JWT: JWTConfig{
-			Secret: "strong-agenthub-secret-padded-to-minimum-32-chars..",
-		},
-		TokenDanceID: TokenDanceIDConfig{
-			IssuerURL:    "https://id.example",
-			ClientID:     "agenthub-client",
-			ClientSecret: weakSecretPrefixes[len(weakSecretPrefixes)-1] + strings.Repeat("x", 32),
-			RedirectURI:  "http://127.0.0.1/callback",
-		},
-	}
+func TestValidateAccountOIDCRejectsShortClientSecret(t *testing.T) {
+	cfg := accountOIDCBaseConfig()
+	cfg.AccountOIDC.ClientSecret = "short-but-present-secret"
 
 	err := cfg.Validate()
 	if err == nil {
-		t.Fatal("expected seed SQL TokenDance ID client secret to be rejected")
+		t.Fatal("expected short Account client secret to be rejected")
 	}
-	if !strings.Contains(err.Error(), "tokendance_id.client_secret must be a strong") {
-		t.Fatalf("Validate() error = %q, want tokendance_id.client_secret must be a strong", err.Error())
+	if !strings.Contains(err.Error(), "account_oidc.client_secret too short") {
+		t.Fatalf("Validate() error = %q, want account_oidc.client_secret too short", err.Error())
+	}
+}
+
+func TestValidateAccountOIDCRejectsWeakSecret(t *testing.T) {
+	cfg := accountOIDCBaseConfig()
+	cfg.AccountOIDC.ClientSecret = "agenthub-dev-secret-change-me" + strings.Repeat("x", 16)
+
+	err := cfg.Validate()
+	if err == nil {
+		t.Fatal("expected weak Account client secret to be rejected")
+	}
+	if !strings.Contains(err.Error(), "account_oidc.client_secret must be a strong") {
+		t.Fatalf("Validate() error = %q, want strong-secret error", err.Error())
+	}
+}
+
+func TestValidateAccountOIDCRejectsInsecureIssuerAndDuplicateRedirect(t *testing.T) {
+	cfg := accountOIDCBaseConfig()
+	cfg.AccountOIDC.IssuerURL = "http://account.example"
+	if err := cfg.Validate(); err == nil || !strings.Contains(err.Error(), "must use https") {
+		t.Fatalf("insecure issuer error = %v", err)
+	}
+
+	cfg = accountOIDCBaseConfig()
+	cfg.AccountOIDC.AllowedRedirectURIs = []string{cfg.AccountOIDC.RedirectURI}
+	if err := cfg.Validate(); err == nil || !strings.Contains(err.Error(), "duplicated") {
+		t.Fatalf("duplicate redirect error = %v", err)
+	}
+}
+
+func TestValidateAccountOIDCAllowsLoopbackDevelopment(t *testing.T) {
+	cfg := &Config{
+		DB: DBConfig{
+			Host: "localhost", Port: 5432, User: "agenthub", Name: "agenthub",
+			MaxOpenConns: 2, MaxIdleConns: 1,
+			ConnMaxLifetime: 30 * time.Minute, ConnMaxIdleTime: 5 * time.Minute,
+		},
+		Redis: RedisConfig{Host: "localhost", Port: 6379},
+		JWT:   JWTConfig{Secret: "strong-agenthub-secret-padded-to-minimum-32-chars.."},
+		AccountOIDC: AccountOIDCConfig{
+			IssuerURL:    "http://127.0.0.1:8080",
+			ClientID:     "agenthub-account-local",
+			ClientSecret: "account-oidc-secret-with-at-least-32-characters",
+			RedirectURI:  "http://127.0.0.1:5174/workbench/auth/account/callback",
+		},
+	}
+	if err := cfg.Validate(); err != nil {
+		t.Fatalf("loopback development config rejected: %v", err)
+	}
+}
+
+func TestValidateAccountOIDCProductionRejectsNonPublicIssuer(t *testing.T) {
+	for _, issuerURL := range []string{
+		"http://127.0.0.1:8080",
+		"https://localhost:8443",
+		"https://10.0.0.1",
+		"https://192.168.1.2",
+		"https://[fd00::1]",
+		"https://169.254.169.254",
+		"https://0.0.0.0",
+	} {
+		t.Run(issuerURL, func(t *testing.T) {
+			cfg := accountOIDCBaseConfig()
+			cfg.Server.Env = "production"
+			cfg.DB.SSLMode = "require"
+			cfg.AccountOIDC.IssuerURL = issuerURL
+			t.Setenv("AGENTHUB_AUTH_FAIL_CLOSED", "true")
+
+			err := cfg.Validate()
+			if err == nil || !strings.Contains(err.Error(), "issuer_url must") {
+				t.Fatalf("non-public production issuer %q error = %v", issuerURL, err)
+			}
+		})
+	}
+}
+
+func TestValidateAccountOIDCRejectsPartialConfiguration(t *testing.T) {
+	cfg := accountOIDCBaseConfig()
+	cfg.AccountOIDC.ClientID = ""
+
+	err := cfg.Validate()
+	if err == nil || !strings.Contains(err.Error(), "account_oidc.client_id") {
+		t.Fatalf("partial Account config error = %v", err)
+	}
+}
+
+func TestValidateProductionRequiresAccountOIDC(t *testing.T) {
+	cfg := accountOIDCBaseConfig()
+	cfg.Server.Env = "production"
+	cfg.DB.SSLMode = "require"
+	cfg.AccountOIDC = AccountOIDCConfig{}
+	t.Setenv("AGENTHUB_AUTH_FAIL_CLOSED", "true")
+
+	err := cfg.Validate()
+	if err == nil || !strings.Contains(err.Error(), "account_oidc must be configured") {
+		t.Fatalf("production Account config error = %v", err)
+	}
+}
+
+func TestValidateProductionRejectsRetiredTokenDanceEnv(t *testing.T) {
+	cfg := accountOIDCBaseConfig()
+	cfg.Server.Env = "production"
+	cfg.DB.SSLMode = "require"
+	t.Setenv("AGENTHUB_AUTH_FAIL_CLOSED", "true")
+	t.Setenv("AGENTHUB_TOKENDANCE_ID_CLIENT_ID", "retired-client")
+
+	err := cfg.Validate()
+	if err == nil || !strings.Contains(err.Error(), "AGENTHUB_TOKENDANCE_ID_CLIENT_ID") {
+		t.Fatalf("retired env error = %v", err)
 	}
 }
 
@@ -1363,6 +1352,11 @@ jwt:
 upload:
   dir: ""
   max_size: 10485760
+account_oidc:
+  issuer_url: https://account.example
+  client_id: agenthub-account
+  client_secret: prod-guard-account-client-secret-32-chars
+  redirect_uri: https://hub.example/workbench/auth/account/callback
 `
 
 func writeProdGuardConfig(t *testing.T, env, sslmode string) string {

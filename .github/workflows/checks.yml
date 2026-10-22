@@ -11,17 +11,6 @@ on:
   push:
     branches: [master]
   workflow_dispatch:
-    inputs:
-      id_env:
-        description: >-
-          ID 来源（real-e2e-stack lane）：
-          source=从 vars.OIDC_SOURCE_REPO 指定的 GitHub 仓库构建（需 secrets.OIDC_CLONE_TOKEN）；
-          image=使用 vars.OIDC_IMAGE 指定的镜像；
-          local=runner 本机 loopback ID。
-          本 lane 只使用 127.0.0.1:3000。
-        default: source
-        type: choice
-        options: [source, image, local]
 
 permissions:
   contents: read
@@ -893,10 +882,10 @@ jobs:
       AGENTHUB_ENV: test
       # OIDC authorize 测试走真实 router，需要非空 OIDC 配置；
       # 占位值即可（GenerateAuthorizationURL 只组装 URL 不发起网络请求）。
-      AGENTHUB_TOKENDANCE_ID_ISSUER_URL: "https://id.example.invalid"
-      AGENTHUB_TOKENDANCE_ID_CLIENT_ID: "ci-integration-client"
-      AGENTHUB_TOKENDANCE_ID_CLIENT_SECRET: "ci-integration-secret-not-a-real-secret"
-      AGENTHUB_TOKENDANCE_ID_REDIRECT_URI: "http://127.0.0.1:8080/client/auth/oidc/callback"
+      AGENTHUB_ACCOUNT_OIDC_ISSUER_URL: "https://account.example.invalid"
+      AGENTHUB_ACCOUNT_OIDC_CLIENT_ID: "ci-integration-client"
+      AGENTHUB_ACCOUNT_OIDC_CLIENT_SECRET: "ci-integration-secret-not-a-real-secret"
+      AGENTHUB_ACCOUNT_OIDC_REDIRECT_URI: "http://127.0.0.1:8080/client/auth/oidc/callback"
       # migration_audit_test.go 需要 admin URL（superuser）来 CREATE/DROP 独立测试库。
       # agenthub:agenthub 是 CI PG 测试容器的 throwaway 凭据，127.0.0.1 是 runner loopback，非真实凭据。
       AGENTHUB_PG_MIGRATION_TEST_ADMIN_URL: "postgres://agenthub:agenthub@127.0.0.1:5432/agenthub?sslmode=disable"  # leak-guard-allow:LG-F4C6A155
@@ -1662,18 +1651,11 @@ jobs:
         working-directory: ./app
 
   # ── Real E2E stack lane (L3, dispatch-only) ─────
-  # 可重跑真栈 lane：起 PostgreSQL/Redis(docker compose)+TokenDance ID+
-  # hub+edge+web 全栈后跑真实 OIDC 浏览器 spec（app/e2e/real-oidc-login.spec.ts，
-  # playwright.real.config.ts），产出 tests/artifacts/manifest-<stamp>.json
-  # （六字段 evidence 合同，verify-real-e2e-lane-manifest.py 自检）并上传证据。
-  # L3 不进 PR merge 门禁；与 e2e-smoke 同为 dispatch-only。
-  # ID 来源（workflow_dispatch 输入 id_env：source/image/local）：
-  #   source —— 从 vars.OIDC_SOURCE_REPO 指定的 GitHub 仓库构建。
-  #              克隆需要 secrets.OIDC_CLONE_TOKEN（contents:read）；
-  #              缺失时 lane 记 blocked（real_tested=false）。
-  #   image  —— 使用 vars.OIDC_IMAGE 指定的镜像。
-  #   local  —— 假定 runner 本机 127.0.0.1:3000 已有 ID。
-  #   所有模式都只使用 runner 本机 127.0.0.1:3000。
+  # Operator-only lane: the external TokenDance Account issuer/client must
+  # already be registered, and disposable account credentials are supplied by
+  # repository secrets. This workflow starts Hub/Edge/Web plus disposable
+  # PostgreSQL/Redis only; it never clones, builds, seeds or starts Account.
+  # Default PR/push gates therefore never depend on internal Account source.
   real-e2e-stack:
     name: Real E2E stack (L3 lane, dispatch-only)
     if: github.event_name == 'workflow_dispatch'
@@ -1691,11 +1673,11 @@ jobs:
       AGENTHUB_REDIS_PORT: "6379"
       AGENTHUB_SERVER_PORT: "8080"
       AGENTHUB_SERVER_ADMIN_PORT: "6060"
-      # Local OIDC issuer for this CI session.
-      AGENTHUB_TOKENDANCE_ID_ISSUER_URL: http://127.0.0.1:3000
-      AGENTHUB_TOKENDANCE_ID_REDIRECT_URI: http://127.0.0.1:8080/client/auth/oidc/callback
-      # workbench 回调走 /workbench 前缀；CI 会话需要两版变体（无 base 变体供 H5 兼容）。
-      AGENTHUB_TOKENDANCE_ID_ALLOWED_REDIRECT_URIS: http://127.0.0.1:8080/client/auth/oidc/callback,http://127.0.0.1:5174/auth/tokendance/callback,http://localhost:5174/auth/tokendance/callback,http://127.0.0.1:5174/workbench/auth/tokendance/callback,http://localhost:5174/workbench/auth/tokendance/callback
+      # Account is external. Both callback forms are required: the packaged
+      # desktop fixed loopback port and Web dev under its /workbench base (plus
+      # the root-base variants for VITE_BASE_PATH=/).
+      AGENTHUB_ACCOUNT_OIDC_REDIRECT_URI: http://127.0.0.1:53682/callback
+      AGENTHUB_ACCOUNT_OIDC_ALLOWED_REDIRECT_URIS: http://localhost:5174/auth/account/callback,http://127.0.0.1:5174/auth/account/callback,http://localhost:5174/workbench/auth/account/callback,http://127.0.0.1:5174/workbench/auth/account/callback
     steps:
       - uses: actions/checkout@v7
         with:
@@ -1721,133 +1703,90 @@ jobs:
         run: pnpm exec playwright install --with-deps chromium
         working-directory: ./app
 
-      - name: Install lane prereqs (sqlite3, bcrypt)
-        shell: bash
-        run: |
-          sudo apt-get update -y
-          sudo apt-get install -y sqlite3 openssl python3-bcrypt
-          # 不用 pip 装系统 python（PEP 668 externally-managed）；provision 的
-          # python3 -c 'import bcrypt' 走系统解释器，apt 包即满足。
-
-      - name: Generate run-time credentials (OIDC client, hub JWT, DB password; never committed)
+      - name: Generate run-time Hub/DB credentials (never committed)
         id: creds
         shell: bash
         run: |
-          cid="c_$(openssl rand -hex 12)"
-          csec="cs_$(openssl rand -hex 24)"
           jwt="$(openssl rand -hex 24)"
           dbpw="$(openssl rand -hex 18)"
           # step outputs 不进 masking 系统：先 add-mask 再写 GITHUB_OUTPUT，
           # 避免后续步骤/失败回显把明文凭据打进公开 run log。
-          for v in "$csec" "$jwt" "$dbpw"; do echo "::add-mask::$v"; done
+          for v in "$jwt" "$dbpw"; do echo "::add-mask::$v"; done
           {
-            echo "cid=$cid"
-            echo "csec=$csec"
             echo "jwt=$jwt"
             echo "dbpw=$dbpw"
           } >> "$GITHUB_OUTPUT"
+
+      - name: Validate external Account registration
+        shell: bash
+        env:
+          ACCOUNT_ISSUER: ${{ vars.AGENTHUB_E2E_ACCOUNT_ISSUER }}
+          ACCOUNT_CLIENT_ID: ${{ vars.AGENTHUB_E2E_ACCOUNT_CLIENT_ID }}
+        run: |
+          missing=""
+          for name in ACCOUNT_ISSUER ACCOUNT_CLIENT_ID; do
+            if [ -z "${!name:-}" ]; then missing="$missing $name"; fi
+          done
+          if [ -n "$missing" ]; then
+            echo "::error::external Account lane inputs missing:$missing"
+            exit 1
+          fi
+          python3 - <<'PY'
+          import json
+          import os
+          import urllib.parse
+          import urllib.request
+
+          issuer = os.environ["ACCOUNT_ISSUER"].strip().rstrip("/")
+          if issuer != os.environ["ACCOUNT_ISSUER"].strip():
+              raise SystemExit("external Account issuer must be supplied without a trailing slash")
+          parsed = urllib.parse.urlparse(issuer)
+          if parsed.scheme != "https":
+              raise SystemExit("external Account issuer must use HTTPS")
+          with urllib.request.urlopen(
+              issuer + "/.well-known/openid-configuration",
+              timeout=15,
+          ) as response:
+              metadata = json.load(response)
+          if metadata.get("issuer") != issuer:
+              raise SystemExit("Account discovery issuer mismatch")
+          expected = {
+              "authorization_endpoint": issuer + "/oauth/authorize",
+              "token_endpoint": issuer + "/oauth/token",
+              "userinfo_endpoint": issuer + "/oauth/userinfo",
+              "jwks_uri": issuer + "/oauth/jwks",
+          }
+          for key, value in expected.items():
+              if metadata.get(key) != value:
+                  raise SystemExit(f"Account discovery {key} mismatch")
+          required = {
+              "response_types_supported": "code",
+              "response_modes_supported": "query",
+              "grant_types_supported": "authorization_code",
+              "id_token_signing_alg_values_supported": "RS256",
+              "code_challenge_methods_supported": "S256",
+              "token_endpoint_auth_methods_supported": "client_secret_basic",
+          }
+          for key, value in required.items():
+              if value not in (metadata.get(key) or []):
+                  raise SystemExit(f"Account discovery missing {key}={value}")
+          if metadata.get("authorization_response_iss_parameter_supported") is not True:
+              raise SystemExit("Account discovery missing RFC 9207 issuer support")
+          PY
 
       - name: Start PostgreSQL + Redis (compose)
         env:
           AGENTHUB_DB_PASSWORD: ${{ steps.creds.outputs.dbpw }}
         run: docker compose up -d postgres redis
 
-      # OIDC_SOURCE_REPO / OIDC_IMAGE are maintainer-managed repository
-      # variables. Variable-write access is part of the trust boundary: the lane
-      # builds and runs whatever these point at, with the runner credentials.
-      - name: Start TokenDance ID (source checkout)
-        if: inputs.id_env == 'source'
-        shell: bash
-        env:
-          ID_REPO_TOKEN: ${{ secrets.OIDC_CLONE_TOKEN }}
-          ID_SOURCE_REPO: ${{ vars.OIDC_SOURCE_REPO }}
-        run: |
-          if [ -z "$ID_REPO_TOKEN" ] || [ -z "$ID_SOURCE_REPO" ]; then
-            echo "::warning::TokenDance ID source credentials/configuration unset — real ID unavailable;"
-            echo "::warning::the lane step will record an honest blocked manifest (real_tested=false)."
-            exit 0
-          fi
-          if ! printf '%s' "$ID_SOURCE_REPO" | grep -Eq '^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$'; then
-            echo "::error::OIDC_SOURCE_REPO must be a plain owner/repo name"
-            exit 1
-          fi
-          sudo mkdir -p /var/lib/oidc-provider
-          # 目录须归 runner 用户：ID 二进制以非特权 runner 运行并要在此创建
-          # tokendance.db（lane/provision 的 AGENTHUB_E2E_ID_DB 同路径读写）。
-          sudo chown "$(id -u):$(id -g)" /var/lib/oidc-provider
-          AUTH_HEADER="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$ID_REPO_TOKEN" | base64 -w0)"
-          git -c http.https://github.com/.extraheader="$AUTH_HEADER" clone --quiet --depth 1             "https://github.com/${ID_SOURCE_REPO}.git" /tmp/oidc-provider
-          (cd /tmp/oidc-provider && go build -o /tmp/oidc-provider-bin ./cmd/tokendance-id)
-          cp /tmp/oidc-provider/configs/config.example.yaml /tmp/oidc-provider/configs/config.yaml
-          openssl genrsa -out /tmp/id-private.pem 2048 >/dev/null 2>&1
-          openssl rsa -in /tmp/id-private.pem -pubout -out /tmp/id-public.pem >/dev/null 2>&1
-          (cd /tmp/oidc-provider && nohup env \
-            -u ID_REPO_TOKEN -u ID_SOURCE_REPO \
-            TOKENDANCE_SERVER_ADDR=:3000 \
-            TOKENDANCE_DATABASE_DSN=/var/lib/oidc-provider/tokendance.db \
-            TOKENDANCE_JWT_ISSUER=http://127.0.0.1:3000 \
-            TOKENDANCE_JWT_PRIVATE_KEY_PATH=/tmp/id-private.pem \
-            TOKENDANCE_JWT_PUBLIC_KEY_PATH=/tmp/id-public.pem \
-            TOKENDANCE_JWT_ACCESS_TTL=15m \
-            TOKENDANCE_JWT_REFRESH_TTL=24h \
-            TOKENDANCE_SECURITY_COOKIE_SECURE=false \
-            TOKENDANCE_SECURITY_COOKIE_DOMAIN=127.0.0.1 \
-            TOKENDANCE_SESSION_TTL=24h \
-            TOKENDANCE_FEATURES_REQUIRE_INVITE=false \
-            TOKENDANCE_REDIS_ADDR=127.0.0.1:6379 \
-            /tmp/oidc-provider-bin > /tmp/id.log 2>&1 &)
-          for i in $(seq 1 60); do
-            curl -sf -m 3 http://127.0.0.1:3000/health >/dev/null 2>&1 && break
-            sleep 2
-          done
-          curl -sf -m 3 http://127.0.0.1:3000/health >/dev/null || { echo "TokenDance ID did not become healthy"; tail -50 /tmp/id.log; exit 1; }
-
-      - name: Start TokenDance ID (image, pre-registered)
-        if: inputs.id_env == 'image'
-        shell: bash
-        env:
-          ID_IMAGE: ${{ vars.OIDC_IMAGE }}
-        run: |
-          if [ -z "$ID_IMAGE" ]; then
-            echo "::warning::vars.OIDC_IMAGE unset — image lane unavailable."
-            exit 0
-          fi
-          if ! printf '%s' "$ID_IMAGE" | grep -Eq '^[a-z0-9][a-z0-9._/-]*(:[A-Za-z0-9._-]+)?(@sha256:[a-f0-9]{64})?$'; then
-            echo "::error::OIDC_IMAGE must be a plain image reference"
-            exit 1
-          fi
-          sudo mkdir -p /var/lib/oidc-provider
-          # 挂载目录归 runner 用户；容器以 --user 同属主运行，库文件归 runner，
-          # lane/provision 的 sqlite 读写不受 root 属主影响。
-          sudo chown "$(id -u):$(id -g)" /var/lib/oidc-provider
-          docker run -d --user "$(id -u):$(id -g)" --name td-id -p 127.0.0.1:3000:3000 \
-            -e TOKENDANCE_SERVER_ADDR=:3000 \
-            -e TOKENDANCE_DATABASE_DSN=/app/data/tokendance.db \
-            -e TOKENDANCE_JWT_ISSUER=http://127.0.0.1:3000 \
-            -e TOKENDANCE_SECURITY_COOKIE_SECURE=false \
-            -e TOKENDANCE_SECURITY_COOKIE_DOMAIN=127.0.0.1 \
-            -e TOKENDANCE_SESSION_TTL=24h \
-            -e TOKENDANCE_FEATURES_REQUIRE_INVITE=false \
-            -v /var/lib/oidc-provider:/app/data \
-            "$ID_IMAGE"
-          for i in $(seq 1 60); do
-            curl -sf -m 3 http://127.0.0.1:3000/health >/dev/null 2>&1 && break
-            sleep 2
-          done
-          curl -sf -m 3 http://127.0.0.1:3000/health >/dev/null || { echo "TokenDance ID image did not become healthy"; exit 1; }
-
-      - name: Preflight local TokenDance ID (loopback only)
-        if: inputs.id_env == 'local'
-        shell: bash
-        run: echo "::info::id_env=local; lane preflight will probe http://127.0.0.1:3000"
-
       - name: Build and start Hub Server
         shell: bash
         env:
           AGENTHUB_DB_PASSWORD: ${{ steps.creds.outputs.dbpw }}
           AGENTHUB_JWT_SECRET: ${{ steps.creds.outputs.jwt }}
-          AGENTHUB_TOKENDANCE_ID_CLIENT_ID: ${{ steps.creds.outputs.cid }}
-          AGENTHUB_TOKENDANCE_ID_CLIENT_SECRET: ${{ steps.creds.outputs.csec }}
+          AGENTHUB_ACCOUNT_OIDC_ISSUER_URL: ${{ vars.AGENTHUB_E2E_ACCOUNT_ISSUER }}
+          AGENTHUB_ACCOUNT_OIDC_CLIENT_ID: ${{ vars.AGENTHUB_E2E_ACCOUNT_CLIENT_ID }}
+          AGENTHUB_ACCOUNT_OIDC_CLIENT_SECRET: ${{ secrets.AGENTHUB_E2E_ACCOUNT_CLIENT_SECRET }}
         run: |
           mkdir -p uploads
           nohup go run ./hub-server/cmd/server-hub > /tmp/hub.log 2>&1 &
@@ -1883,16 +1822,14 @@ jobs:
         if: always()
         shell: bash
         env:
-          # Same local issuer as above.
-          AGENTHUB_E2E_ID_BASE_URL: http://127.0.0.1:3000
+          AGENTHUB_E2E_ACCOUNT_ISSUER: ${{ vars.AGENTHUB_E2E_ACCOUNT_ISSUER }}
           AGENTHUB_E2E_HUB_BASE_URL: http://127.0.0.1:8080
           AGENTHUB_E2E_EDGE_BASE_URL: http://127.0.0.1:3210
           AGENTHUB_E2E_WEB_BASE_URL: http://127.0.0.1:5174
-          # 与 hub 启动步骤同一对运行期凭据；provision 脚本以此 seed ID 的 OAuth client。
-          AGENTHUB_E2E_ID_CLIENT_ID: ${{ steps.creds.outputs.cid }}
-          AGENTHUB_E2E_ID_CLIENT_SECRET: ${{ steps.creds.outputs.csec }}
-          # ID 容器/二进制跑在 runner 本机，使用 provision 脚本默认 sqlite 路径。
-          AGENTHUB_E2E_ID_DB: /var/lib/oidc-provider/tokendance.db
+          AGENTHUB_E2E_USER_EMAIL: ${{ secrets.AGENTHUB_E2E_USER_EMAIL }}
+          AGENTHUB_E2E_USER_PASSWORD: ${{ secrets.AGENTHUB_E2E_USER_PASSWORD }}
+          AGENTHUB_E2E_PARTNER_EMAIL: ${{ secrets.AGENTHUB_E2E_PARTNER_EMAIL }}
+          AGENTHUB_E2E_PARTNER_PASSWORD: ${{ secrets.AGENTHUB_E2E_PARTNER_PASSWORD }}
           # chat-real.spec.ts 的 mintTestJWT 需要正在运行的 Hub 签名密钥；
           # 该值在 creds 步骤已 ::add-mask::，跨步骤不会自动继承。
           AGENTHUB_JWT_SECRET: ${{ steps.creds.outputs.jwt }}

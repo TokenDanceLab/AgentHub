@@ -2,14 +2,14 @@
 # ───────────────────────────────────────────────────────────────
 # devserver.sh — 远程 dev 服务器测试平台统一入口
 #
-# 远程服务器 = 真实测试面（L3）：全栈（TokenDanceID + hub + edge +
-# web vite）跑在服务器上，本脚本从本地发起同步/启动/测试/回传。
+# 远程服务器 = 真实测试面（L3）：外部 TokenDance Account + hub + edge +
+# web vite 跑在服务器/operator 环境中，本脚本从本地发起同步/启动/测试/回传。
 #
 # 用法:
 #   scripts/dev/devserver.sh sync     # 打包本地 master 增量并推送到服务器（ff-only）
 #   scripts/dev/devserver.sh start    # 依赖容器 + hub/edge 启动与健康等待（幂等）
 #   scripts/dev/devserver.sh stop     # 停止 hub/edge 进程（容器保留）
-#   scripts/dev/devserver.sh status   # 四服务健康 + git 状态
+#   scripts/dev/devserver.sh status   # Account/Hub/Edge/Web 健康 + git 状态
 #   scripts/dev/devserver.sh test     # 服务器跑 go test -short 并回传报告 JSON
 #   scripts/dev/devserver.sh integration  # integration lane：重建测试库 + 全量跑并回传报告
 #
@@ -113,13 +113,27 @@ docker compose up -d postgres redis
 
 # env 从服务器本地 .env 读取，值不出脚本
 for key in AGENTHUB_JWT_SECRET AGENTHUB_DB_PASSWORD AGENTHUB_DB_NAME AGENTHUB_DB_USER \
-           AGENTHUB_DB_HOST AGENTHUB_DB_PORT AGENTHUB_TOKENDANCE_ID_ISSUER_URL \
-           AGENTHUB_TOKENDANCE_ID_CLIENT_ID AGENTHUB_TOKENDANCE_ID_CLIENT_SECRET \
-           AGENTHUB_TOKENDANCE_ID_REDIRECT_URI AGENTHUB_TOKENDANCE_ID_ALLOWED_REDIRECT_URIS; do
+           AGENTHUB_DB_HOST AGENTHUB_DB_PORT AGENTHUB_ACCOUNT_OIDC_ISSUER_URL \
+           AGENTHUB_ACCOUNT_OIDC_CLIENT_ID AGENTHUB_ACCOUNT_OIDC_CLIENT_SECRET \
+           AGENTHUB_ACCOUNT_OIDC_REDIRECT_URI AGENTHUB_ACCOUNT_OIDC_ALLOWED_REDIRECT_URIS; do
   line="$(awk -F= -v k="$key" '$1==k {sub(/^[^=]*=/,""); print}' .env | tail -1)"
   [ -n "$line" ] || { echo "[devserver] ERROR: .env 缺 $key"; exit 1; }
   export "$key=$line"
 done
+
+# 健康等待（wait_http 替换裸 sleep）
+wait_http() { # $1=url $2=name $3=迭代上限（每次 sleep 2s，总时长约 2×$3 秒）
+  local i=0
+  until curl -sf -m 2 "$1" >/dev/null 2>&1; do
+    i=$((i+1)); [ "$i" -ge "$3" ] && { echo "[devserver] TIMEOUT — $2 未在 ~$((2*$3))s 内就绪"; return 1; }
+    sleep 2
+  done
+  echo "[devserver] $2 Ready"
+}
+
+# Account is external/operator-managed; this script never starts an Account
+# checkout or provider container. Verify discovery before stopping/starting Hub.
+wait_http "${AGENTHUB_ACCOUNT_OIDC_ISSUER_URL%/}/.well-known/openid-configuration" Account 30
 
 # 幂等重启：按 pidfile 停旧进程，不误伤其他端口用户
 stop_by_pidfile() { # $1=name $2=pidfile
@@ -140,15 +154,6 @@ go build -o /tmp/agenthub-bin/agenthub-edge ./edge-server/cmd/agenthub-edge
 nohup /tmp/agenthub-bin/server-hub >/tmp/hub.log 2>&1 & echo $! >/tmp/agenthub-hub.pid
 nohup /tmp/agenthub-bin/agenthub-edge >/tmp/edge.log 2>&1 & echo $! >/tmp/agenthub-edge.pid
 
-# 健康等待（wait_http 替换裸 sleep）
-wait_http() { # $1=url $2=name $3=迭代上限（每次 sleep 2s，总时长约 2×$3 秒）
-  local i=0
-  until curl -sf -m 2 "$1" >/dev/null 2>&1; do
-    i=$((i+1)); [ "$i" -ge "$3" ] && { echo "[devserver] TIMEOUT — $2 未在 ~$((2*$3))s 内就绪"; return 1; }
-    sleep 2
-  done
-  echo "[devserver] $2 Ready"
-}
 wait_http http://127.0.0.1:8080/health hub 90
 wait_http http://127.0.0.1:3210/v1/health edge 60
 echo "[devserver] start 完成"
@@ -178,7 +183,13 @@ REPO_ROOT="${1:?missing remote repo root}"
 echo "== git =="
 git -C "$REPO_ROOT" status -sb | head -2
 echo "== services =="
-for url_name in "http://127.0.0.1:3000/.well-known/openid-configuration ID" "http://127.0.0.1:8080/health hub" "http://127.0.0.1:3210/v1/health edge" "http://127.0.0.1:5174/ web"; do
+account_issuer="$(awk -F= '$1=="AGENTHUB_ACCOUNT_OIDC_ISSUER_URL" {sub(/^[^=]*=/,""); print}' "$REPO_ROOT/.env" | tail -1)"
+if [ -n "$account_issuer" ] && curl -sf -m 3 "${account_issuer%/}/.well-known/openid-configuration" >/dev/null 2>&1; then
+  echo "Account OK (external issuer)"
+else
+  echo "Account ${account_issuer:+DOWN}${account_issuer:-UNCONFIGURED}"
+fi
+for url_name in "http://127.0.0.1:8080/health hub" "http://127.0.0.1:3210/v1/health edge" "http://127.0.0.1:5174/ web"; do
   url="${url_name% *}"; name="${url_name##* }"
   if curl -sf -m 3 "$url" >/dev/null 2>&1; then echo "$name OK"; else echo "$name DOWN"; fi
 done
@@ -263,8 +274,8 @@ cd "$REPO_ROOT"
 
 # 从服务器本地 .env 提取凭据/配置（值不出脚本、不回传明文）。
 for key in AGENTHUB_DB_USER AGENTHUB_DB_PASSWORD AGENTHUB_REDIS_HOST AGENTHUB_REDIS_PORT \
-           AGENTHUB_TOKENDANCE_ID_ISSUER_URL AGENTHUB_TOKENDANCE_ID_CLIENT_ID \
-           AGENTHUB_TOKENDANCE_ID_CLIENT_SECRET AGENTHUB_TOKENDANCE_ID_REDIRECT_URI; do
+           AGENTHUB_ACCOUNT_OIDC_ISSUER_URL AGENTHUB_ACCOUNT_OIDC_CLIENT_ID \
+           AGENTHUB_ACCOUNT_OIDC_CLIENT_SECRET AGENTHUB_ACCOUNT_OIDC_REDIRECT_URI; do
   line="$(awk -F= -v k="$key" '$1==k {sub(/^[^=]*=/,""); print}' .env | tail -1)"
   [ -n "$line" ] || { echo "[devserver] ERROR: .env 缺 $key"; exit 1; }
   export "$key=$line"

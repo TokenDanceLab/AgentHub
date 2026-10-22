@@ -10,7 +10,7 @@
 import type { HubUserProfile } from '../../hub/hubClient';
 
 /** Which Hub auth method produced the current session. */
-export type HubTokenSource = 'tokendance' | 'hub' | null;
+export type HubTokenSource = 'account' | 'hub' | null;
 
 /** Immutable snapshot of the Hub authentication state published to listeners. */
 export interface HubAuthState {
@@ -25,7 +25,7 @@ export interface HubAuthState {
 export interface HubAuth {
   getState: () => HubAuthState;
   subscribe: (fn: (state: HubAuthState) => void) => () => void;
-  loginWithTokenDance: () => Promise<void>;
+  loginWithAccount: () => Promise<void>;
   logout: () => Promise<void>;
   tryAutoLogin: () => Promise<boolean>;
 }
@@ -34,6 +34,8 @@ export interface HubAuth {
 export interface OidcCallbackResult {
   code: string;
   state: string;
+  /** RFC 9207 issuer returned by Account. It must match the issuer pinned at login start. */
+  iss: string;
 }
 
 /**
@@ -46,6 +48,8 @@ export interface BrowserOIDCPending {
   codeVerifier: string;
   deviceId: string;
   redirectUri: string;
+  /** Account issuer remembered from the Hub authorize response. */
+  issuer: string;
   createdAt: number;
 }
 
@@ -86,9 +90,12 @@ export class OidcError extends Error {
  */
 export const OidcBackendErrorCodes = {
   invalidState: 'oidc_invalid_state',
+  issuerInvalid: 'oidc_issuer_invalid',
   codeExchangeFailed: 'oidc_code_exchange_failed',
   idTokenInvalid: 'oidc_id_token_invalid',
   subNotFound: 'oidc_sub_not_found',
+  userInfoInvalid: 'oidc_userinfo_invalid',
+  identityRetired: 'oidc_identity_retired',
 } as const;
 
 export type OidcBackendErrorCode =
@@ -109,7 +116,10 @@ export function isOidcBackendErrorCode(value: unknown): value is OidcBackendErro
  */
 export const oidcBackendCodeToI18nCode: Record<OidcBackendErrorCode, string> = {
   oidc_invalid_state: 'stateMismatch',
+  oidc_issuer_invalid: 'issuerInvalid',
   oidc_code_exchange_failed: 'tokenExchangeFailed',
   oidc_id_token_invalid: 'tokenExchangeFailed',
   oidc_sub_not_found: 'tokenExchangeFailed',
+  oidc_userinfo_invalid: 'tokenExchangeFailed',
+  oidc_identity_retired: 'identityRetired',
 };

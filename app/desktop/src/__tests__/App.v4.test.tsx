@@ -275,7 +275,7 @@ function mockAuthSession(user: ReturnType<typeof useAuth>['user']): void {
     user,
     loading: false,
     error: null,
-    loginWithTokenDance: vi.fn().mockResolvedValue(undefined),
+    loginWithAccount: vi.fn().mockResolvedValue(undefined),
     logout: vi.fn().mockResolvedValue(undefined),
     tryAutoLogin,
   } as ReturnType<typeof useAuth>);
@@ -439,8 +439,8 @@ describe('Desktop App v4 root', () => {
     expect(screen.getByRole('heading', { name: '登录 AgentHub' })).toBeInTheDocument();
     expect(screen.getByAltText('AgentHub')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '切换主题' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '使用 TokenDance ID 继续' })).toBeInTheDocument();
-    expect(screen.getByTestId('tokendance-id-logo')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '使用 TokenDance Account 继续' })).toBeInTheDocument();
+    expect(screen.getByTestId('account-logo')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '使用 Demo 模式继续' })).toBeInTheDocument();
     expect(screen.queryByRole('navigation', { name: globalRailLabel })).not.toBeInTheDocument();
   });
@@ -526,7 +526,7 @@ describe('Desktop App v4 root', () => {
       user: authenticatedUser,
       loading: false,
       error: null,
-      loginWithTokenDance: vi.fn().mockResolvedValue(undefined),
+      loginWithAccount: vi.fn().mockResolvedValue(undefined),
       logout,
       tryAutoLogin,
     }) as ReturnType<typeof useAuth>);

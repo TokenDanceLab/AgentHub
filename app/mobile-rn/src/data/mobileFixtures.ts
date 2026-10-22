@@ -154,8 +154,8 @@ export const mobileFixture: MobileAppFixture = {
       evidenceCount: 5,
     },
     {
-      id: 'tokendance-id',
-      title: 'TokenDance ID',
+      id: 'account-oidc',
+      title: 'TokenDance Account',
       subtitle: '身份、设备和通知状态只在账号面板展示，不进入聊天消息流。',
       initials: 'TD',
       avatarTone: 'warning',
@@ -282,7 +282,7 @@ export const mobileFixture: MobileAppFixture = {
     ],
   },
   account: {
-    tokenDanceId: 'signed_in',
+    accountIdentity: 'signed_in',
     hubSession: 'active',
     notification: 'prompt',
     hubSync: 'active',
@@ -295,11 +295,11 @@ const emptyFixture: MobileAppFixture = {
   runs: [],
   transcript: {},
   account: {
-    tokenDanceId: 'signed_in',
+    accountIdentity: 'signed_in',
     hubSession: 'active',
     notification: 'prompt',
     hubSync: 'active',
-    deviceLabel: 'TokenDance ID mobile session ready',
+    deviceLabel: 'TokenDance Account mobile session ready',
   },
 };
 
@@ -353,11 +353,11 @@ const offlineFixture: MobileAppFixture = {
     ],
   },
   account: {
-    tokenDanceId: 'recovering',
+    accountIdentity: 'recovering',
     hubSession: 'missing',
     notification: 'prompt',
     hubSync: 'offline',
-    deviceLabel: 'TokenDance ID recovery preview',
+    deviceLabel: 'TokenDance Account recovery preview',
   },
 };
 
@@ -413,7 +413,7 @@ const notificationFixture: MobileAppFixture = {
     ],
   },
   account: {
-    tokenDanceId: 'signed_in',
+    accountIdentity: 'signed_in',
     hubSession: 'active',
     notification: 'granted',
     hubSync: 'active',
@@ -473,7 +473,7 @@ const deeplinkFixture: MobileAppFixture = {
     ],
   },
   account: {
-    tokenDanceId: 'signed_in',
+    accountIdentity: 'signed_in',
     hubSession: 'active',
     notification: 'prompt',
     hubSync: 'active',
@@ -533,7 +533,7 @@ const sendErrorFixture: MobileAppFixture = {
     ],
   },
   account: {
-    tokenDanceId: 'signed_in',
+    accountIdentity: 'signed_in',
     hubSession: 'active',
     notification: 'prompt',
     hubSync: 'active',
@@ -601,7 +601,7 @@ const sendPendingFixture: MobileAppFixture = {
     ],
   },
   account: {
-    tokenDanceId: 'signed_in',
+    accountIdentity: 'signed_in',
     hubSession: 'active',
     notification: 'prompt',
     hubSync: 'active',
@@ -675,7 +675,7 @@ const approvalResolvedFixture: MobileAppFixture = {
     ],
   },
   account: {
-    tokenDanceId: 'signed_in',
+    accountIdentity: 'signed_in',
     hubSession: 'active',
     notification: 'granted',
     hubSync: 'active',
@@ -741,7 +741,7 @@ const approvalErrorFixture: MobileAppFixture = {
     ],
   },
   account: {
-    tokenDanceId: 'recovering',
+    accountIdentity: 'recovering',
     hubSession: 'expired',
     notification: 'prompt',
     hubSync: 'recovering',
@@ -839,7 +839,7 @@ const diffPreviewFixture: MobileAppFixture = {
     ],
   },
   account: {
-    tokenDanceId: 'signed_in',
+    accountIdentity: 'signed_in',
     hubSession: 'active',
     notification: 'prompt',
     hubSync: 'active',
@@ -1025,7 +1025,7 @@ const previewMatrixFixture: MobileAppFixture = {
     'preview-browser-error': [],
   },
   account: {
-    tokenDanceId: 'signed_in',
+    accountIdentity: 'signed_in',
     hubSession: 'active',
     notification: 'granted',
     hubSync: 'active',

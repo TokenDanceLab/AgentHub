@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """AgentHub WSL 全栈 E2E 编排（stdlib only）。
 
-在 WSL 内以容器形态部署完整栈（tokendance-id + hub-server + PG16 + Redis7），
-执行真实 OIDC Authorization Code + PKCE 登录流断言，输出证据 manifest。
+在 WSL 内以容器形态部署完整栈（仓库内 Account-shaped OIDC fixture +
+hub-server + PG16 + Redis7），执行 Authorization Code + PKCE 合约断言，
+输出 fixture 证据 manifest。该 lane 不启动或克隆内部 Account provider。
 
 本脚本只负责编排（前置检查、WSL 调用、输出解析、证据收集），栈逻辑在
 wsl-full-stack-e2e.sh（WSL 侧执行体）。
@@ -11,7 +12,7 @@ wsl-full-stack-e2e.sh（WSL 侧执行体）。
   python scripts/e2e/verify-wsl-full-stack-e2e.py
   python scripts/e2e/verify-wsl-full-stack-e2e.py -Keep            # 保留栈便于手动复查
   python scripts/e2e/verify-wsl-full-stack-e2e.py -EvidenceDir .tmp/e2e-evidence
-  python scripts/e2e/verify-wsl-full-stack-e2e.py -SrcRoot <parent-checkout> -IdSrc <tokendance-id-checkout>
+  python scripts/e2e/verify-wsl-full-stack-e2e.py -SrcRoot <parent-checkout>
 
 退出码：0 = 全部断言通过；1 = 任一断言失败或编排失败。
 证据：manifest 写入 -EvidenceDir/evidence.json；默认保留 .tmp/e2e-evidence。
@@ -69,12 +70,11 @@ def detect_wsl_distro() -> str:
 
 
 def run(script_wsl_path: str, project_name: str, keep: bool, evidence_wsl_dir: str,
-        src_root_wsl: str, id_src_wsl: str, distro: str) -> int:
+        src_root_wsl: str, distro: str) -> int:
     # Windows 进程的环境变量不会自动传入 WSL；用 distro 内的 env 显式传递。
     cmd = [
         "wsl", "-d", distro, "-e", "env",
         f"AGENTHUB_E2E_SRC_ROOT={src_root_wsl}",
-        f"AGENTHUB_E2E_ID_SRC={id_src_wsl}",
         "bash", script_wsl_path, project_name, "1" if keep else "0",
         evidence_wsl_dir,
     ]
@@ -137,8 +137,6 @@ def main() -> int:
                         help="证据输出目录（Windows 路径）")
     parser.add_argument("-SrcRoot", "--SrcRoot", default="/workspace",
                         help="源码根目录（含 AgentHub 子目录；Windows 或 WSL 路径）")
-    parser.add_argument("-IdSrc", "--IdSrc", default="",
-                        help="tokendance-id 源码目录（Windows 或 WSL 路径；默认 <SrcRoot>/tokendance-id）")
     args = parser.parse_args()
 
     script_wsl_path = windows_to_wsl_path(os.path.join(SCRIPT_DIR, SCRIPT_NAME))
@@ -156,9 +154,8 @@ def main() -> int:
     # 证据目录直接用 Windows 路径的 WSL 视图，bash 侧落盘后 python 侧可直接复制
     wsl_evidence_dir = windows_to_wsl_path(os.path.abspath(args.EvidenceDir))
     src_root_wsl = to_wsl_path(args.SrcRoot)
-    id_src_wsl = to_wsl_path(args.IdSrc) if args.IdSrc else f"{src_root_wsl.rstrip('/')}/tokendance-id"
     rc = run(script_wsl_path, "agenthub-e2e", args.Keep, wsl_evidence_dir,
-             src_root_wsl, id_src_wsl, distro)
+             src_root_wsl, distro)
     collect_evidence(wsl_evidence_dir, args.EvidenceDir, distro)
     return rc
 

@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 import { assertFontGuardHermetic, blockExternalFonts, type E2EFontGuard } from '../../../e2e/fontBlocker';
 
 // The desktop renderer ships a CSP meta (app/desktop/index.html) whose
-// connect-src only allows 'self', loopback and *.example.invalid. The E2E
+// connect-src only allows 'self', loopback and the canonical Hub origin. The E2E
 // webServer env points VITE_HUB_URL at the RFC 6761 fail-closed sentinel
 // `https://hub.test.invalid` (playwright.config.ts), so CSP kills every
 // mocked Hub fetch before it can reach Playwright route interception
@@ -17,12 +17,14 @@ test.use({ bypassCSP: true });
  *
  * These tests use Playwright's page.route() to mock the Hub API, allowing
  * us to test the full OIDC login flow without depending on the real
- * TokenDance ID or Hub server.
+ * TokenDance Account or Hub server.
  *
  * The Desktop app uses a local Tauri callback server (http://127.0.0.1:{port}/callback)
  * in production, but in Vite dev mode it falls back to redirect-based flow
  * similar to the Web app.
  */
+
+const ACCOUNT_ISSUER = 'https://account.example.test';
 
 // ── Test helpers ──────────────────────────────────
 
@@ -54,19 +56,24 @@ async function mockOIDCFlow(page: import('@playwright/test').Page, params: MockO
     }
 
     const body = route.request().postDataJSON();
-    const authUrl = new URL('https://id.example.com/oidc/authorize');
+    const authUrl = new URL(`${ACCOUNT_ISSUER}/oauth/authorize`);
     authUrl.searchParams.set('response_type', 'code');
     authUrl.searchParams.set('client_id', 'c_test_client');
-    authUrl.searchParams.set('redirect_uri', body.redirect_uri || 'http://localhost:5173/auth/tokendance/callback');
-    authUrl.searchParams.set('scope', 'openid profile email');
+    authUrl.searchParams.set('redirect_uri', body.redirect_uri || 'http://localhost:5173/auth/account/callback');
+    authUrl.searchParams.set('scope', 'openid profile');
     authUrl.searchParams.set('state', state);
+    authUrl.searchParams.set('nonce', 'desktop-test-nonce');
     authUrl.searchParams.set('code_challenge', body.code_challenge);
     authUrl.searchParams.set('code_challenge_method', 'S256');
 
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: JSON.stringify({ state, authorization_url: authUrl.toString() }),
+      body: JSON.stringify({
+        state,
+        authorization_url: authUrl.toString(),
+        issuer: ACCOUNT_ISSUER,
+      }),
     });
   });
 
@@ -96,12 +103,12 @@ async function mockOIDCFlow(page: import('@playwright/test').Page, params: MockO
 
   // The mocked authorization_url points at a reserved example host (RFC
   // 2606); fulfill it locally so the browser-redirect navigation completes
-  // without touching the network — no real IDP exists for this flow.
-  await page.route('https://id.example.com/**', async (route) => {
+  // without touching the network — no real Account exists for this flow.
+  await page.route(`${ACCOUNT_ISSUER}/**`, async (route) => {
     await route.fulfill({
       status: 200,
       contentType: 'text/html',
-      body: '<!DOCTYPE html><html><head><title>Mock TokenDance ID</title></head><body>mock authorization endpoint</body></html>',
+      body: '<!DOCTYPE html><html><head><title>Mock TokenDance Account</title></head><body>mock authorization endpoint</body></html>',
     });
   });
 
@@ -117,6 +124,11 @@ async function mockOIDCFlow(page: import('@playwright/test').Page, params: MockO
   });
 
   return tokenCalls;
+}
+
+function buildCallbackUrl(state: string, code: string, issuer = ACCOUNT_ISSUER): string {
+  const params = new URLSearchParams({ code, state, iss: issuer });
+  return `/auth/account/callback?${params.toString()}`;
 }
 
 // ── Tests ────────────────────────────────────────
@@ -139,24 +151,25 @@ test.afterEach(() => {
 });
 
 test.describe('OIDC Login — Desktop', () => {
-  test('login button redirects to TokenDance ID', async ({ page }) => {
+  test('login button redirects to TokenDance Account', async ({ page }) => {
     await mockOIDCFlow(page);
 
     await page.goto('/');
 
-    // Click the TokenDance ID login button
-    const loginBtn = page.getByRole('button', { name: /TokenDance|ID.*登录|登录.*TokenDance/i });
+    const loginBtn = page.getByRole('button', {
+      name: /Continue with TokenDance Account|使用 TokenDance Account 继续/i,
+    });
     if (await loginBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
       await loginBtn.click();
 
-      // Should have redirected to TokenDance ID
-      // The Hub mock returns authorization_url on id.example.com; the app
+      // The Hub mock returns authorization_url on account.example.test; the app
       // must navigate the window to exactly that URL (browser-mode redirect).
-      await page.waitForURL(/id\.example\.com\/oidc\/authorize/, { timeout: 10000 });
+      await page.waitForURL(/account\.example\.test\/oauth\/authorize/, { timeout: 10000 });
       const url = new URL(page.url());
       expect(url.searchParams.get('response_type')).toBe('code');
       expect(url.searchParams.get('code_challenge_method')).toBe('S256');
-      expect(url.searchParams.get('scope')).toContain('openid');
+      expect(url.searchParams.get('scope')).toBe('openid profile');
+      expect(url.searchParams.get('nonce')).toBeTruthy();
     } else {
       // Login button may not be visible if already on a different page;
       // this is fine — we just verify the app rendered without crashing.
@@ -170,18 +183,18 @@ test.describe('OIDC Login — Desktop', () => {
 
     // Simulate PKCE pending data in sessionStorage BEFORE navigating
     await page.goto('/');
-    await page.evaluate(() => {
+    await page.evaluate((issuer) => {
       sessionStorage.setItem('agenthub_oidc_pkce_pending', JSON.stringify({
         state: 'test-state-mock-12345',
         codeVerifier: 'test-code-verifier-base64url',
         deviceId: '00000000-0000-0000-0000-000000000001',
-        redirectUri: 'http://localhost:5199/auth/tokendance/callback',
+        redirectUri: 'http://localhost:5199/auth/account/callback',
+        issuer,
         createdAt: Date.now(),
       }));
-    });
+    }, ACCOUNT_ISSUER);
 
-    // Navigate to callback URL (simulating TokenDance ID redirect)
-    await page.goto('/auth/tokendance/callback?code=test-auth-code-67890&state=test-state-mock-12345');
+    await page.goto(buildCallbackUrl('test-state-mock-12345', 'test-auth-code-67890'));
 
     // Wait for token exchange to complete
     await page.waitForTimeout(3000);
@@ -195,11 +208,12 @@ test.describe('OIDC Login — Desktop', () => {
     }
     expect(firstTokenCall.code).toBe('test-auth-code-67890');
     expect(firstTokenCall.state).toBe('test-state-mock-12345');
+    expect(firstTokenCall.iss).toBe(ACCOUNT_ISSUER);
     expect(firstTokenCall.code_verifier).toBe('test-code-verifier-base64url');
 
-    // URL should have been cleaned up (no /auth/tokendance/callback)
+    // URL should have been cleaned up (no /auth/account/callback)
     const finalUrl = page.url();
-    expect(finalUrl).not.toContain('/auth/tokendance/callback');
+    expect(finalUrl).not.toContain('/auth/account/callback');
   });
 
   test('rejects state mismatch as CSRF protection', async ({ page }) => {
@@ -207,24 +221,50 @@ test.describe('OIDC Login — Desktop', () => {
 
     await page.goto('/');
     // Plant pending PKCE with a DIFFERENT state
-    await page.evaluate(() => {
+    await page.evaluate((issuer) => {
       sessionStorage.setItem('agenthub_oidc_pkce_pending', JSON.stringify({
         state: 'original-state-abc',
         codeVerifier: 'test-code-verifier-base64url',
         deviceId: '00000000-0000-0000-0000-000000000001',
-        redirectUri: 'http://localhost:5199/auth/tokendance/callback',
+        redirectUri: 'http://localhost:5199/auth/account/callback',
+        issuer,
         createdAt: Date.now(),
       }));
-    });
+    }, ACCOUNT_ISSUER);
 
-    // Navigate with a DIFFERENT state (CSRF attack simulation)
-    await page.goto('/auth/tokendance/callback?code=evil-code&state=attacker-state-xyz');
+    await page.goto(buildCallbackUrl('attacker-state-xyz', 'evil-code'));
 
     await page.waitForTimeout(2000);
 
     // URL should be cleaned up even on error
     const finalUrl = page.url();
-    expect(finalUrl).not.toContain('/auth/tokendance/callback');
+    expect(finalUrl).not.toContain('/auth/account/callback');
+  });
+
+  test('rejects an RFC 9207 issuer mismatch', async ({ page }) => {
+    const tokenCalls = await mockOIDCFlow(page);
+
+    await page.goto('/');
+    await page.evaluate(() => {
+      sessionStorage.setItem('agenthub_oidc_pkce_pending', JSON.stringify({
+        state: 'test-state-mock-12345',
+        codeVerifier: 'test-code-verifier-base64url',
+        deviceId: '00000000-0000-0000-0000-000000000001',
+        redirectUri: 'http://localhost:5199/auth/account/callback',
+        issuer: 'https://account.example.test',
+        createdAt: Date.now(),
+      }));
+    });
+
+    await page.goto(buildCallbackUrl(
+      'test-state-mock-12345',
+      'issuer-mismatch-code',
+      'https://wrong-account.example.test',
+    ));
+    await page.waitForTimeout(1000);
+
+    expect(tokenCalls).toHaveLength(0);
+    expect(page.url()).not.toContain('/auth/account/callback');
   });
 
   test('rejects expired PKCE (over 10 minutes)', async ({ page }) => {
@@ -232,23 +272,24 @@ test.describe('OIDC Login — Desktop', () => {
 
     await page.goto('/');
     // Plant expired PKCE data (11 minutes ago)
-    await page.evaluate(() => {
+    await page.evaluate((issuer) => {
       sessionStorage.setItem('agenthub_oidc_pkce_pending', JSON.stringify({
         state: 'expired-state-test',
         codeVerifier: 'test-code-verifier-base64url',
         deviceId: '00000000-0000-0000-0000-000000000001',
-        redirectUri: 'http://localhost:5199/auth/tokendance/callback',
+        redirectUri: 'http://localhost:5199/auth/account/callback',
+        issuer,
         createdAt: Date.now() - 11 * 60 * 1000,
       }));
-    });
+    }, ACCOUNT_ISSUER);
 
-    await page.goto('/auth/tokendance/callback?code=some-code&state=expired-state-test');
+    await page.goto(buildCallbackUrl('expired-state-test', 'some-code'));
 
     await page.waitForTimeout(2000);
 
     // URL should be cleaned up
     const finalUrl = page.url();
-    expect(finalUrl).not.toContain('/auth/tokendance/callback');
+    expect(finalUrl).not.toContain('/auth/account/callback');
   });
 
   test('handles missing pending PKCE data gracefully', async ({ page }) => {
@@ -257,13 +298,13 @@ test.describe('OIDC Login — Desktop', () => {
     await page.goto('/');
 
     // No PKCE pending data planted — navigate to callback URL
-    await page.goto('/auth/tokendance/callback?code=orphan-code&state=orphan-state');
+    await page.goto(buildCallbackUrl('orphan-state', 'orphan-code'));
 
     await page.waitForTimeout(2000);
 
     // Should redirect back to root
     const finalUrl = page.url();
-    expect(finalUrl).not.toContain('/auth/tokendance/callback');
+    expect(finalUrl).not.toContain('/auth/account/callback');
   });
 });
 
@@ -290,22 +331,23 @@ test.describe('OIDC Login — Error Scenarios', () => {
     await mockOIDCFlow(page, { tokenError: 'Invalid authorization code' });
 
     await page.goto('/');
-    await page.evaluate(() => {
+    await page.evaluate((issuer) => {
       sessionStorage.setItem('agenthub_oidc_pkce_pending', JSON.stringify({
         state: 'test-state-mock-12345',
         codeVerifier: 'test-code-verifier-base64url',
         deviceId: '00000000-0000-0000-0000-000000000001',
-        redirectUri: 'http://localhost:5199/auth/tokendance/callback',
+        redirectUri: 'http://localhost:5199/auth/account/callback',
+        issuer,
         createdAt: Date.now(),
       }));
-    });
+    }, ACCOUNT_ISSUER);
 
-    await page.goto('/auth/tokendance/callback?code=bad-code&state=test-state-mock-12345');
+    await page.goto(buildCallbackUrl('test-state-mock-12345', 'bad-code'));
     await page.waitForTimeout(3000);
 
     // URL should be cleaned up
     const finalUrl = page.url();
-    expect(finalUrl).not.toContain('/auth/tokendance/callback');
+    expect(finalUrl).not.toContain('/auth/account/callback');
   });
 });
 
@@ -316,7 +358,7 @@ test.describe('OIDC Login — Session Persistence', () => {
     // Setup: plant valid token in storage
     await page.goto('/');
     await page.evaluate(() => {
-      sessionStorage.setItem('agenthub_token_source', 'tokendance');
+      sessionStorage.setItem('agenthub_token_source', 'account');
       sessionStorage.setItem('agenthub_hub_token', 'test-access-token-mock');
     });
 
@@ -352,17 +394,18 @@ test.describe('OIDC Login — Session Persistence', () => {
     });
 
     await page.goto('/');
-    await page.evaluate(() => {
+    await page.evaluate((issuer) => {
       sessionStorage.setItem('agenthub_oidc_pkce_pending', JSON.stringify({
         state: 'test-state-mock-12345',
         codeVerifier: 'test-code-verifier-base64url',
         deviceId: '00000000-0000-0000-0000-000000000001',
-        redirectUri: 'http://localhost:5199/auth/tokendance/callback',
+        redirectUri: 'http://localhost:5199/auth/account/callback',
+        issuer,
         createdAt: Date.now(),
       }));
-    });
+    }, ACCOUNT_ISSUER);
 
-    await page.goto('/auth/tokendance/callback?code=test-auth-code-67890&state=test-state-mock-12345');
+    await page.goto(buildCallbackUrl('test-state-mock-12345', 'test-auth-code-67890'));
     console.log('[desktop runtime]', await page.evaluate(() => ({
       tauri: '__TAURI_INTERNALS__' in window,
       href: window.location.href,

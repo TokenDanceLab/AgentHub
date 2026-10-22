@@ -51,8 +51,6 @@ export interface HubUserProfile {
   username: string;
   nickname: string;
   avatar_url?: string;
-  tokendance_sub?: string;
-  tokendance_sub_linked_at?: string;
   created_at?: string;
   updated_at?: string;
 }
@@ -78,11 +76,14 @@ export interface HubOidcAuthorizeRequest {
 export interface HubOidcAuthorizeResponse {
   state: string;
   authorization_url: string;
+  /** Pinned Account issuer that clients must compare with the RFC 9207 response. */
+  issuer: string;
 }
 
 export interface HubOidcCallbackRequest {
   code: string;
   state: string;
+  iss: string;
   code_verifier: string;
   device_type?: string;
   device_id?: string;

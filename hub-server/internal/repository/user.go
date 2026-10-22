@@ -1,15 +1,39 @@
 package repository
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
+	"net/url"
 	"strings"
 	"time"
 
 	"github.com/agenthub/hub-server/internal/model"
+	"github.com/agenthub/hub-server/internal/uuidv7"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
+
+// ErrOIDCIdentityRetired means the exact (issuer, subject) binding exists but
+// is intentionally no longer usable for authentication.
+var ErrOIDCIdentityRetired = errors.New("oidc identity is retired")
+
+var errAccountIdentityConflict = errors.New("account identity was created concurrently")
+
+// AccountSessionInput describes the local state that must be committed
+// together for an Account login. The raw refresh token never enters the
+// repository; only its hash is persisted.
+type AccountSessionInput struct {
+	Issuer           string
+	Subject          string
+	Name             string
+	Picture          string
+	DeviceType       string
+	DeviceID         string
+	RefreshTokenHash string
+	RefreshExpiresAt time.Time
+}
 
 func CreateUser(db *gorm.DB, user *model.User) error {
 	return db.Create(user).Error
@@ -53,136 +77,204 @@ func GetUsersByIDs(db *gorm.DB, ids []string) (map[string]*model.User, error) {
 	return m, nil
 }
 
-// FindByTokenDanceSub looks up a user by their TokenDance ID subject claim.
-func FindByTokenDanceSub(db *gorm.DB, sub string) (*model.User, error) {
-	var user model.User
-	err := db.Where("tokendance_sub = ?", sub).First(&user).Error
+// FindOrCreateByAccountIdentity maps the exact Account (issuer, subject) pair
+// to a Hub-local user. It never matches by email, nickname or a legacy
+// tokendance_sub. Account profile fields initialize a new local user only;
+// later logins do not overwrite local profile edits.
+func FindOrCreateByAccountIdentity(db *gorm.DB, issuer, subject, name, picture string) (*model.User, error) {
+	var user *model.User
+	err := db.Transaction(func(tx *gorm.DB) error {
+		var err error
+		user, _, err = findOrCreateAccountIdentityTx(tx, issuer, subject, name, picture)
+		return err
+	})
+	if errors.Is(err, errAccountIdentityConflict) {
+		_, existing, findErr := findAccountIdentityUser(db, issuer, subject)
+		if findErr != nil {
+			return nil, findErr
+		}
+		return existing, nil
+	}
+	if errors.Is(err, ErrOIDCIdentityRetired) {
+		if revokeErr := RevokeRefreshTokensForRetiredIdentity(db, issuer, subject); revokeErr != nil {
+			return nil, revokeErr
+		}
+	}
 	if err != nil {
 		return nil, err
 	}
-	return &user, nil
+	return user, nil
 }
 
-// tokenDanceSubIndexPredicate is the index predicate of the partial unique
-// index on users(tokendance_sub). Three places must carry the same text and
-// must not drift, because PostgreSQL matches an ON CONFLICT arbiter against the
-// index definition syntactically:
-//
-//  1. migrations/0020_token_dance_sub.up.sql — CREATE UNIQUE INDEX … WHERE …
-//  2. model.User's gorm tag — uniqueIndex:idx_users_tokendance_sub,where:…
-//  3. this package's ON CONFLICT clause — TargetWhere below
-//
-// TestTokenDanceSubPredicateSSOT reads 1. and 2. from disk and fails if either
-// stops containing this constant, which is the drift that silently breaks OIDC
-// login on PostgreSQL while every SQLite fixture stays green.
-const tokenDanceSubIndexPredicate = "tokendance_sub IS NOT NULL AND tokendance_sub != ''"
+// FindOrCreateAccountSession atomically binds the exact Account identity,
+// registers the device and stores the refresh token. A concurrent first login
+// rolls back its losing transaction and retries against the winning identity.
+func FindOrCreateAccountSession(db *gorm.DB, in AccountSessionInput) (*model.User, error) {
+	if in.RefreshTokenHash == "" || in.RefreshExpiresAt.IsZero() {
+		return nil, errors.New("refresh token hash and expiry are required")
+	}
+	for attempt := 0; attempt < 2; attempt++ {
+		var user *model.User
+		err := db.Transaction(func(tx *gorm.DB) error {
+			var err error
+			var identity *model.UserIdentity
+			user, identity, err = findOrCreateAccountIdentityTx(tx, in.Issuer, in.Subject, in.Name, in.Picture)
+			if err != nil {
+				return err
+			}
+			if err := UpsertDevice(tx, &model.Device{
+				ID:           in.DeviceID,
+				UserID:       user.ID,
+				DeviceType:   in.DeviceType,
+				Capabilities: "[]",
+			}); err != nil {
+				return err
+			}
+			return UpsertRefreshToken(tx, &model.RefreshToken{
+				UserID:         user.ID,
+				DeviceType:     in.DeviceType,
+				DeviceID:       in.DeviceID,
+				UserIdentityID: &identity.ID,
+				TokenHash:      in.RefreshTokenHash,
+				ExpiresAt:      in.RefreshExpiresAt,
+			})
+		})
+		if err == nil {
+			return user, nil
+		}
+		if errors.Is(err, ErrOIDCIdentityRetired) {
+			if revokeErr := RevokeRefreshTokensForRetiredIdentity(db, in.Issuer, in.Subject); revokeErr != nil {
+				return nil, revokeErr
+			}
+			return nil, ErrOIDCIdentityRetired
+		}
+		if !errors.Is(err, errAccountIdentityConflict) {
+			return nil, err
+		}
+	}
+	return nil, errAccountIdentityConflict
+}
 
-// FindOrCreateByTokenDanceSub atomically finds or creates a Hub user linked to
-// a TokenDance ID sub. On conflict (existing user), nickname and avatar are
-// refreshed from the provided claims. Uses a single INSERT … ON CONFLICT
-// statement to avoid TOCTOU races on concurrent first-logins (#2102).
-func FindOrCreateByTokenDanceSub(db *gorm.DB, sub, name, picture string) (*model.User, error) {
-	username := tokenDanceUsername(sub)
-	now := time.Now()
-	nickname := name
-	if nickname == "" {
-		nickname = tokenDanceNickname(sub)
+func findOrCreateAccountIdentityTx(
+	db *gorm.DB,
+	issuer, subject, name, picture string,
+) (*model.User, *model.UserIdentity, error) {
+	if issuer == "" || subject == "" {
+		return nil, nil, errors.New("issuer and subject are required")
+	}
+	if err := lockAccountIdentity(db, issuer, subject); err != nil {
+		return nil, nil, err
+	}
+	if identity, user, err := findAccountIdentityUser(db, issuer, subject); err == nil {
+		return user, identity, nil
+	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, nil, err
 	}
 
+	now := time.Now().UTC()
+	candidateID, err := uuidv7.New()
+	if err != nil {
+		return nil, nil, err
+	}
 	user := &model.User{
-		Username:              username,
-		Nickname:              nickname,
-		AvatarURL:             picture,
-		TokenDanceSub:         &sub,
-		TokenDanceSubLinkedAt: &now,
+		ID:        candidateID,
+		Username:  accountUsername(candidateID),
+		Nickname:  accountDisplayName(name),
+		AvatarURL: accountProfilePicture(picture),
 	}
+	if err := db.Create(user).Error; err != nil {
+		return nil, nil, err
+	}
+	identity := &model.UserIdentity{
+		UserID:   user.ID,
+		Provider: model.IdentityProviderAccount,
+		Issuer:   issuer,
+		Subject:  subject,
+		Status:   model.IdentityStatusActive,
+		LinkedAt: now,
+	}
+	result := db.Clauses(clause.OnConflict{
+		Columns:   []clause.Column{{Name: "issuer"}, {Name: "subject"}},
+		DoNothing: true,
+	}).Create(identity)
+	if result.Error != nil {
+		return nil, nil, result.Error
+	}
+	if result.RowsAffected == 0 {
+		// Another first login won the unique race. The caller rolls back this
+		// transaction, including the unbound candidate user, before retrying.
+		return nil, nil, errAccountIdentityConflict
+	}
+	return user, identity, nil
+}
 
-	// Upsert: on conflict update nickname + avatar only when incoming values
-	// are non-empty. We use COALESCE-like logic via SQL expressions so empty
-	// claims don't wipe existing profile data.
-	err := db.Clauses(clause.OnConflict{
-		Columns: []clause.Column{{Name: "tokendance_sub"}},
-		// The arbiter index is *partial*, so PostgreSQL only infers it when the
-		// index predicate is restated here. Without TargetWhere the statement
-		// never reaches execution: it fails at plan time with 42P10 ("there is
-		// no unique or exclusion constraint matching the ON CONFLICT
-		// specification"). The predicate text is shared with migration 0020 and
-		// the model.User gorm tag — see tokenDanceSubIndexPredicate.
-		TargetWhere: clause.Where{Exprs: []clause.Expression{
-			clause.Expr{SQL: tokenDanceSubIndexPredicate},
-		}},
-		DoUpdates: clause.Assignments(map[string]interface{}{
-			// Table-qualified on purpose: inside DO UPDATE both the target
-			// table and the EXCLUDED pseudo-row carry these columns, so a bare
-			// `nickname` is ambiguous and PostgreSQL rejects the statement with
-			// 42702. Same convention as UpsertExecutionTargetEvidence.
-			"nickname":   gorm.Expr("CASE WHEN ? <> '' THEN ? ELSE users.nickname END", name, name),
-			"avatar_url": gorm.Expr("CASE WHEN ? <> '' THEN ? ELSE users.avatar_url END", picture, picture),
-		}),
-	}).Create(user).Error
+func lockAccountIdentity(db *gorm.DB, issuer, subject string) error {
+	if db.Name() != "postgres" {
+		return nil
+	}
+	ctx := db.Statement.Context
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	const query = "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))"
+	key := issuer + "\n" + subject
+	var err error
+	switch conn := db.Statement.ConnPool.(type) {
+	case *gorm.PreparedStmtTX:
+		_, err = conn.Tx.ExecContext(ctx, query, key)
+	case gorm.Tx:
+		_, err = conn.ExecContext(ctx, query, key)
+	default:
+		err = errors.New("account identity lock requires a transaction")
+	}
+	return err
+}
+
+func findAccountIdentityUser(db *gorm.DB, issuer, subject string) (*model.UserIdentity, *model.User, error) {
+	var identity model.UserIdentity
+	if err := db.Where("issuer = ? AND subject = ?", issuer, subject).First(&identity).Error; err != nil {
+		return nil, nil, err
+	}
+	if identity.Status != model.IdentityStatusActive {
+		return nil, nil, ErrOIDCIdentityRetired
+	}
+	user, err := GetUserByID(db, identity.UserID)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-
-	// After upsert, re-fetch to get the canonical row (ID, timestamps, and
-	// any DB-applied defaults). This also ensures the returned struct reflects
-	// the post-conflict state rather than the input struct.
-	result, err := FindByTokenDanceSub(db, sub)
-	if err != nil {
-		return nil, err
-	}
-	return result, nil
+	return &identity, user, nil
 }
 
-func tokenDanceUsername(sub string) string {
-	hash := sha256.Sum256([]byte(sub))
-	suffix := hex.EncodeToString(hash[:])[:10]
-
-	const (
-		prefix       = "td_"
-		maxUsername  = 32
-		separatorLen = 1
-	)
-	maxBaseLen := maxUsername - len(prefix) - separatorLen - len(suffix)
-	base := sanitizeUsernamePart(sub)
-	if len(base) > maxBaseLen {
-		base = base[:maxBaseLen]
+func accountDisplayName(name string) string {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		name = "Account User"
 	}
-	base = strings.Trim(base, "_")
-	if base == "" {
-		base = "user"
-	}
-	return prefix + base + "_" + suffix
+	return truncateRunes(name, 64)
 }
 
-func sanitizeUsernamePart(value string) string {
-	value = strings.ToLower(strings.TrimSpace(value))
-	var b strings.Builder
-	b.Grow(len(value))
-	lastUnderscore := false
-	for _, r := range value {
-		allowed := (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9')
-		if allowed {
-			b.WriteRune(r)
-			lastUnderscore = false
-			continue
-		}
-		if !lastUnderscore {
-			b.WriteByte('_')
-			lastUnderscore = true
-		}
+func accountProfilePicture(picture string) string {
+	picture = strings.TrimSpace(picture)
+	if picture == "" || len([]rune(picture)) > 512 {
+		return ""
 	}
-	return b.String()
+	parsed, err := url.Parse(picture)
+	if err != nil || parsed.User != nil || parsed.Host == "" ||
+		(parsed.Scheme != "http" && parsed.Scheme != "https") {
+		return ""
+	}
+	return picture
 }
 
-func tokenDanceNickname(sub string) string {
-	value := strings.TrimSpace(sub)
-	if value == "" {
-		return "TokenDance User"
-	}
+func truncateRunes(value string, max int) string {
 	runes := []rune(value)
-	if len(runes) <= 64 {
+	if len(runes) <= max {
 		return value
 	}
-	return string(runes[:64])
+	return string(runes[:max])
+}
+
+func accountUsername(candidateID string) string {
+	hash := sha256.Sum256([]byte(candidateID))
+	return "acct_" + hex.EncodeToString(hash[:])[:12]
 }

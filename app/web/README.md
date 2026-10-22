@@ -1,6 +1,6 @@
 # AgentHub Web
 
-最后更新：2026-10-19
+最后更新：2026-10-23
 
 `app/web/` 是 AgentHub 浏览器端工作台。它负责 Hub 登录后的远程查看、审批、IM、项目视图、Agent/Profile 展示和 Web 预览；真实执行仍由 Edge Server 完成。
 
@@ -13,9 +13,9 @@ Web UI -> Hub Server -> Edge relay / sync -> Edge Server -> Agent Runtime adapte
 - Web 不直接启动 Codex/OpenCode/Claude Code，也不直连 Local Edge。
 - Web 生产路径只通过 Hub session、Hub REST/WS、Edge target routing 访问执行能力。
 - 未登录 preview fallback 只能表示演示状态，不能冒充真实 Runtime 在线。
-- Web token 当前为 tab-scoped `sessionStorage` fallback；公开 Web 发布前应升级为 BFF/HttpOnly cookie 或等价 server-owned session。
-- TokenDance ID 第三方 provider、账号绑定和 OIDC client 归 TokenDance ID；Web 只消费 Hub session。
-- Hub 认证状态机（OIDC PKCE、token 生命周期、refresh fallback、logout 清理）共享自 `../shared/src/api/auth/`；`src/api/hubAuth.ts` 只注入 Web Port（sessionStorage token、浏览器 callback 路由、当前窗口跳转）。
+- Web 当前把 Hub access/refresh token 放在 tab-scoped `sessionStorage`，并保留内存 fallback。它不是 HttpOnly cookie session，也不是 BFF-owned server session。
+- TokenDance Account 只作为 Hub 的公共 OIDC provider。Web 不直接调用 Account 管理 API，不持有 Account access/ID token；登录成功后只使用 Hub session。
+- Hub 认证状态机（OIDC PKCE、token 生命周期、refresh fallback、logout 清理）共享自 `../shared/src/api/auth/`；`src/api/hubAuth.ts` 只注入 Web Port（sessionStorage token、`/auth/account/callback` 浏览器 callback 路由、当前窗口跳转）。
 
 ## Source Map
 
@@ -59,7 +59,7 @@ Visual QA:
 corepack pnpm --dir app/web visual:qa:shell
 ```
 
-Evidence from fixture/stub/visual runs must not claim real login, real model/API execution, packaged Desktop, or production behavior. Evidence labels are enforced by `scripts/verify/verify-real-e2e-contract.py`.
+Evidence from fixture/stub/visual runs must not claim real login, real model/API execution, packaged Desktop, or production behavior. Real Account L3 requires a real Account issuer and browser authorization-code flow; fixture or stubbed-hub runs cannot replace it. Evidence labels are enforced by `scripts/verify/verify-real-e2e-contract.py`.
 
 ## Links
 

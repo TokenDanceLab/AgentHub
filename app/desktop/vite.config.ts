@@ -101,9 +101,9 @@ export default defineConfig({
         "font-src 'self'",
         // Embedded Edge sends back inline images as data: URIs for content previews.
         // avatars.githubusercontent.com covers GitHub avatar proxying.
-        "img-src 'self' data: blob: https://avatars.githubusercontent.com https://*.example.invalid",
+        "img-src 'self' data: blob: https://avatars.githubusercontent.com https://img.example.invalid",
         // Connect covers: Edge localhost API, Hub API + WS, Desktop OIDC redirect.
-        "connect-src 'self' http://127.0.0.1:* ws://127.0.0.1:* http://localhost:* ws://localhost:* https://*.example.invalid wss://*.example.invalid",
+        "connect-src 'self' http://127.0.0.1:* ws://127.0.0.1:* http://localhost:* ws://localhost:* https://hub.example.invalid wss://hub.example.invalid",
         // BrowserPreview embeds user/deploy URLs; mirror index.html/tauri.conf.
         "frame-src 'self' http://127.0.0.1:* http://localhost:* https:",
         "frame-ancestors 'none'",

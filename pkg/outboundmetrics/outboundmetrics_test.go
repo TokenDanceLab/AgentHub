@@ -64,7 +64,7 @@ func TestRecorderRegistersContractNames(t *testing.T) {
 // histogram with the same label dimensions as Record.
 func TestRecorderObserveRecordsDuration(t *testing.T) {
 	r, reg := newTestRecorder(t)
-	r.Observe(ProviderTokenDanceID, PurposeJWKSFetch, CategoryFailure, StatusNetworkError, 250*time.Millisecond)
+	r.Observe(ProviderAccountOIDC, PurposeJWKSFetch, CategoryFailure, StatusNetworkError, 250*time.Millisecond)
 
 	families, err := reg.Gather()
 	if err != nil {
@@ -82,7 +82,7 @@ func TestRecorderObserveRecordsDuration(t *testing.T) {
 			labels[lp.GetName()] = lp.GetValue()
 		}
 		want := map[string]string{
-			LabelProvider: ProviderTokenDanceID,
+			LabelProvider: ProviderAccountOIDC,
 			LabelPurpose:  PurposeJWKSFetch,
 			LabelCategory: CategoryFailure,
 			LabelStatus:   StatusNetworkError,

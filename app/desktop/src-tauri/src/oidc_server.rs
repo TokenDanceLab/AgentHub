@@ -1,6 +1,6 @@
 // OIDC callback HTTP server for PKCE flow.
-// Starts a local HTTP server on 127.0.0.1:0 (random port), listens for
-// the TokenDance ID redirect, extracts code+state from the query string,
+// Starts a local HTTP server on the fixed registered loopback port, listens
+// for the TokenDance Account redirect, extracts code+state+iss,
 // returns a success HTML page, and emits a Tauri event with the result.
 //
 // This is necessary because the frontend (browser webview) cannot create
@@ -15,6 +15,8 @@ use tauri::{Emitter, Manager};
 static OIDC_STOPPED: AtomicBool = AtomicBool::new(false);
 
 const CALLBACK_TIMEOUT_SECS: u64 = 300;
+const OIDC_CALLBACK_PORT: u16 = 53682;
+const OIDC_CALLBACK_BIND: &str = "127.0.0.1:53682";
 
 #[derive(Debug, Clone, Serialize)]
 pub struct LoopbackReadiness {
@@ -27,27 +29,13 @@ pub struct LoopbackReadiness {
 
 pub fn check_loopback_callback_readiness() -> LoopbackReadiness {
     let bind_host = "127.0.0.1".to_string();
-    match TcpListener::bind("127.0.0.1:0") {
-        Ok(listener) => match listener.local_addr() {
-            Ok(addr) => {
-                let port = addr.port();
-                LoopbackReadiness {
-                    available: true,
-                    bind_host,
-                    port: Some(port),
-                    redirect_uri: Some(format!("http://127.0.0.1:{port}/callback")),
-                    error: None,
-                }
-            }
-            Err(err) => LoopbackReadiness {
-                available: false,
-                bind_host,
-                port: None,
-                redirect_uri: None,
-                error: Some(format!(
-                    "failed to inspect loopback callback address: {err}"
-                )),
-            },
+    match TcpListener::bind(OIDC_CALLBACK_BIND) {
+        Ok(_listener) => LoopbackReadiness {
+            available: true,
+            bind_host,
+            port: Some(OIDC_CALLBACK_PORT),
+            redirect_uri: Some(format!("http://127.0.0.1:{OIDC_CALLBACK_PORT}/callback")),
+            error: None,
         },
         Err(err) => LoopbackReadiness {
             available: false,
@@ -59,20 +47,15 @@ pub fn check_loopback_callback_readiness() -> LoopbackReadiness {
     }
 }
 
-/// Starts an HTTP server on a random port that listens for ONE OIDC callback.
+/// Starts an HTTP server on the fixed registered port that listens for ONE OIDC callback.
 /// Returns the port number immediately.
 /// When the callback arrives, emits either `oidc-callback` or `oidc-callback-error`.
 #[tauri::command]
 pub async fn start_oidc_callback_server(app: tauri::AppHandle) -> Result<u16, String> {
     OIDC_STOPPED.store(true, Ordering::Relaxed); // stop any previous instance
 
-    let listener = TcpListener::bind("127.0.0.1:0")
+    let listener = TcpListener::bind(OIDC_CALLBACK_BIND)
         .map_err(|e| format!("failed to bind callback server: {e}"))?;
-
-    let port = listener
-        .local_addr()
-        .map(|a| a.port())
-        .map_err(|e| format!("failed to get local address: {e}"))?;
 
     // Reset for new instance
     OIDC_STOPPED.store(false, Ordering::Relaxed);
@@ -97,12 +80,18 @@ pub async fn start_oidc_callback_server(app: tauri::AppHandle) -> Result<u16, St
                     if OIDC_STOPPED.load(Ordering::Relaxed) {
                         return;
                     }
+                    let _ = stream.set_read_timeout(Some(std::time::Duration::from_secs(2)));
 
-                    // Read only the first line (request line)
-                    let mut reader = BufReader::new(stream.try_clone().unwrap_or_else(|_| {
-                        // If we can't clone, create a dummy — won't happen in practice
-                        std::net::TcpStream::connect("127.0.0.1:1").unwrap()
-                    }));
+                    let reader_stream = match stream.try_clone() {
+                        Ok(stream) => stream,
+                        Err(_) => {
+                            let _ = stream.write_all(
+                                b"HTTP/1.1 500 Internal Server Error\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
+                            );
+                            continue;
+                        }
+                    };
+                    let mut reader = BufReader::new(reader_stream);
 
                     let mut request_line = String::new();
                     if reader.read_line(&mut request_line).is_err() {
@@ -114,7 +103,7 @@ pub async fn start_oidc_callback_server(app: tauri::AppHandle) -> Result<u16, St
 
                     // Parse: GET /callback?code=xxx&state=yyy HTTP/1.1
                     let parts: Vec<&str> = request_line.split_whitespace().collect();
-                    if parts.len() < 2 {
+                    if parts.len() < 2 || parts[0] != "GET" {
                         let body = "Bad Request";
                         let resp = format!(
                             "HTTP/1.1 400 Bad Request\r\nContent-Type: text/plain\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
@@ -124,7 +113,43 @@ pub async fn start_oidc_callback_server(app: tauri::AppHandle) -> Result<u16, St
                         continue;
                     }
 
+                    let mut host_header = String::new();
+                    for _ in 0..32 {
+                        let mut header_line = String::new();
+                        if reader.read_line(&mut header_line).is_err() {
+                            break;
+                        }
+                        if header_line == "\r\n" || header_line == "\n" || header_line.is_empty() {
+                            break;
+                        }
+                        if let Some((name, value)) = header_line.split_once(':') {
+                            if name.eq_ignore_ascii_case("host") {
+                                host_header = value.trim().to_string();
+                            }
+                        }
+                    }
+                    if host_header != OIDC_CALLBACK_BIND {
+                        let body = "Invalid Host";
+                        let resp = format!(
+                            "HTTP/1.1 400 Bad Request\r\nContent-Type: text/plain\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+                            body.len(),
+                            body
+                        );
+                        let _ = stream.write_all(resp.as_bytes());
+                        continue;
+                    }
+
                     let path_and_query = parts[1];
+                    let request_path = path_and_query.split('?').next().unwrap_or("");
+                    if request_path != "/callback" {
+                        let body = "Not Found";
+                        let resp = format!(
+                            "HTTP/1.1 404 Not Found\r\nContent-Type: text/plain\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+                            body.len(), body
+                        );
+                        let _ = stream.write_all(resp.as_bytes());
+                        continue;
+                    }
                     let query = path_and_query.find('?').map(|i| &path_and_query[i + 1..]);
 
                     let query = match query {
@@ -144,6 +169,7 @@ pub async fn start_oidc_callback_server(app: tauri::AppHandle) -> Result<u16, St
                     // Parse query parameters manually (no url crate dependency)
                     let mut code = String::new();
                     let mut state = String::new();
+                    let mut issuer = String::new();
                     let mut error_val = String::new();
 
                     for pair in query.split('&') {
@@ -155,6 +181,7 @@ pub async fn start_oidc_callback_server(app: tauri::AppHandle) -> Result<u16, St
                         match key {
                             "code" => code = decoded_val,
                             "state" => state = decoded_val,
+                            "iss" => issuer = decoded_val,
                             "error" => error_val = decoded_val,
                             _ => {}
                         }
@@ -195,12 +222,12 @@ pub async fn start_oidc_callback_server(app: tauri::AppHandle) -> Result<u16, St
                         return;
                     }
 
-                    if code.is_empty() || state.is_empty() {
+                    if code.is_empty() || state.is_empty() || issuer.is_empty() {
                         let body = "<!DOCTYPE html><html><head><meta charset=\"utf-8\"><title>AgentHub Error</title>\
                         <style>body{font-family:-apple-system,system-ui,sans-serif;display:flex;justify-content:center;align-items:center;height:100vh;margin:0;background:#1a0a0a;color:#eee}\
                         h1{color:#f87171}p{color:#999}</style></head>\
                         <body><div style=\"text-align:center\"><h1>Invalid Callback</h1>\
-                        <p>The callback URL is missing required parameters. Please try logging in again.</p></div></body></html>";
+                        <p>The callback URL is missing code, state, or issuer. Please try logging in again.</p></div></body></html>";
                         let resp = format!(
                             "HTTP/1.1 400 Bad Request\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
                             body.len(), body
@@ -211,22 +238,23 @@ pub async fn start_oidc_callback_server(app: tauri::AppHandle) -> Result<u16, St
                             "oidc-callback-error",
                             serde_json::json!({
                                 "error": "invalid_callback",
-                                "description": "Missing code or state in callback URL",
+                                "description": "Missing code, state, or issuer in callback URL",
                             }),
                         );
                         OIDC_STOPPED.store(true, Ordering::Relaxed);
                         return;
                     }
 
-                    // Success — return a nice HTML page
+                    // Callback received — the renderer still has to validate state,
+                    // exchange the code and establish the Hub session.
                     let body = "<!DOCTYPE html><html><head><meta charset=\"utf-8\"><title>AgentHub Login</title>\
                     <style>body{font-family:-apple-system,system-ui,sans-serif;display:flex;justify-content:center;align-items:center;height:100vh;margin:0;background:#0f0f0f;color:#eee}\
                     svg{width:64px;height:64px;margin-bottom:16px}\
                     h1{color:#4ade80;margin:0 0 8px}p{color:#999;margin:0}</style></head>\
                     <body><div style=\"text-align:center\">\
                     <svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"#4ade80\" stroke-width=\"2\"><path d=\"M22 11.08V12a10 10 0 1 1-5.93-9.14\"/><polyline points=\"22 4 12 14.01 9 11.01\"/></svg>\
-                    <h1>Login Successful</h1>\
-                    <p>You may close this window and return to AgentHub Desktop.</p></div></body></html>";
+                    <h1>Callback Received</h1>\
+                    <p>AgentHub is verifying the sign-in. You may close this window and return to the app.</p></div></body></html>";
                     let resp = format!(
                         "HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
                         body.len(), body
@@ -238,6 +266,7 @@ pub async fn start_oidc_callback_server(app: tauri::AppHandle) -> Result<u16, St
                         serde_json::json!({
                             "code": code,
                             "state": state,
+                            "iss": issuer,
                         }),
                     );
 
@@ -281,21 +310,16 @@ pub async fn start_oidc_callback_server(app: tauri::AppHandle) -> Result<u16, St
         }
     });
 
-    Ok(port)
+    Ok(OIDC_CALLBACK_PORT)
 }
 
-/// Parsed components of a URL string, extracted without the `url` crate.
-#[derive(Debug)]
-struct ParsedProxyUrl {
-    scheme: String,
-    host: String,
-    port: Option<u16>,
-}
-
-/// Ports on 127.0.0.1 that `proxy_http_post` is permitted to reach.
-/// Local Edge runs on 3210; the OIDC callback server binds a random port
-/// but is never a proxy *target*, so it is deliberately absent here.
-const ALLOWED_LOOPBACK_PORTS: &[u16] = &[3210];
+/// Hub origins the proxy may reach. This command forwards Hub authorization
+/// headers, so it is deliberately not a general-purpose web proxy.
+const ALLOWED_HUB_PROXY_ORIGINS: &[&str] = &[
+    "http://127.0.0.1:8080",
+    "http://localhost:8080",
+    "https://hub.example.invalid",
+];
 
 /// HTTP request headers the proxy will forward. Anything else is dropped to
 /// prevent header injection / SSRF enrichment by a compromised webview.
@@ -310,150 +334,46 @@ const ALLOWED_REQUEST_HEADERS: &[&str] = &[
     "x-correlation-id",
 ];
 
-/// Parse a URL into scheme/host/port without an external `url` dependency.
-/// Returns `Err` if the URL is structurally invalid (no scheme, no host).
-fn parse_proxy_url(raw: &str) -> Result<ParsedProxyUrl, String> {
-    let scheme_end = raw
-        .find("://")
-        .ok_or_else(|| format!("invalid URL: missing scheme separator in {raw:?}"))?;
-    let scheme = raw[..scheme_end].to_lowercase();
-    if scheme.is_empty() {
-        return Err(format!("invalid URL: empty scheme in {raw:?}"));
+fn normalized_http_origin(raw: &str) -> Result<String, String> {
+    let parsed = reqwest::Url::parse(raw)
+        .map_err(|_| "invalid URL: expected an absolute HTTP(S) URL".to_string())?;
+    if parsed.scheme() != "http" && parsed.scheme() != "https" {
+        return Err("SSRF guard: only HTTP(S) Hub origins are allowed".to_string());
     }
-
-    let rest = &raw[scheme_end + 3..];
-    // Host ends at the first '/', '?', '#', or ':' (port) — whichever comes first.
-    let host_end = rest
-        .find(|c: char| c == '/' || c == '?' || c == '#' || c == ':')
-        .unwrap_or(rest.len());
-    let host = rest[..host_end]
-        .trim_start_matches('[')
-        .trim_end_matches(']')
-        .to_lowercase();
-    if host.is_empty() {
-        return Err(format!("invalid URL: empty host in {raw:?}"));
+    if !parsed.username().is_empty() || parsed.password().is_some() {
+        return Err("SSRF guard: URL credentials are not allowed".to_string());
     }
-
-    let port = if host_end < rest.len() && rest.as_bytes()[host_end] == b':' {
-        let port_start = host_end + 1;
-        let port_str = &rest[port_start..rest_start_of_path(rest, port_start)];
-        port_str.parse::<u16>().ok()
-    } else {
-        None
-    };
-
-    Ok(ParsedProxyUrl { scheme, host, port })
+    if parsed.fragment().is_some() {
+        return Err("SSRF guard: URL fragments are not allowed".to_string());
+    }
+    let origin = parsed.origin().ascii_serialization();
+    if origin == "null" {
+        return Err("SSRF guard: URL must have a network origin".to_string());
+    }
+    Ok(origin)
 }
 
-/// Find the byte index where the path begins (first '/' or '?' or '#') at or
-/// after `start`, or the end of the string.
-fn rest_start_of_path(s: &str, start: usize) -> usize {
-    s[start..]
-        .find(|c: char| c == '/' || c == '?' || c == '#')
-        .map(|i| start + i)
-        .unwrap_or(s.len())
+fn allowed_hub_proxy_origin(origin: &str) -> bool {
+    if ALLOWED_HUB_PROXY_ORIGINS.contains(&origin) {
+        return true;
+    }
+    std::env::var("AGENTHUB_DESKTOP_HUB_ORIGIN")
+        .ok()
+        .and_then(|raw| normalized_http_origin(raw.trim()).ok())
+        .is_some_and(|configured| configured == origin)
 }
 
-/// Returns `true` if `host` is a private, link-local, loopback, or
-/// metadata-endpoint IP that must never be reached via the proxy (SSRF guard).
-/// Loopback (127.0.0.1 / ::1) is handled separately because it is conditionally
-/// allowed on whitelisted ports.
-fn is_blocked_private_host(host: &str) -> bool {
-    // IPv4 dotted-quad checks.
-    let octets: Vec<&str> = host.split('.').collect();
-    if octets.len() == 4 && octets.iter().all(|o| o.parse::<u8>().is_ok()) {
-        let a: u8 = octets[0].parse().unwrap();
-        let b: u8 = octets[1].parse().unwrap();
-        return matches!(a, 10)                       // 10.0.0.0/8
-            || (a == 172 && (16..=31).contains(&b))  // 172.16.0.0/12
-            || (a == 192 && b == 168)                // 192.168.0.0/16
-            || (a == 169 && b == 254)                // 169.254.0.0/16 (link-local + cloud metadata)
-            || a == 0                                // 0.0.0.0/8
-            || (a == 127 && host != "127.0.0.1"); // 127.0.0.0/8 except the exact loopback addr
-    }
-    // IPv6 link-local / unique-local / loopback.
-    if host == "::1" {
-        return false; // loopback handled by caller
-    }
-    if host.starts_with("fc") || host.starts_with("fd") {
-        return true; // fc00::/7 unique-local
-    }
-    if host.starts_with("fe80") {
-        return true; // link-local
-    }
-    false
-}
-
-/// Validate a proxy target URL against the SSRF allowlist policy.
-///
-/// Rules:
-/// - Scheme must be `http` or `https` (no file://, ftp://, gopher://, etc.).
-/// - `https` is allowed to any public host, but private IP ranges are blocked.
-///   `https` to `127.0.0.1` is also blocked unless on an allowlisted port.
-/// - `http` is allowed ONLY to `127.0.0.1` on ports in [`ALLOWED_LOOPBACK_PORTS`].
-/// - `localhost` (non-IP) over http is rejected — callers must use 127.0.0.1
-///   or switch to https.
-fn validate_proxy_url(raw: &str) -> Result<ParsedProxyUrl, String> {
-    // Fast-path scheme check before full parse so that file:///etc/passwd
-    // (which has an empty host) is rejected for the right reason.
-    let scheme_end = raw
-        .find("://")
-        .ok_or_else(|| format!("invalid URL: missing scheme separator in {raw:?}"))?;
-    let scheme = raw[..scheme_end].to_lowercase();
-    if scheme != "http" && scheme != "https" {
+/// Validate a proxy target URL against the exact Hub-origin allowlist.
+fn validate_proxy_url(raw: &str) -> Result<reqwest::Url, String> {
+    let parsed = reqwest::Url::parse(raw)
+        .map_err(|_| "invalid URL: expected an absolute HTTP(S) Hub URL".to_string())?;
+    let origin = normalized_http_origin(raw)?;
+    if !allowed_hub_proxy_origin(&origin) {
         return Err(format!(
-            "SSRF guard: scheme {scheme:?} is not allowed; use http (loopback only) or https"
+            "SSRF guard: Hub proxy target origin {origin} is not allowlisted"
         ));
     }
-
-    let parsed = parse_proxy_url(raw)?;
-    debug_assert_eq!(parsed.scheme, scheme);
-
-    match parsed.scheme.as_str() {
-        "https" => {
-            if is_blocked_private_host(&parsed.host) {
-                return Err(format!(
-                    "SSRF guard: https to private/link-local host {} is blocked",
-                    parsed.host
-                ));
-            }
-            // Block https to loopback unless on an allowlisted port. Reaching
-            // 127.0.0.1 over https to a random port is not a legitimate
-            // business endpoint and mirrors the SSRF exfiltration risk.
-            if parsed.host == "127.0.0.1" {
-                let port = parsed.port.ok_or_else(|| {
-                    "SSRF guard: https to 127.0.0.1 without an explicit port is blocked".to_string()
-                })?;
-                if !ALLOWED_LOOPBACK_PORTS.contains(&port) {
-                    return Err(format!(
-                        "SSRF guard: https to 127.0.0.1 port {port} is not in the allowlist {ALLOWED_LOOPBACK_PORTS:?}"
-                    ));
-                }
-            }
-            Ok(parsed)
-        }
-        "http" => {
-            if parsed.host != "127.0.0.1" {
-                return Err(format!(
-                    "SSRF guard: http is only allowed to 127.0.0.1 (got host {}); use https for remote hosts",
-                    parsed.host
-                ));
-            }
-            let port = parsed.port.ok_or_else(|| {
-                "SSRF guard: http to 127.0.0.1 without an explicit port is blocked".to_string()
-            })?;
-            if !ALLOWED_LOOPBACK_PORTS.contains(&port) {
-                return Err(format!(
-                    "SSRF guard: http to 127.0.0.1 port {port} is not in the allowlist {ALLOWED_LOOPBACK_PORTS:?}"
-                ));
-            }
-            Ok(parsed)
-        }
-        // Unreachable: scheme already validated above.
-        other => Err(format!(
-            "SSRF guard: scheme {other:?} is not allowed; use http (loopback only) or https"
-        )),
-    }
+    Ok(parsed)
 }
 
 /// Proxy an HTTP POST request through the Rust backend.
@@ -476,7 +396,8 @@ pub async fn proxy_http_post(
     // Validate the URL before touching the network. This is the core SSRF
     // mitigation: an arbitrary webview must not be able to POST to internal
     // services, cloud metadata endpoints, or non-loopback private hosts.
-    let _validated = validate_proxy_url(&url)?;
+    let validated = validate_proxy_url(&url)?;
+    let target_origin = validated.origin().ascii_serialization();
 
     // Redirects are disabled so an allowlisted URL cannot bounce the proxy to
     // an arbitrary target (e.g. 302 → http://169.254.169.254). Callers that
@@ -487,7 +408,9 @@ pub async fn proxy_http_post(
         .build()
         .map_err(|e| format!("failed to build HTTP client: {e}"))?;
 
-    let mut req = client.post(&url).header("Content-Type", "application/json");
+    let mut req = client
+        .post(validated)
+        .header("Content-Type", "application/json");
 
     if let Some(hdrs) = headers {
         for (k, v) in hdrs {
@@ -503,7 +426,7 @@ pub async fn proxy_http_post(
     req = req.body(body);
 
     let resp = req.send().await.map_err(|e| {
-        log::error!("[proxy_http_post] request to {url} failed: {e}");
+        log::error!("[proxy_http_post] request to {target_origin} failed: {e}");
         format!("request failed: {e}")
     })?;
 
@@ -615,12 +538,16 @@ mod tests {
     use super::*;
 
     #[test]
-    fn loopback_readiness_binds_random_localhost_port() {
+    fn loopback_readiness_binds_registered_localhost_port() {
         let readiness = check_loopback_callback_readiness();
 
         assert!(readiness.available);
         assert_eq!(readiness.bind_host, "127.0.0.1");
-        assert!(readiness.port.unwrap_or_default() > 0);
+        assert_eq!(readiness.port, Some(OIDC_CALLBACK_PORT));
+        assert_eq!(
+            readiness.redirect_uri.as_deref(),
+            Some("http://127.0.0.1:53682/callback")
+        );
         assert!(readiness.error.is_none());
     }
 
@@ -629,117 +556,104 @@ mod tests {
         let readiness = LoopbackReadiness {
             available: true,
             bind_host: "127.0.0.1".to_string(),
-            port: Some(49152),
-            redirect_uri: Some("http://127.0.0.1:49152/callback".to_string()),
+            port: Some(OIDC_CALLBACK_PORT),
+            redirect_uri: Some(format!("http://127.0.0.1:{OIDC_CALLBACK_PORT}/callback")),
             error: None,
         };
 
         assert_eq!(
             readiness.redirect_uri.as_deref(),
-            Some("http://127.0.0.1:49152/callback")
+            Some("http://127.0.0.1:53682/callback")
         );
     }
 
     // ── SSRF guard: validate_proxy_url ───────────────────────────────
 
     #[test]
-    fn proxy_url_allows_https_to_public_domain() {
-        let parsed = validate_proxy_url("https://api.example.invalid/v1/chat").unwrap();
-        assert_eq!(parsed.scheme, "https");
-        assert_eq!(parsed.host, "api.example.invalid");
-        assert!(parsed.port.is_none());
+    fn proxy_url_allows_canonical_hub_origin() {
+        let parsed =
+            validate_proxy_url("https://hub.example.invalid/client/auth/me").unwrap();
+        assert_eq!(
+            parsed.origin().ascii_serialization(),
+            "https://hub.example.invalid"
+        );
+        assert_eq!(parsed.path(), "/client/auth/me");
     }
 
     #[test]
-    fn proxy_url_allows_http_to_loopback_edge_port() {
-        let parsed = validate_proxy_url("http://127.0.0.1:3210/v1/health").unwrap();
-        assert_eq!(parsed.scheme, "http");
-        assert_eq!(parsed.host, "127.0.0.1");
-        assert_eq!(parsed.port, Some(3210));
+    fn proxy_url_allows_loopback_hub() {
+        let parsed = validate_proxy_url("http://127.0.0.1:8080/client/auth/me").unwrap();
+        assert_eq!(
+            parsed.origin().ascii_serialization(),
+            "http://127.0.0.1:8080"
+        );
+    }
+
+    #[test]
+    fn proxy_url_blocks_arbitrary_public_https() {
+        let err = validate_proxy_url("https://collector.example/upload").unwrap_err();
+        assert!(err.contains("not allowlisted"), "{err}");
+    }
+
+    #[test]
+    fn proxy_url_blocks_old_hub_host() {
+        let err = validate_proxy_url("https://api.example.invalid/v1/chat").unwrap_err();
+        assert!(err.contains("not allowlisted"), "{err}");
+    }
+
+    #[test]
+    fn proxy_url_blocks_userinfo_private_target() {
+        let err = validate_proxy_url("https://foo@10.0.0.1/admin").unwrap_err();
+        assert!(err.contains("credentials"), "{err}");
+    }
+
+    #[test]
+    fn proxy_url_blocks_local_edge_port() {
+        let err = validate_proxy_url("http://127.0.0.1:3210/v1/health").unwrap_err();
+        assert!(err.contains("not allowlisted"), "{err}");
     }
 
     #[test]
     fn proxy_url_blocks_cloud_metadata_endpoint() {
-        // 169.254.169.254 is the classic cloud metadata IP — SSRF exfiltration.
         let err = validate_proxy_url("http://169.254.169.254/latest/meta-data/").unwrap_err();
-        assert!(err.contains("SSRF guard"), "{err}");
-        assert!(err.contains("169.254.169.254"), "{err}");
+        assert!(err.contains("not allowlisted"), "{err}");
     }
 
     #[test]
-    fn proxy_url_blocks_private_10_range() {
-        let err = validate_proxy_url("https://10.0.0.1/admin").unwrap_err();
-        assert!(err.contains("SSRF guard"), "{err}");
-    }
-
-    #[test]
-    fn proxy_url_blocks_private_192_168_range() {
-        let err = validate_proxy_url("https://192.168.1.1/admin").unwrap_err();
-        assert!(err.contains("SSRF guard"), "{err}");
-    }
-
-    #[test]
-    fn proxy_url_blocks_private_172_16_range() {
-        let err = validate_proxy_url("https://172.16.0.1/admin").unwrap_err();
-        assert!(err.contains("SSRF guard"), "{err}");
-    }
-
-    #[test]
-    fn proxy_url_blocks_loopback_non_allowlisted_port() {
-        let err = validate_proxy_url("http://127.0.0.1:8080/secret").unwrap_err();
-        assert!(err.contains("allowlist"), "{err}");
-        assert!(err.contains("8080"), "{err}");
-    }
-
-    #[test]
-    fn proxy_url_blocks_http_to_non_loopback_host() {
-        let err = validate_proxy_url("http://api.example.invalid/v1/chat").unwrap_err();
-        assert!(err.contains("only allowed to 127.0.0.1"), "{err}");
-    }
-
-    #[test]
-    fn proxy_url_blocks_http_to_localhost() {
-        // `localhost` is not the exact IP 127.0.0.1 — rejected to avoid DNS rebinding.
-        let err = validate_proxy_url("http://localhost:3210/").unwrap_err();
-        assert!(err.contains("only allowed to 127.0.0.1"), "{err}");
-    }
-
-    #[test]
-    fn proxy_url_blocks_non_http_scheme() {
-        let err = validate_proxy_url("file:///etc/passwd").unwrap_err();
-        assert!(err.contains("scheme"), "{err}");
-        assert!(err.contains("file"), "{err}");
+    fn proxy_url_blocks_private_dns_style_hosts() {
+        for target in [
+            "https://10.0.0.1/admin",
+            "https://192.168.1.1/admin",
+            "https://172.16.0.1/admin",
+            "https://[fd00::1]/admin",
+        ] {
+            let err = validate_proxy_url(target).unwrap_err();
+            assert!(err.contains("not allowlisted"), "{target}: {err}");
+        }
     }
 
     #[test]
     fn proxy_url_blocks_zero_ip() {
         let err = validate_proxy_url("https://0.0.0.0/").unwrap_err();
-        assert!(err.contains("SSRF guard"), "{err}");
+        assert!(err.contains("not allowlisted"), "{err}");
     }
 
     #[test]
-    fn proxy_url_blocks_ipv6_unique_local() {
-        let err = validate_proxy_url("https://[fd00::1]/").unwrap_err();
-        assert!(err.contains("SSRF guard"), "{err}");
+    fn proxy_url_blocks_non_http_scheme() {
+        let err = validate_proxy_url("file:///etc/passwd").unwrap_err();
+        assert!(err.contains("HTTP(S)"), "{err}");
     }
 
     #[test]
-    fn proxy_url_blocks_https_to_loopback_non_edge_port() {
-        // Even over https, 127.0.0.1 without an allowlisted port is not a
-        // legitimate business endpoint — block it.
-        let err = validate_proxy_url("https://127.0.0.1:9999/").unwrap_err();
-        assert!(err.contains("SSRF guard"), "{err}");
-    }
-
-    #[test]
-    fn proxy_url_parses_port_from_url_with_path() {
-        let parsed = validate_proxy_url("http://127.0.0.1:3210/v1/health?detail=1").unwrap();
-        assert_eq!(parsed.port, Some(3210));
+    fn proxy_url_blocks_fragments() {
+        let err =
+            validate_proxy_url("https://hub.example.invalid/client#fragment").unwrap_err();
+        assert!(err.contains("fragments"), "{err}");
     }
 
     #[test]
     fn proxy_url_rejects_missing_scheme() {
-        let err = validate_proxy_url("127.0.0.1:3210/").unwrap_err();
-        assert!(err.contains("missing scheme"), "{err}");
+        let err = validate_proxy_url("127.0.0.1:8080/").unwrap_err();
+        assert!(err.contains("invalid URL"), "{err}");
     }
 }

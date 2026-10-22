@@ -4,7 +4,8 @@ import { blockExternalFonts, isExternalFontUrl } from '../../../e2e/fontBlocker'
 const LIVE_BACKEND_HOSTS = new Set([
   'hub.example.invalid',
   'api.hub.example.invalid',
-  'id.example.invalid',
+  'hub.example.invalid',
+  'account.example.invalid',
   'api.example.invalid',
   'localhost:8080',
   '127.0.0.1:8080',

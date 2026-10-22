@@ -2,7 +2,7 @@
 
 > 子文档 | 主索引：[architecture.md](../architecture.md)
 >
-> 最后更新：2026-10-18（合并协议能力映射）
+> 最后更新：2026-10-23（Account OIDC 身份边界）
 >
 > 状态：设计基线（Accepted）。本文描述目标架构、协议分层、可靠性/安全/可观测合同与设计差距；实现状态以源码为准。
 
@@ -86,7 +86,7 @@ Edge MCP server 暴露 8 个 canonical `agenthub_*` 工具；它们都是 REST �
 
 ## 6. 安全与最小代理权
 
-已有资产：TokenDance ID 只证身份、Hub-local 授权分离；Web/Mobile Hub-only；Desktop renderer 无 raw process；`env_sanitizer` / `tool_allowlist` / `security_hooks` / 出站 egress；JWT rotation/revoke/jti blacklist/`auditPermission`。
+已有资产：Hub 只消费 TokenDance Account 公开 OIDC endpoint，以 `issuer + subject` 绑定外部身份；Account token 仅停留在 Hub OIDC service，Hub REST/WS 只接受 Hub HS256 session。Hub-local 授权分离；Web/Mobile Hub-only；Desktop renderer 无 raw process；`env_sanitizer` / `tool_allowlist` / `security_hooks` / 出站 egress；JWT rotation/revoke/jti blacklist/`auditPermission`。
 
 演进合同：
 
@@ -96,6 +96,7 @@ Edge MCP server 暴露 8 个 canonical `agenthub_*` 工具；它们都是 REST �
 4. 审批是确定性 broker：pending/decided 状态机、iteration cap、timeout 默认拒绝或安全降级；禁止模型自评。
 5. sandbox 按风险分级：本地受限 sandbox（当前 Edge 边界）与远端 untrusted code（microVM/gVisor、egress allowlist、DNS 限制、非 root、短生命周期）分开授权。
 6. gateway 单入口：远端 runtime 只接受 gateway 来源的调用；client backend 自己维护 session↔user mapping。
+7. 身份凭据与产品会话分层：Account access/ID token、Hub session token、Edge token 和 task capability 不可互换；任何一层都不能绕过下一层的 owner、device、purpose 或 action 检查。
 
 ## 7. 可观测
 
@@ -114,6 +115,7 @@ Edge MCP server 暴露 8 个 canonical `agenthub_*` 工具；它们都是 REST �
 - 不让 LLM 当控制面/supervisor；路由、授权、审批、重试必须 deterministic。
 - 不并行引入 MCP + A2A + AG-UI 三套内部协议。
 - 不让 Web/Mobile 直连 Local Edge。
+- 不引入 Account 管理 API/DB 旁路，不允许 Account token 作为 Hub bearer，也不允许 legacy `tokendance_sub` 自动认领。
 - 不现在上 CRDT；先 event log + snapshot，确有并发协作编辑场景再评估。
 - 不让模型自评审批/完成度；`real_tested` 与证据等级继续是唯一真实性口径。
 - 不在真实 E2E/approved-real 证据前宣称远程执行、sandbox 或发布“生产就绪”。

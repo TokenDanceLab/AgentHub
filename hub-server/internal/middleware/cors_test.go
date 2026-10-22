@@ -32,10 +32,48 @@ func TestCORSReturnsMiddlewareOnValidConfig(t *testing.T) {
 	}
 }
 
+func TestCORSRejectsWildcardInAllEnvironments(t *testing.T) {
+	for _, env := range []string{"development", "staging", "production"} {
+		t.Run(env, func(t *testing.T) {
+			if err := validateCORSOriginsForEnvironment(env, []string{"*"}); err == nil {
+				t.Fatal("wildcard CORS origin must be rejected")
+			}
+		})
+	}
+}
+
+func TestCORSRejectsNonOriginShapes(t *testing.T) {
+	for _, origin := range []string{
+		"https://user@hub.example",
+		"https://hub.example/path",
+		"https://hub.example/",
+		"https://hub.example?query=1",
+		"https://hub.example#fragment",
+		"file:///tmp/origin",
+		"null",
+	} {
+		t.Run(origin, func(t *testing.T) {
+			if err := validateCORSOriginsForEnvironment("development", []string{origin}); err == nil {
+				t.Fatalf("non-origin CORS value must be rejected: %s", origin)
+			}
+		})
+	}
+}
+
+func TestCORSRejectsDuplicates(t *testing.T) {
+	err := validateCORSOriginsForEnvironment("development", []string{
+		"http://localhost:5173",
+		"http://localhost:5173",
+	})
+	if err == nil {
+		t.Fatal("duplicate CORS origin must be rejected")
+	}
+}
+
 func TestValidateCORSOriginsForEnvironmentRejectsLoopbackInProduction(t *testing.T) {
 	origins := []string{
 		"https://hub.example.invalid",
-		"http://localhost:5173",
+		"https://localhost:5173",
 	}
 
 	err := validateCORSOriginsForEnvironment("production", origins)
@@ -56,5 +94,33 @@ func TestValidateCORSOriginsForEnvironmentAllowsLoopbackOutsideProduction(t *tes
 
 	if err := validateCORSOriginsForEnvironment("development", origins); err != nil {
 		t.Fatalf("development CORS validation returned error: %v", err)
+	}
+}
+
+func TestValidateCORSOriginsForEnvironmentRejectsPrivateProductionOrigins(t *testing.T) {
+	for _, origin := range []string{
+		"http://hub.example",
+		"https://127.0.0.1",
+		"https://[::1]",
+		"https://10.0.0.1",
+		"https://192.168.1.2",
+		"https://[fd00::1]",
+		"https://169.254.169.254",
+		"https://0.0.0.0",
+	} {
+		t.Run(origin, func(t *testing.T) {
+			if err := validateCORSOriginsForEnvironment("production", []string{origin}); err == nil {
+				t.Fatalf("unsafe production CORS origin must be rejected: %s", origin)
+			}
+		})
+	}
+}
+
+func TestValidateCORSOriginsForEnvironmentAllowsTauriCustomProtocol(t *testing.T) {
+	if err := validateCORSOriginsForEnvironment("production", []string{"https://tauri.localhost"}); err != nil {
+		t.Fatalf("Tauri custom-protocol origin must be allowed: %v", err)
+	}
+	if err := validateCORSOriginsForEnvironment("production", []string{"https://other.localhost"}); err == nil {
+		t.Fatal("non-Tauri .localhost origin must be rejected in production")
 	}
 }

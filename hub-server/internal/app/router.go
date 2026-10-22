@@ -22,7 +22,7 @@ func (a *App) setupRouter() (*gin.Engine, error) {
 	authMW := middleware.NewAuthMiddleware(a.Config, middleware.AuthDependencies{
 		BlacklistChecker: a.CacheClient,
 		PermissionAudit:  a.auditPermissionDecision,
-	}, a.tdVerifier())
+	})
 	if err := router.SetupRoutes(r, a.Config, authMW, a.Config.JWT.Secret, a.CacheClient,
 		a.AuthHandler, a.WebSocketHandler, a.DeviceHandler,
 		a.ContactHandler, a.SessionHandler, a.MessageHandler,

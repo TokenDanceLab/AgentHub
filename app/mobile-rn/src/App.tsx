@@ -23,6 +23,7 @@ import {
   type PushPermissionState,
 } from '@/pushRegistration';
 import { createExpoMobileAuthSession, type CreateExpoMobileAuthSessionResult } from '@/session/mobileAuthSession';
+import { resolveMobileAccountLoginEnabled } from '@/session/mobileLoginPolicy';
 import type { HubSessionSnapshot } from '@/session/sessionState';
 import {
   getMobileFixtureForScenario,
@@ -66,7 +67,7 @@ const previewDegradedFixture: MobileAppFixture = {
   runs: [],
   transcript: {},
   account: {
-    tokenDanceId: 'recovering',
+    accountIdentity: 'recovering',
     hubSession: 'missing',
     notification: 'prompt',
     hubSync: 'offline',
@@ -249,7 +250,9 @@ function MobileAppContent({ preview }: { preview: PreviewOptions }): React.React
     let notificationBridge: AgentHubNotificationBridge | undefined;
     const baseUrl = resolveDefaultHubBaseUrl();
 
-    createExpoMobileAuthSession(baseUrl)
+    createExpoMobileAuthSession(baseUrl, {
+      allowRealLogin: resolveMobileAccountLoginEnabled(),
+    })
       .then((assembly) => {
         if (cancelled) return;
         setAuthHandle(assembly);
@@ -263,7 +266,11 @@ function MobileAppContent({ preview }: { preview: PreviewOptions }): React.React
             // Authorization responses arrive via the deep-link bridge; the
             // auth ports validate state + expiry against the pending login.
             if (callback.kind !== 'success') return;
-            assembly.handleIncomingOidcCallback({ code: callback.code, state: callback.state });
+            assembly.handleIncomingOidcCallback({
+              code: callback.code,
+              state: callback.state,
+              iss: callback.iss,
+            });
           },
           onNavigate: applyMobileNavigationTarget,
           onIgnored: () => undefined,
@@ -309,6 +316,7 @@ function MobileAppContent({ preview }: { preview: PreviewOptions }): React.React
   }, []);
 
   const handleSignIn = async () => {
+    if (!resolveMobileAccountLoginEnabled()) return;
     if (!authHandle || authPhase !== 'idle') return;
     setAuthPhase('signing_in');
     try {
@@ -356,7 +364,7 @@ function MobileAppContent({ preview }: { preview: PreviewOptions }): React.React
             : fixture.account.notification;
     return {
       ...fixture.account,
-      tokenDanceId: hubSessionStatus === 'active' ? 'signed_in' : 'signed_out',
+      accountIdentity: hubSessionStatus === 'active' ? 'signed_in' : 'signed_out',
       hubSession: hubSessionStatus === 'active' ? 'active' : 'missing',
       notification,
     };
@@ -517,7 +525,7 @@ function MobileAppContent({ preview }: { preview: PreviewOptions }): React.React
         themeMode={mode}
         onChangeThemeMode={setMode}
         onClose={() => setActiveTab(accountReturnTab)}
-        onSignIn={handleSignIn}
+        {...(resolveMobileAccountLoginEnabled() ? { onSignIn: handleSignIn } : {})}
         onSignOut={handleSignOut}
         authBusy={authPhase !== 'idle'}
         sessionRestoreError={sessionRestoreError}
@@ -863,7 +871,7 @@ function TabletInspectorOverview({
         <Text style={{ color: tokens.color.ink, fontSize: tokens.type.sm, fontWeight: tokens.type.weight.semibold, lineHeight: tokens.type.lineHeight.sm }}>
           {t.hubSession}
         </Text>
-        <InspectorMetaRow label={t.tokenDanceIdentity} value={formatIdentityStatus(account.tokenDanceId, t)} />
+        <InspectorMetaRow label={t.accountIdentityLabel} value={formatIdentityStatus(account.accountIdentity, t)} />
         <InspectorMetaRow label={t.hubSyncStatus} value={formatHubSyncStatus(account.hubSync, t)} />
         <InspectorMetaRow label={t.notificationPermission} value={formatNotificationStatus(account.notification, t)} />
       </Surface>
@@ -1099,7 +1107,7 @@ function formatRunStatusLabel(status: MobileRun['status'], t: ReturnType<typeof 
   return t.status;
 }
 
-function formatIdentityStatus(status: MobileAccountState['tokenDanceId'], t: ReturnType<typeof useStrings>): string {
+function formatIdentityStatus(status: MobileAccountState['accountIdentity'], t: ReturnType<typeof useStrings>): string {
   if (status === 'signed_in') {
     return t.signedIn;
   }

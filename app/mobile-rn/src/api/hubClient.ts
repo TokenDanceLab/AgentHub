@@ -396,14 +396,14 @@ function mapSessionsToMobileFixture(
     // offline fixture scenario (data/mobileFixtures.ts).
     account: sessionsOk
       ? {
-          tokenDanceId: 'signed_in',
+          accountIdentity: 'signed_in',
           hubSession: 'active',
           notification: 'granted',
           hubSync: 'active',
           deviceLabel: 'AgentHub Mobile',
         }
       : {
-          tokenDanceId: 'recovering',
+          accountIdentity: 'recovering',
           hubSession: 'missing',
           notification: 'prompt',
           hubSync: 'offline',

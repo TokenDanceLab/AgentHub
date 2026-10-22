@@ -136,19 +136,13 @@ services:
       AGENTHUB_SERVER_ADMIN_PORT: "6060"
       AGENTHUB_UPLOAD_DIR: ${AGENTHUB_UPLOAD_DIR:-./uploads}
       AGENTHUB_UPLOAD_MAX_SIZE: ${AGENTHUB_UPLOAD_MAX_SIZE:-10485760}
-      # TokenDance ID OIDC. Values stay empty in local dev unless the operator
-      # has registered an AgentHub OAuth client in TokenDance ID.
-      # Web dev owns browser callbacks on 5174. Desktop/Tauri uses the
-      # http://127.0.0.1/callback loopback policy for dynamic callback ports;
-      # do not register Desktop port 5173 as a Web callback.
-      # Run hub-server/scripts/setup-tokendance-oidc.sh to register the client,
-      # then set the CLIENT_ID and CLIENT_SECRET below.
-      AGENTHUB_TOKENDANCE_ID_ISSUER_URL: ${AGENTHUB_TOKENDANCE_ID_ISSUER_URL:-http://localhost:3000}
-      AGENTHUB_TOKENDANCE_ID_JWKS_URI: ${AGENTHUB_TOKENDANCE_ID_JWKS_URI:-}
-      AGENTHUB_TOKENDANCE_ID_CLIENT_ID: ${AGENTHUB_TOKENDANCE_ID_CLIENT_ID:-}
-      AGENTHUB_TOKENDANCE_ID_CLIENT_SECRET: ${AGENTHUB_TOKENDANCE_ID_CLIENT_SECRET:-}
-      AGENTHUB_TOKENDANCE_ID_REDIRECT_URI: ${AGENTHUB_TOKENDANCE_ID_REDIRECT_URI:-http://127.0.0.1/callback}
-      AGENTHUB_TOKENDANCE_ID_ALLOWED_REDIRECT_URIS: ${AGENTHUB_TOKENDANCE_ID_ALLOWED_REDIRECT_URIS:-http://127.0.0.1/callback,http://localhost:5174/auth/tokendance/callback,http://127.0.0.1:5174/auth/tokendance/callback}
+      # TokenDance Account OIDC. Empty by default; local Account clients are
+      # operator-supplied and never embedded in this repository.
+      AGENTHUB_ACCOUNT_OIDC_ISSUER_URL: ${AGENTHUB_ACCOUNT_OIDC_ISSUER_URL:-}
+      AGENTHUB_ACCOUNT_OIDC_CLIENT_ID: ${AGENTHUB_ACCOUNT_OIDC_CLIENT_ID:-}
+      AGENTHUB_ACCOUNT_OIDC_CLIENT_SECRET: ${AGENTHUB_ACCOUNT_OIDC_CLIENT_SECRET:-}
+      AGENTHUB_ACCOUNT_OIDC_REDIRECT_URI: ${AGENTHUB_ACCOUNT_OIDC_REDIRECT_URI:-http://127.0.0.1:53682/callback}
+      AGENTHUB_ACCOUNT_OIDC_ALLOWED_REDIRECT_URIS: ${AGENTHUB_ACCOUNT_OIDC_ALLOWED_REDIRECT_URIS:-http://localhost:5174/auth/account/callback,http://127.0.0.1:5174/auth/account/callback,http://localhost:5174/workbench/auth/account/callback,http://127.0.0.1:5174/workbench/auth/account/callback}
     ports:
       - "${AGENTHUB_BIND_HOST:-127.0.0.1}:${AGENTHUB_SERVER_PORT:-8080}:8080"
       - "${AGENTHUB_BIND_HOST:-127.0.0.1}:${AGENTHUB_SERVER_ADMIN_PORT:-6060}:6060"

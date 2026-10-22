@@ -29,13 +29,13 @@ interface AccountMenuSection {
   items: AccountMenuItem[];
 }
 
-function formatTokenDanceStatus(status: MobileAccountState['tokenDanceId']): string {
+function formatAccountIdentityStatus(status: MobileAccountState['accountIdentity']): string {
   if (status === 'signed_in') return 'Signed in';
   if (status === 'recovering') return 'Recovering';
   return 'Signed out';
 }
 
-function getAccountTone(status: MobileAccountState['tokenDanceId']): 'success' | 'warning' | 'danger' {
+function getAccountTone(status: MobileAccountState['accountIdentity']): 'success' | 'warning' | 'danger' {
   if (status === 'signed_in') return 'success';
   if (status === 'recovering') return 'warning';
   return 'danger';
@@ -76,7 +76,7 @@ function getStatusBadgeTone(value: string): 'neutral' | 'success' | 'warning' | 
 }
 
 function isAccountReady(account: MobileAccountState): boolean {
-  return account.tokenDanceId === 'signed_in' && account.hubSession === 'active';
+  return account.accountIdentity === 'signed_in' && account.hubSession === 'active';
 }
 
 function getAccountReadyLabel(account: MobileAccountState): string {
@@ -101,7 +101,7 @@ function buildMenuSections(account: MobileAccountState): AccountMenuSection[] {
     {
       title: 'Identity and session',
       items: [
-        { icon: 'shield', label: 'TokenDance ID', status: account.tokenDanceId, color: '#moss' },
+        { icon: 'shield', label: 'TokenDance Account', status: account.accountIdentity, color: '#moss' },
         { icon: 'runs', label: 'AgentHub', status: account.hubSession, color: '#accent' },
         { icon: 'grid', label: 'Workspace settings', color: '#accent' },
       ],
@@ -126,20 +126,20 @@ function buildMenuSections(account: MobileAccountState): AccountMenuSection[] {
 }
 
 // ---------------------------------------------------------------------------
-// formatTokenDanceStatus
+// formatAccountIdentityStatus
 // ---------------------------------------------------------------------------
 
-describe('formatTokenDanceStatus', () => {
+describe('formatAccountIdentityStatus', () => {
   it('maps signed_in to Signed in', () => {
-    expect(formatTokenDanceStatus('signed_in')).toBe('Signed in');
+    expect(formatAccountIdentityStatus('signed_in')).toBe('Signed in');
   });
 
   it('maps recovering to Recovering', () => {
-    expect(formatTokenDanceStatus('recovering')).toBe('Recovering');
+    expect(formatAccountIdentityStatus('recovering')).toBe('Recovering');
   });
 
   it('maps signed_out to Signed out', () => {
-    expect(formatTokenDanceStatus('signed_out')).toBe('Signed out');
+    expect(formatAccountIdentityStatus('signed_out')).toBe('Signed out');
   });
 });
 
@@ -240,7 +240,7 @@ describe('getStatusBadgeTone', () => {
 describe('isAccountReady', () => {
   it('returns true when signed_in and active', () => {
     const account: MobileAccountState = {
-      tokenDanceId: 'signed_in',
+      accountIdentity: 'signed_in',
       hubSession: 'active',
       notification: 'prompt',
       hubSync: 'active',
@@ -252,12 +252,12 @@ describe('isAccountReady', () => {
   const notReadyCases: Array<[string, Partial<MobileAccountState>]> = [
     ['expired hubSession', { hubSession: 'expired' }],
     ['missing hubSession', { hubSession: 'missing', hubSync: 'offline' }],
-    ['recovering tokenDanceId', { tokenDanceId: 'recovering', hubSync: 'recovering' }],
-    ['signed_out tokenDanceId', { tokenDanceId: 'signed_out' }],
+    ['recovering accountIdentity', { accountIdentity: 'recovering', hubSync: 'recovering' }],
+    ['signed_out accountIdentity', { accountIdentity: 'signed_out' }],
   ];
   it.each(notReadyCases)('returns false when %s', (_, overrides) => {
     const account: MobileAccountState = {
-      tokenDanceId: 'signed_in',
+      accountIdentity: 'signed_in',
       hubSession: 'active',
       notification: 'prompt',
       hubSync: 'active',
@@ -275,7 +275,7 @@ describe('isAccountReady', () => {
 describe('account ready label and tone', () => {
   it('returns Online / success for ready account', () => {
     const account: MobileAccountState = {
-      tokenDanceId: 'signed_in',
+      accountIdentity: 'signed_in',
       hubSession: 'active',
       notification: 'prompt',
       hubSync: 'active',
@@ -287,7 +287,7 @@ describe('account ready label and tone', () => {
 
   it('returns Needs action / warning for non-ready account', () => {
     const account: MobileAccountState = {
-      tokenDanceId: 'signed_out',
+      accountIdentity: 'signed_out',
       hubSession: 'missing',
       notification: 'blocked',
       hubSync: 'offline',
@@ -349,9 +349,9 @@ describe('account menu sections', () => {
     expect(sections[2]!.items).toHaveLength(2);
   });
 
-  it('identity section includes TokenDance ID status', () => {
+  it('identity section includes TokenDance Account status', () => {
     const sections = buildMenuSections(mobileFixture.account);
-    const tdItem = sections[0]!.items.find((i) => i.label === 'TokenDance ID');
+    const tdItem = sections[0]!.items.find((i) => i.label === 'TokenDance Account');
     expect(tdItem).toBeDefined();
     expect(tdItem!.status).toBe('signed_in');
   });
@@ -387,7 +387,7 @@ describe('account menu sections', () => {
 describe('default fixture account', () => {
   it('has valid account state', () => {
     const account = mobileFixture.account;
-    expect(account.tokenDanceId).toBe('signed_in');
+    expect(account.accountIdentity).toBe('signed_in');
     expect(account.hubSession).toBe('active');
     expect(account.notification).toBe('prompt');
     expect(account.hubSync).toBe('active');
@@ -405,7 +405,7 @@ describe('default fixture account', () => {
 
 describe('account fixture scenarios', () => {
   type ScenarioExpectations = {
-    tokenDanceId: MobileAccountState['tokenDanceId'];
+    accountIdentity: MobileAccountState['accountIdentity'];
     hubSession: MobileAccountState['hubSession'];
     notification: MobileAccountState['notification'];
     hubSync: MobileAccountState['hubSync'];
@@ -414,7 +414,7 @@ describe('account fixture scenarios', () => {
 
   it('offline scenario has degraded account state', () => {
     const f = getMobileFixtureForScenario('offline');
-    expect(f.account.tokenDanceId).toBe('recovering');
+    expect(f.account.accountIdentity).toBe('recovering');
     expect(f.account.hubSession).toBe('missing');
     expect(f.account.hubSync).toBe('offline');
     expect(isAccountReady(f.account)).toBe(false);
@@ -423,13 +423,13 @@ describe('account fixture scenarios', () => {
   it('notification scenario has granted notification', () => {
     const f = getMobileFixtureForScenario('notification');
     expect(f.account.notification).toBe('granted');
-    expect(f.account.tokenDanceId).toBe('signed_in');
+    expect(f.account.accountIdentity).toBe('signed_in');
     expect(isAccountReady(f.account)).toBe(true);
   });
 
   it('empty scenario has active session', () => {
     const f = getMobileFixtureForScenario('empty');
-    expect(f.account.tokenDanceId).toBe('signed_in');
+    expect(f.account.accountIdentity).toBe('signed_in');
     expect(f.account.hubSession).toBe('active');
     expect(isAccountReady(f.account)).toBe(true);
   });
@@ -437,7 +437,7 @@ describe('account fixture scenarios', () => {
   it('approvalError scenario has expired hub session', () => {
     const f = getMobileFixtureForScenario('approvalError');
     expect(f.account.hubSession).toBe('expired');
-    expect(f.account.tokenDanceId).toBe('recovering');
+    expect(f.account.accountIdentity).toBe('recovering');
     expect(isAccountReady(f.account)).toBe(false);
   });
 
@@ -526,8 +526,8 @@ describe('theme mode handling', () => {
 // ---------------------------------------------------------------------------
 
 describe('account status combinations', () => {
-  it('TokenDance ID status + Hub session combinations', () => {
-    const tdStatuses: MobileAccountState['tokenDanceId'][] = ['signed_in', 'signed_out', 'recovering'];
+  it('TokenDance Account status + Hub session combinations', () => {
+    const tdStatuses: MobileAccountState['accountIdentity'][] = ['signed_in', 'signed_out', 'recovering'];
     const hubStatuses: MobileAccountState['hubSession'][] = ['active', 'missing', 'expired'];
 
     const combinations: Array<{ td: typeof tdStatuses[number]; hub: typeof hubStatuses[number]; ready: boolean }> = [];

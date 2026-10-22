@@ -2,10 +2,10 @@ export type HubSessionStatus = 'active' | 'expired' | 'missing';
 
 export interface HubSessionSnapshot {
   status: HubSessionStatus;
-  // Hub-issued tokens returned after TokenDance ID code exchange.
+  // Hub-issued tokens returned after TokenDance Account code exchange.
   accessToken?: string;
   refreshToken?: string;
-  // TokenDance ID subject. This is identity context, not an ID token.
+  // TokenDance Account subject. This is identity context, not an ID token.
   userSub?: string;
   expiresAt?: string;
 }
@@ -39,10 +39,10 @@ export interface HubSessionStorageOptions {
 
 export interface HubSessionBoundary {
   hubSessionStatus: HubSessionStatus;
-  tokenDanceIdSubject?: string;
+  accountSubject?: string;
   hasHubAccessToken: boolean;
   hasHubRefreshToken: boolean;
-  storesTokenDanceIdToken: false;
+  storesProviderToken: false;
   storesThirdPartyProviderToken: false;
 }
 
@@ -124,14 +124,14 @@ export function getHubSessionBoundary(session: HubSessionSnapshot): HubSessionBo
     hubSessionStatus: session.status,
     hasHubAccessToken: Boolean(session.accessToken),
     hasHubRefreshToken: Boolean(session.refreshToken),
-    storesTokenDanceIdToken: false,
+    storesProviderToken: false,
     storesThirdPartyProviderToken: false,
-  } satisfies Omit<HubSessionBoundary, 'tokenDanceIdSubject'>;
+  } satisfies Omit<HubSessionBoundary, 'accountSubject'>;
 
   return session.userSub
     ? {
         ...boundary,
-        tokenDanceIdSubject: session.userSub,
+        accountSubject: session.userSub,
       }
     : boundary;
 }

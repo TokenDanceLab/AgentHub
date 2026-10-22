@@ -3,7 +3,7 @@
  *
  * Pure TypeScript core covering the Hub auth lifecycle:
  * - mutable auth state with immutable snapshots + listener notify
- * - TokenDance ID OIDC PKCE login flow (authorize → callback validation → code exchange)
+ * - TokenDance Account OIDC PKCE login flow (authorize → callback validation → code exchange)
  * - access/refresh token persistence and restore
  * - refresh fallback when the profile request fails
  * - user profile fetch, logout server call + full session cleanup
@@ -14,6 +14,7 @@
  */
 
 import type { HubClient } from '../../hub/hubClient';
+import { isTerminalHubAuthError } from '../../errors';
 import { computeCodeChallenge, generateCodeVerifier } from './pkce';
 import type { HubClientFactory, HubAuthPorts } from './ports';
 import {
@@ -151,6 +152,7 @@ export function createHubAuthCore(ports: HubAuthPorts, options: HubAuthCoreOptio
   async function exchangeCodeForToken(
     code: string,
     stateParam: string,
+    issuer: string,
     codeVerifier: string,
     deviceId: string,
     redirectUri: string,
@@ -159,6 +161,7 @@ export function createHubAuthCore(ports: HubAuthPorts, options: HubAuthCoreOptio
     const body: {
       code: string;
       state: string;
+      iss: string;
       code_verifier: string;
       device_type: string;
       device_id: string;
@@ -166,6 +169,7 @@ export function createHubAuthCore(ports: HubAuthPorts, options: HubAuthCoreOptio
     } = {
       code,
       state: stateParam,
+      iss: issuer,
       code_verifier: codeVerifier,
       device_type: deviceIdentity.deviceType,
       device_id: deviceId,
@@ -198,15 +202,20 @@ export function createHubAuthCore(ports: HubAuthPorts, options: HubAuthCoreOptio
       callbackChannel.leaveCallbackRoute();
       throw new OidcError('stateMismatch', 'OIDC state mismatch — possible CSRF attack. Please try again.');
     }
+    if (pending.issuer !== browserCallback.iss) {
+      callbackChannel.leaveCallbackRoute();
+      throw new OidcError('issuerInvalid', 'OIDC issuer mismatch — refusing to exchange the authorization code.');
+    }
     if (Date.now() - pending.createdAt > OIDC_PENDING_EXPIRY_MS) {
       callbackChannel.leaveCallbackRoute();
-      throw new OidcError('timeout', 'OIDC login expired. Please start TokenDance ID login again.');
+      throw new OidcError('timeout', 'OIDC login expired. Please start Account login again.');
     }
 
     try {
       const tokenResp = await exchangeCodeForToken(
         browserCallback.code,
         browserCallback.state,
+        browserCallback.iss,
         pending.codeVerifier,
         pending.deviceId,
         pending.redirectUri,
@@ -214,7 +223,7 @@ export function createHubAuthCore(ports: HubAuthPorts, options: HubAuthCoreOptio
       await completeLogin(
         tokenResp.access_token,
         tokenResp.refresh_token,
-        'tokendance',
+        'account',
         tokenResp.user ?? undefined,
       );
       callbackChannel.leaveCallbackRoute();
@@ -236,8 +245,8 @@ export function createHubAuthCore(ports: HubAuthPorts, options: HubAuthCoreOptio
       };
     },
 
-    // ── TokenDance ID OIDC PKCE login ──
-    async loginWithTokenDance() {
+    // ── TokenDance Account OIDC PKCE login ──
+    async loginWithAccount() {
       // 1. Generate PKCE parameters.
       const codeVerifier = generateCodeVerifier();
       const codeChallenge = await computeCodeChallenge(codeVerifier);
@@ -248,7 +257,7 @@ export function createHubAuthCore(ports: HubAuthPorts, options: HubAuthCoreOptio
       const { redirectUri, callback } = await callbackChannel.start();
 
       // 3. Call Hub to get the authorization URL and server-generated state.
-      let authorizeResp: { state: string; authorization_url: string };
+      let authorizeResp: { state: string; authorization_url: string; issuer: string };
       try {
         const authorizeBody: {
           code_challenge: string;
@@ -273,7 +282,10 @@ export function createHubAuthCore(ports: HubAuthPorts, options: HubAuthCoreOptio
         throw oidcErr;
       }
 
-      const { state: serverState, authorization_url: authUrl } = authorizeResp;
+      const { state: serverState, authorization_url: authUrl, issuer } = authorizeResp;
+      if (!issuer) {
+        throw new OidcError('issuerInvalid', 'Hub did not pin an Account OIDC issuer.');
+      }
 
       // The PKCE verifier travels through the pending port — browser mode keeps
       // it in sessionStorage (never persistent localStorage); Tauri keeps it
@@ -283,6 +295,7 @@ export function createHubAuthCore(ports: HubAuthPorts, options: HubAuthCoreOptio
         codeVerifier,
         deviceId,
         redirectUri,
+        issuer,
         createdAt: Date.now(),
       };
       pendingStorage.save(pending);
@@ -292,10 +305,14 @@ export function createHubAuthCore(ports: HubAuthPorts, options: HubAuthCoreOptio
 
       // 5. Local-callback-server mode (Tauri): wait for the callback.
       const callbackResult = await callback;
+      pendingStorage.clear();
 
       // 6. Validate state matches (CSRF protection).
       if (callbackResult.state !== serverState) {
         throw new OidcError('stateMismatch', 'OIDC state mismatch — possible CSRF attack. Please try again.');
+      }
+      if (callbackResult.iss !== issuer) {
+        throw new OidcError('issuerInvalid', 'OIDC issuer mismatch — refusing to exchange the authorization code.');
       }
 
       // 7. Exchange the code for Hub tokens.
@@ -304,6 +321,7 @@ export function createHubAuthCore(ports: HubAuthPorts, options: HubAuthCoreOptio
         tokenResp = await exchangeCodeForToken(
           callbackResult.code,
           callbackResult.state,
+          callbackResult.iss,
           codeVerifier,
           deviceId,
           redirectUri,
@@ -319,7 +337,7 @@ export function createHubAuthCore(ports: HubAuthPorts, options: HubAuthCoreOptio
       await completeLogin(
         tokenResp.access_token,
         tokenResp.refresh_token,
-        'tokendance',
+        'account',
         tokenResp.user ?? undefined,
       );
     },
@@ -352,7 +370,7 @@ export function createHubAuthCore(ports: HubAuthPorts, options: HubAuthCoreOptio
         state.user = await authClient.me();
         markAuthenticated();
         return true;
-      } catch {
+      } catch (authErr) {
         const refreshToken = state.refreshToken ?? (await tokenStorage.loadRefreshToken());
         if (refreshToken) {
           try {
@@ -366,11 +384,18 @@ export function createHubAuthCore(ports: HubAuthPorts, options: HubAuthCoreOptio
             state.user = await authClient.me();
             markAuthenticated();
             return true;
-          } catch {
-            // Refresh failed — fall through to full cleanup.
+          } catch (refreshErr) {
+            if (isTerminalHubAuthError(refreshErr)) {
+              await clearSession();
+            }
+            // Transient refresh failures keep the stored token for a later
+            // restore attempt instead of treating an outage as a logout.
+            return false;
           }
         }
-        await clearSession();
+        if (isTerminalHubAuthError(authErr)) {
+          await clearSession();
+        }
         return false;
       }
     },

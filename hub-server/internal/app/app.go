@@ -15,8 +15,6 @@ import (
 	"github.com/agenthub/hub-server/internal/cache"
 	"github.com/agenthub/hub-server/internal/config"
 	"github.com/agenthub/hub-server/internal/handler"
-	"github.com/agenthub/hub-server/internal/jwtutil"
-	"github.com/agenthub/hub-server/internal/outboundhttp"
 	"github.com/agenthub/hub-server/internal/service/agent"
 	"github.com/agenthub/hub-server/internal/service/agentcontrol"
 	"github.com/agenthub/hub-server/internal/service/agentteam"
@@ -75,7 +73,7 @@ type App struct {
 	DeviceService          *device.Service
 	DocumentService        *document.Service
 
-	// OIDC (optional — only when TokenDance ID is configured)
+	// Account OIDC BFF (optional until configured).
 	OIDCService *oidc.Service
 	OIDCHandler *handler.OIDCHandler
 
@@ -218,25 +216,6 @@ func buildInfoVersion() string {
 		version += "-dirty"
 	}
 	return version
-}
-
-// tdVerifier returns the instance-owned TokenDance ID JWKS verifier (#1551),
-// constructed from config — never a process-global. The transport/cache
-// policy (client, timeout, body cap) is injected from config (#1564). nil
-// when TokenDance ID is not configured (the auth middleware skips the RS256
-// path).
-func (a *App) tdVerifier() *jwtutil.TokenDanceVerifier {
-	jwksURI := a.Config.TokenDanceID.JWKSURI
-	if jwksURI == "" && a.Config.TokenDanceID.IssuerURL != "" {
-		jwksURI = strings.TrimRight(a.Config.TokenDanceID.IssuerURL, "/") + "/oidc/jwks"
-	}
-	if jwksURI == "" {
-		return nil
-	}
-	return jwtutil.NewTokenDanceVerifier(jwksURI, jwtutil.VerifierConfig{
-		HTTPClient:   outboundhttp.NewClient(a.Config.TokenDanceID.HTTPTimeout),
-		MaxBodyBytes: a.Config.TokenDanceID.MaxResponseBodyBytes,
-	})
 }
 
 // auditPermissionDecision adapts audit.Service.RecordPermissionDecision for

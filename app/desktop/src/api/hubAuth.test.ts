@@ -7,6 +7,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { computeCodeChallenge, generateCodeVerifier } from '@shared/api/auth';
 
+const ACCOUNT_ISSUER = 'https://account.example';
+
 // ── Mock setup ────────────────────────────────────
 
 // ── Mock localStorage and sessionStorage ──────────
@@ -85,7 +87,8 @@ describe('Hub OIDC API contract (mocked)', () => {
   it('oidcAuthorize sends correct payload to Hub', async () => {
     const mockResponse = {
       state: 'hub-generated-state',
-      authorization_url: 'https://id.example.invalid/oidc/auth?response_type=code&client_id=hub&redirect_uri=http://localhost:8080/callback&code_challenge=abc&code_challenge_method=S256&state=hub-generated-state',
+      issuer: 'https://account.example',
+      authorization_url: 'https://account.example/oauth/authorize?response_type=code&client_id=hub&redirect_uri=http://localhost:8080/callback&code_challenge=abc&code_challenge_method=S256&state=hub-generated-state',
     };
 
     const fetchMock = vi.fn().mockResolvedValue({
@@ -113,7 +116,7 @@ describe('Hub OIDC API contract (mocked)', () => {
 
     const data = await res.json();
     expect(data.state).toBe('hub-generated-state');
-    expect(data.authorization_url).toContain('id.example.invalid');
+    expect(data.authorization_url).toContain('account.example/oauth/authorize');
     const [, authorizeInit] = fetchMock.mock.calls[0] as [string, RequestInit];
     const sent = JSON.parse(authorizeInit.body as string);
     expect(sent.redirect_uri).toBe('http://127.0.0.1:49152/callback');
@@ -202,14 +205,19 @@ describe('Desktop browser-dev OIDC fixture boundary', () => {
   });
 
   it('exchanges fake callback through Hub and keeps token material out of localStorage', async () => {
-    window.history.pushState({}, '', '/auth/tokendance/callback?code=desktop-code&state=state-desktop-fixture');
+    window.history.pushState(
+      {},
+      '',
+      `/auth/account/callback?code=desktop-code&state=state-desktop-fixture&iss=${encodeURIComponent(ACCOUNT_ISSUER)}`,
+    );
     sessionStorage.setItem(
       'agenthub_oidc_pkce_pending',
       JSON.stringify({
         state: 'state-desktop-fixture',
         codeVerifier: 'desktop-verifier-fixture',
         deviceId: '00000000-0000-0000-0000-00000000a301',
-        redirectUri: `${window.location.origin}/auth/tokendance/callback`,
+        redirectUri: `${window.location.origin}/auth/account/callback`,
+        issuer: ACCOUNT_ISSUER,
         createdAt: Date.now(),
       }),
     );
@@ -224,10 +232,11 @@ describe('Desktop browser-dev OIDC fixture boundary', () => {
         expect(body).toMatchObject({
           code: 'desktop-code',
           state: 'state-desktop-fixture',
+          iss: ACCOUNT_ISSUER,
           code_verifier: 'desktop-verifier-fixture',
           device_type: 'desktop',
           device_id: '00000000-0000-0000-0000-00000000a301',
-          redirect_uri: `${window.location.origin}/auth/tokendance/callback`,
+          redirect_uri: `${window.location.origin}/auth/account/callback`,
         });
         return new Response(
           JSON.stringify({
@@ -257,12 +266,12 @@ describe('Desktop browser-dev OIDC fixture boundary', () => {
       isAuthenticated: true,
       token: 'desktop-fixture-access-token',
       refreshToken: 'desktop-fixture-refresh-token',
-      tokenSource: 'tokendance',
+      tokenSource: 'account',
     });
     expect(sessionStorage.getItem('agenthub_hub_token')).toBe('desktop-fixture-access-token');
     expect(localStorage.getItem('agenthub_hub_token')).toBeNull();
     expect(localStorage.getItem('agenthub_hub_refresh_token')).toBeNull();
-    expect(localStorage.getItem('agenthub_token_source')).toBe('tokendance');
+    expect(localStorage.getItem('agenthub_token_source')).toBe('account');
     expect(requestedUrls).toHaveLength(1);
     expect(requestedUrls.join('\n')).not.toMatch(/127\.0\.0\.1:3210|localhost:3210|\/v1\/runs|\/v1\/events|spawn|Command/);
   });

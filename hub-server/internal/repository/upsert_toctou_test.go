@@ -37,6 +37,11 @@ func setupSharedSQLite(t *testing.T) *gorm.DB {
 	require.NoError(t, err)
 	sqlDB, err := db.DB()
 	require.NoError(t, err)
+	// SQLite shared-cache writes cannot model PostgreSQL row-level conflict
+	// arbitration; multiple write transactions deadlock before the unique-key
+	// race is exercised. Keep this fixture deterministic and use the tagged
+	// PostgreSQL integration test for true concurrent upserts.
+	sqlDB.SetMaxOpenConns(1)
 	t.Cleanup(func() { _ = sqlDB.Close() })
 
 	// Reuse the same schema as setupSQLite. We extract the table definitions
@@ -55,11 +60,25 @@ func setupSharedSQLite(t *testing.T) *gorm.DB {
 		)`,
 		`CREATE UNIQUE INDEX IF NOT EXISTS idx_users_tokendance_sub ON users(tokendance_sub)
 			WHERE tokendance_sub IS NOT NULL AND tokendance_sub != ''`,
+		`CREATE TABLE IF NOT EXISTS user_identities (
+			id TEXT PRIMARY KEY,
+			user_id TEXT NOT NULL,
+			provider TEXT NOT NULL,
+			issuer TEXT NOT NULL,
+			subject TEXT NOT NULL,
+			status TEXT NOT NULL DEFAULT 'active',
+			linked_at DATETIME NOT NULL,
+			created_at DATETIME,
+			updated_at DATETIME
+		)`,
+		`CREATE UNIQUE INDEX IF NOT EXISTS idx_user_identities_issuer_subject ON user_identities(issuer, subject)`,
+		`CREATE INDEX IF NOT EXISTS idx_user_identities_user_id ON user_identities(user_id)`,
 		`CREATE TABLE IF NOT EXISTS refresh_tokens (
 			id TEXT PRIMARY KEY,
 			user_id TEXT NOT NULL,
 			device_type TEXT NOT NULL DEFAULT '',
 			device_id TEXT NOT NULL DEFAULT '',
+			user_identity_id TEXT,
 			token_hash TEXT NOT NULL UNIQUE,
 			expires_at DATETIME NOT NULL,
 			revoked INTEGER NOT NULL DEFAULT 0,
@@ -113,11 +132,10 @@ func TestUpsertRefreshToken_Concurrent(t *testing.T) {
 	assert.Equal(t, int64(1), count, "expected exactly 1 row after concurrent upserts")
 }
 
-// TestFindOrCreateByTokenDanceSub_Concurrent verifies that concurrent first-login
-// attempts for the same TokenDance sub produce exactly one user and no errors
-// (#2102). This guards against TOCTOU races in the previous
-// Find-then-Create implementation.
-func TestFindOrCreateByTokenDanceSub_Concurrent(t *testing.T) {
+// TestFindOrCreateByAccountIdentity_Concurrent verifies that concurrent first
+// logins for the same exact Account (issuer, subject) produce exactly one Hub
+// user and identity link.
+func TestFindOrCreateByAccountIdentity_Concurrent(t *testing.T) {
 	db := setupSharedSQLite(t)
 
 	const goroutines = 20
@@ -128,12 +146,13 @@ func TestFindOrCreateByTokenDanceSub_Concurrent(t *testing.T) {
 	}
 	results := make([]result, goroutines)
 
-	sub := "concurrent-sub-test-2102"
+	issuer := "https://account.example"
+	subject := "concurrent-account-subject"
 	for i := 0; i < goroutines; i++ {
 		wg.Add(1)
 		go func(idx int) {
 			defer wg.Done()
-			u, err := FindOrCreateByTokenDanceSub(db, sub,
+			u, err := FindOrCreateByAccountIdentity(db, issuer, subject,
 				fmt.Sprintf("Name-%d", idx), fmt.Sprintf("https://avatar/%d.png", idx))
 			results[idx] = result{u, err}
 		}(i)
@@ -146,11 +165,14 @@ func TestFindOrCreateByTokenDanceSub_Concurrent(t *testing.T) {
 		assert.NotNil(t, r.user, "goroutine %d returned nil user", i)
 	}
 
-	// Exactly one user must exist for this sub.
-	var count int64
-	require.NoError(t, db.Model(&model.User{}).
-		Where("tokendance_sub = ?", sub).Count(&count).Error)
-	assert.Equal(t, int64(1), count, "expected exactly 1 user after concurrent upserts")
+	// Exactly one identity link and one Hub user must exist.
+	var identities []model.UserIdentity
+	require.NoError(t, db.Where("issuer = ? AND subject = ?", issuer, subject).Find(&identities).Error)
+	require.Len(t, identities, 1)
+
+	var userCount int64
+	require.NoError(t, db.Model(&model.User{}).Count(&userCount).Error)
+	assert.Equal(t, int64(1), userCount, "expected exactly one user after concurrent first login")
 
 	// All returned users must share the same ID.
 	if results[0].user != nil {

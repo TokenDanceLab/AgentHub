@@ -16,7 +16,7 @@ export type E2ERequestBoundary =
   | 'app'
   | 'hub'
   | 'local-edge'
-  | 'tokendance-id'
+  | 'account-oidc'
   | 'gateway'
   | 'other-http'
   | 'non-http';
@@ -39,10 +39,11 @@ export interface E2EDataModeScenarioInput {
   dataSource: E2EDataSource;
   appOrigin: string;
   hubOrigin?: string;
+  accountIssuer?: string;
   directLocalEdge?: boolean;
   realLoginTested?: boolean;
   realCliOrModelExecuted?: boolean;
-  tokenDanceIdSecretUsed?: boolean;
+  accountOidcCredentialUsed?: boolean;
   mockAdapterUsed?: boolean;
 }
 
@@ -53,10 +54,11 @@ export interface E2EDataModeScenario {
   dataSource: E2EDataSource;
   appOrigin: string;
   hubOrigin?: string;
+  accountIssuer?: string;
   directLocalEdge: boolean;
   realLoginTested: boolean;
   realCliOrModelExecuted: boolean;
-  tokenDanceIdSecretUsed: boolean;
+  accountOidcCredentialUsed: boolean;
   mockAdapterUsed: boolean;
 }
 
@@ -73,15 +75,19 @@ export function createE2EDataModeScenario(input: E2EDataModeScenarioInput): E2ED
     dataSource: input.dataSource,
     appOrigin: input.appOrigin,
     ...(input.hubOrigin ? { hubOrigin: input.hubOrigin } : {}),
+    ...(input.accountIssuer ? { accountIssuer: input.accountIssuer } : {}),
     directLocalEdge: input.directLocalEdge ?? false,
     realLoginTested: input.realLoginTested ?? false,
     realCliOrModelExecuted: input.realCliOrModelExecuted ?? false,
-    tokenDanceIdSecretUsed: input.tokenDanceIdSecretUsed ?? false,
+    accountOidcCredentialUsed: input.accountOidcCredentialUsed ?? false,
     mockAdapterUsed: input.mockAdapterUsed ?? false,
   };
 }
 
-export function classifyE2ERequest(urlValue: string, scenario?: Pick<E2EDataModeScenario, 'appOrigin' | 'hubOrigin'>): E2ERequestBoundary {
+export function classifyE2ERequest(
+  urlValue: string,
+  scenario?: Pick<E2EDataModeScenario, 'appOrigin' | 'hubOrigin' | 'accountIssuer'>,
+): E2ERequestBoundary {
   let url: URL;
   try {
     url = new URL(urlValue);
@@ -95,6 +101,7 @@ export function classifyE2ERequest(urlValue: string, scenario?: Pick<E2EDataMode
 
   const appOrigin = scenario?.appOrigin ? new URL(scenario.appOrigin).origin : undefined;
   const hubOrigin = scenario?.hubOrigin ? new URL(scenario.hubOrigin).origin : undefined;
+  const accountIssuer = scenario?.accountIssuer ? new URL(scenario.accountIssuer).origin : undefined;
   if (url.origin === appOrigin || DEFAULT_APP_HOSTS.has(url.host)) {
     return 'app';
   }
@@ -104,8 +111,8 @@ export function classifyE2ERequest(urlValue: string, scenario?: Pick<E2EDataMode
   if (LOCAL_EDGE_HOSTS.has(url.host)) {
     return 'local-edge';
   }
-  if (TOKEN_DANCE_ID_HOSTS.has(url.host)) {
-    return 'tokendance-id';
+  if (url.origin === accountIssuer || ACCOUNT_OIDC_HOSTS.has(url.host)) {
+    return 'account-oidc';
   }
   if (GATEWAY_HOSTS.has(url.host)) {
     return 'gateway';
@@ -188,10 +195,11 @@ export function buildE2EDataModeManifest(
     dataSource: scenario.dataSource,
     appOrigin: scenario.appOrigin,
     ...(scenario.hubOrigin ? { hubOrigin: scenario.hubOrigin } : {}),
+    ...(scenario.accountIssuer ? { accountIssuer: scenario.accountIssuer } : {}),
     directLocalEdge: scenario.directLocalEdge,
     realLoginTested: scenario.realLoginTested,
     realCliOrModelExecuted: scenario.realCliOrModelExecuted,
-    tokenDanceIdSecretUsed: scenario.tokenDanceIdSecretUsed,
+    accountOidcCredentialUsed: scenario.accountOidcCredentialUsed,
     mockAdapterUsed: scenario.mockAdapterUsed,
     MockAdapterUsed: scenario.mockAdapterUsed,
     RealLoginTested: scenario.realLoginTested,
@@ -226,7 +234,7 @@ function isBoundaryAllowed(
   if (boundary === 'local-edge') {
     return scenario.surface === 'desktop' && scenario.directLocalEdge;
   }
-  if (boundary === 'tokendance-id') {
+  if (boundary === 'account-oidc') {
     return scenario.realLoginTested;
   }
   if (boundary === 'gateway') {
@@ -283,6 +291,7 @@ const HUB_HOSTS = new Set([
   '127.0.0.1:8080',
   'hub.example.invalid',
   'api.hub.example.invalid',
+  'hub.example.invalid',
 ]);
 
 const LOCAL_EDGE_HOSTS = new Set([
@@ -290,8 +299,8 @@ const LOCAL_EDGE_HOSTS = new Set([
   '127.0.0.1:3210',
 ]);
 
-const TOKEN_DANCE_ID_HOSTS = new Set([
-  'id.example.invalid',
+const ACCOUNT_OIDC_HOSTS = new Set([
+  'account.example.test',
 ]);
 
 const GATEWAY_HOSTS = new Set([

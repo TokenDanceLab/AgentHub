@@ -99,7 +99,7 @@ describe('AgentHub mobile notification intents', () => {
       kind: 'ignore',
       reason: 'missing_data',
     });
-    expect(parseNotificationIntent({ intent: 'tokenDanceStatus' })).toEqual({
+    expect(parseNotificationIntent({ intent: 'accountStatus' })).toEqual({
       kind: 'ignore',
       reason: 'unknown_intent',
     });

@@ -15,7 +15,7 @@ import (
 func applyEnvOverrides(cfg *Config) error {
 	applyJWTEnvOverrides(cfg)
 	applyServerEnvOverrides(cfg)
-	applyTokenDanceIDEnvOverrides(cfg)
+	applyAccountOIDCEnvOverrides(cfg)
 	if err := applyS3EnvOverrides(cfg); err != nil {
 		return err
 	}
@@ -85,48 +85,31 @@ func applyServerEnvOverrides(cfg *Config) {
 	}
 }
 
-func applyTokenDanceIDEnvOverrides(cfg *Config) {
-	// #2124: legacy AGENTHUB_TOKENDANCE_* prefix stays functional but is
-	// deprecated in favor of AGENTHUB_TOKENDANCE_ID_*. Pairs are written as
-	// argument lists (not map literals) because the secret-guard treats
-	// "SECRET_NAME": "VALUE" shapes in config paths as embedded secrets.
-	warnLegacyEnv("AGENTHUB_TOKENDANCE_ISSUER_URL", "AGENTHUB_TOKENDANCE_ID_ISSUER_URL")
-	warnLegacyEnv("AGENTHUB_TOKENDANCE_JWKS_URI", "AGENTHUB_TOKENDANCE_ID_JWKS_URI")
-	warnLegacyEnv("AGENTHUB_TOKENDANCE_CLIENT_ID", "AGENTHUB_TOKENDANCE_ID_CLIENT_ID")
-	warnLegacyEnv("AGENTHUB_TOKENDANCE_CLIENT_SECRET", "AGENTHUB_TOKENDANCE_ID_CLIENT_SECRET")
-	warnLegacyEnv("AGENTHUB_TOKENDANCE_REDIRECT_URI", "AGENTHUB_TOKENDANCE_ID_REDIRECT_URI")
-	warnLegacyEnv("AGENTHUB_TOKENDANCE_ALLOWED_REDIRECT_URIS", "AGENTHUB_TOKENDANCE_ID_ALLOWED_REDIRECT_URIS")
-	warnLegacyEnv("AGENTHUB_TOKENDANCE_TOKEN_URL", "AGENTHUB_TOKENDANCE_ID_TOKEN_URL")
-	// Viper AutomaticEnv handles nesting with underscores but these
-	// belt-and-suspenders overrides guarantee the env vars take precedence
-	// regardless of config file content.
-	if envIssuer := firstEnv("AGENTHUB_TOKENDANCE_ID_ISSUER_URL", "AGENTHUB_TOKENDANCE_ISSUER_URL"); envIssuer != "" {
-		cfg.TokenDanceID.IssuerURL = envIssuer
+func applyAccountOIDCEnvOverrides(cfg *Config) {
+	// These overrides are intentionally explicit so a malformed or partial
+	// Account client fails at startup rather than silently falling back to a
+	// retired provider or an internal endpoint.
+	if envIssuer := os.Getenv("AGENTHUB_ACCOUNT_OIDC_ISSUER_URL"); envIssuer != "" {
+		cfg.AccountOIDC.IssuerURL = envIssuer
 	}
-	if envJWKS := firstEnv("AGENTHUB_TOKENDANCE_ID_JWKS_URI", "AGENTHUB_TOKENDANCE_JWKS_URI"); envJWKS != "" {
-		cfg.TokenDanceID.JWKSURI = envJWKS
+	if envClientID := os.Getenv("AGENTHUB_ACCOUNT_OIDC_CLIENT_ID"); envClientID != "" {
+		cfg.AccountOIDC.ClientID = envClientID
 	}
-	if envClientID := firstEnv("AGENTHUB_TOKENDANCE_ID_CLIENT_ID", "AGENTHUB_TOKENDANCE_CLIENT_ID"); envClientID != "" {
-		cfg.TokenDanceID.ClientID = envClientID
+	if envClientSecret := os.Getenv("AGENTHUB_ACCOUNT_OIDC_CLIENT_SECRET"); envClientSecret != "" {
+		cfg.AccountOIDC.ClientSecret = envClientSecret
 	}
-	if envClientSecret := firstEnv("AGENTHUB_TOKENDANCE_ID_CLIENT_SECRET", "AGENTHUB_TOKENDANCE_CLIENT_SECRET"); envClientSecret != "" {
-		cfg.TokenDanceID.ClientSecret = envClientSecret
+	if envRedirectURI := os.Getenv("AGENTHUB_ACCOUNT_OIDC_REDIRECT_URI"); envRedirectURI != "" {
+		cfg.AccountOIDC.RedirectURI = envRedirectURI
 	}
-	if envRedirectURI := firstEnv("AGENTHUB_TOKENDANCE_ID_REDIRECT_URI", "AGENTHUB_TOKENDANCE_REDIRECT_URI"); envRedirectURI != "" {
-		cfg.TokenDanceID.RedirectURI = envRedirectURI
-	}
-	if envAllowedRedirectURIs := firstEnv("AGENTHUB_TOKENDANCE_ID_ALLOWED_REDIRECT_URIS", "AGENTHUB_TOKENDANCE_ALLOWED_REDIRECT_URIS"); envAllowedRedirectURIs != "" {
-		cfg.TokenDanceID.AllowedRedirectURIs = splitEnvList(envAllowedRedirectURIs)
-	}
-	if envTokenURL := firstEnv("AGENTHUB_TOKENDANCE_ID_TOKEN_URL", "AGENTHUB_TOKENDANCE_TOKEN_URL"); envTokenURL != "" {
-		cfg.TokenDanceID.TokenURL = envTokenURL
+	if envAllowed := os.Getenv("AGENTHUB_ACCOUNT_OIDC_ALLOWED_REDIRECT_URIS"); envAllowed != "" {
+		cfg.AccountOIDC.AllowedRedirectURIs = splitEnvList(envAllowed)
 	}
 }
 
 func applyS3EnvOverrides(cfg *Config) error {
 	// #2124: bare S3_* prefix stays functional but is deprecated in
 	// favor of AGENTHUB_S3_*. Argument-list form avoids the secret-guard
-	// assignment heuristic (see applyTokenDanceIDEnvOverrides).
+	// assignment heuristic (see applyAccountOIDCEnvOverrides).
 	warnLegacyEnv("S3_ENDPOINT", "AGENTHUB_S3_ENDPOINT")
 	warnLegacyEnv("S3_ACCESS_KEY", "AGENTHUB_S3_ACCESS_KEY")
 	warnLegacyEnv("S3_SECRET_KEY", "AGENTHUB_S3_SECRET_KEY")

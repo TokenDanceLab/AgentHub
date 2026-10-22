@@ -91,3 +91,60 @@ func TestRefreshTokenRepo_Revoke(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, found.Revoked)
 }
+
+func TestFindRefreshTokenForRotationRequiresActiveIdentity(t *testing.T) {
+	db := setupSQLite(t)
+	const (
+		userID  = "user-identity-gate"
+		issuer  = "https://account.example"
+		subject = "identity-gate-subject"
+		hash    = "identity-gate-refresh-hash"
+	)
+	require.NoError(t, UpsertRefreshToken(db, &model.RefreshToken{
+		UserID:     userID,
+		DeviceType: "desktop",
+		DeviceID:   "identity-gate-device",
+		TokenHash:  hash,
+		ExpiresAt:  time.Now().Add(time.Hour),
+	}))
+
+	_, err := FindRefreshTokenForRotation(db, hash)
+	assert.ErrorIs(t, err, gorm.ErrRecordNotFound, "a Hub refresh token without an active identity must not rotate")
+
+	identity := &model.UserIdentity{
+		UserID:   userID,
+		Provider: model.IdentityProviderAccount,
+		Issuer:   issuer,
+		Subject:  subject,
+		Status:   model.IdentityStatusActive,
+		LinkedAt: time.Now().UTC(),
+	}
+	require.NoError(t, db.Create(identity).Error)
+	require.NoError(t, db.Model(&model.RefreshToken{}).
+		Where("token_hash = ?", hash).
+		Update("user_identity_id", identity.ID).Error)
+	found, err := FindRefreshTokenForRotation(db, hash)
+	require.NoError(t, err)
+	assert.Equal(t, userID, found.UserID)
+
+	otherActive := &model.UserIdentity{
+		UserID:   userID,
+		Provider: model.IdentityProviderAccount,
+		Issuer:   "https://other-account.example",
+		Subject:  "other-active-subject",
+		Status:   model.IdentityStatusActive,
+		LinkedAt: time.Now().UTC(),
+	}
+	require.NoError(t, db.Create(otherActive).Error)
+	require.NoError(t, db.Model(&model.UserIdentity{}).
+		Where("id = ?", identity.ID).
+		Update("status", model.IdentityStatusRetired).Error)
+	_, err = FindRefreshTokenForRotation(db, hash)
+	assert.ErrorIs(t, err, gorm.ErrRecordNotFound,
+		"another active identity on the same Hub user must not revive the retired binding")
+
+	require.NoError(t, RevokeRefreshTokensForRetiredIdentity(db, issuer, subject))
+	found, err = FindRefreshTokenByHash(db, hash)
+	require.NoError(t, err)
+	assert.True(t, found.Revoked)
+}

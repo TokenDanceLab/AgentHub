@@ -24,6 +24,7 @@ import {
 } from '@/api/hubTokenStorage';
 import { HUB_URL } from '@/config';
 import { resetWebHubSession } from '@/platform/webAuthSessionReset';
+import { isTerminalHubAuthError } from '@shared/errors';
 import { createHubClient as createSharedHubClient } from '@shared/hub/hubClient';
 
 const REFRESH_CACHE_TTL_MS = 25_000;
@@ -73,10 +74,12 @@ export async function refreshWebHubAccessTokenOnce(): Promise<string | null> {
     } catch (err) {
       cachedRefreshedToken = null;
       console.warn('[webHubClient] 401 token refresh failed:', err);
-      // Refresh token invalid/expired — the Hub session is unrecoverable.
-      // Fail closed: drop the stored tokens, reset the auth state, and
-      // surface the login entry again (#1816).
-      await resetWebHubSession();
+      // Only an explicit 401/403 proves the Hub session is unrecoverable.
+      // Network errors, 429s and 5xx responses keep the stored token so a
+      // later retry can recover without a false logout.
+      if (isTerminalHubAuthError(err)) {
+        await resetWebHubSession();
+      }
       return null;
     } finally {
       refreshInFlight = null;

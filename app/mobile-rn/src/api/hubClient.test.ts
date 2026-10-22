@@ -202,7 +202,7 @@ describe('Mobile Hub client facade', () => {
 
     expect(snapshot.threads).toHaveLength(0);
     // Account no longer claims an active session when the Hub is unreachable.
-    expect(snapshot.account.tokenDanceId).toBe('recovering');
+    expect(snapshot.account.accountIdentity).toBe('recovering');
     expect(snapshot.account.hubSession).toBe('missing');
     expect(snapshot.account.hubSync).toBe('offline');
   });
@@ -234,7 +234,7 @@ describe('Mobile preview snapshot glue', () => {
     runs: [{ id: 'r1', threadId: 't1', title: 'Preview Run', status: 'approval_required', target: 'app/mobile-rn', updatedAt: '14:01', summary: 's', changedFiles: [] }],
     transcript: { t1: [] },
     account: {
-      tokenDanceId: 'signed_in',
+      accountIdentity: 'signed_in',
       hubSession: 'active',
       notification: 'prompt',
       hubSync: 'active',

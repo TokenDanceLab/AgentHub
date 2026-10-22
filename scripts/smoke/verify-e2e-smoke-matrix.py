@@ -3,7 +3,7 @@
 
 运行 CI-safe smoke 集合：Web stubbed Hub replay、Desktop renderer/Tauri
 dry gates、Local Edge/Hub service health、approval/artifact replay。真实
-TokenDance ID 登录与 live Hub dispatch 记录为 BLOCKED_WITH_EVIDENCE，
+TokenDance Account 登录与 live Hub dispatch 记录为 BLOCKED_WITH_EVIDENCE，
 除非单独的 approval gate 满足。
 
 子脚本通过 python 执行；CLI 参数同时接受 -Xxx 与 --Xxx；退出码 0=通过 /
@@ -449,7 +449,7 @@ def main() -> int:
         "failed_count": len(failed),
         "boundaries": {
             "secrets_handled": False,
-            "real_tokendance_id_login_executed": False,
+            "real_tokendance_account_login_executed": False,
             "real_cli_or_model_execution_required": False,
             "web_direct_local_edge_allowed": False,
             "hub_probe_only_without_db_redis": True,

@@ -1,6 +1,6 @@
 # AgentHub 开发快速上手
 
-最后更新：2026-10-18
+最后更新：2026-10-23
 
 新人启动本地开发环境的最短路径如下。规则、分支、E2E 证据等级和发布门禁见 `AGENTS.md`。
 
@@ -47,7 +47,7 @@ Get-Content .env | ForEach-Object { if ($_ -match '^([^#=]+)=(.*)$') { Set-Item 
 - `AGENTHUB_DB_HOST`, `AGENTHUB_DB_PORT`, `AGENTHUB_DB_USER`, `AGENTHUB_DB_PASSWORD`
 - `AGENTHUB_REDIS_HOST`, `AGENTHUB_REDIS_PORT`
 - `AGENTHUB_JWT_SECRET`（开发环境也使用足够长度的随机值，至少 32 字符）
-- TokenDance ID OIDC 仅在测试真实登录时配置：`AGENTHUB_TOKENDANCE_ID_ISSUER_URL`、`AGENTHUB_TOKENDANCE_ID_CLIENT_ID`、`AGENTHUB_TOKENDANCE_ID_CLIENT_SECRET`、`AGENTHUB_TOKENDANCE_ID_ALLOWED_REDIRECT_URIS`
+- TokenDance Account OIDC 仅在测试真实登录时配置：`AGENTHUB_ACCOUNT_OIDC_ISSUER_URL`、`AGENTHUB_ACCOUNT_OIDC_CLIENT_ID`、`AGENTHUB_ACCOUNT_OIDC_CLIENT_SECRET`、`AGENTHUB_ACCOUNT_OIDC_REDIRECT_URI`、`AGENTHUB_ACCOUNT_OIDC_ALLOWED_REDIRECT_URIS`
 - 安全开关/前端入口：`AGENTHUB_AUTH_FAIL_CLOSED`（生产必填且须显式设置，见 [05-deployment.md](architecture/05-deployment.md) §安全配置）、`VITE_EDGE_URL`、`VITE_HUB_URL`（Desktop renderer 指向 Edge/Hub，见 `.env.example` §Desktop）
 
 本地依赖可以用 Docker Compose：
@@ -100,19 +100,24 @@ Desktop renderer 监听 `127.0.0.1:5173`。这只证明 Vite renderer，不证�
 cd app/desktop && corepack pnpm tauri dev
 ```
 
-Mobile RN 当前是 fixture/边界验证 lane；本指南的 Desktop/Web 开发流程不包含 Mobile UI/native 深改。
+Mobile RN 默认是 fixture/边界验证 lane；本指南的 Desktop/Web 开发流程不包含 Mobile UI/native 深改。
 
 ## 登录模式
 
-开发默认可以使用 demo/mock 或 fixture 数据。真实 Hub 登录必须走 TokenDance ID OIDC，并按 real E2E 证据等级说明是否真的跑了浏览器授权码流、Hub session、Desktop/Web token storage 和 WebSocket reconnect。
+开发默认可以使用 demo/mock 或 fixture 数据。真实 Hub 登录通过 TokenDance Account 的公开 OIDC endpoint 完成；Hub 只把 Account 的 authorization code、ID token、UserInfo 用于服务端交换，然后签发 Hub session。Account token 不是 Hub bearer，REST/WebSocket 只接受 Hub HS256 token。
 
-常用 OIDC 变量（本地 TokenDance ID fixture；仓库模板值见 `.env.example`）：
+真实登录至少有四项配置；需要额外 callback 时再设置白名单：
 
 ```bash
-AGENTHUB_TOKENDANCE_ID_CLIENT_ID=<client-id>
-AGENTHUB_TOKENDANCE_ID_CLIENT_SECRET=<client-secret>
-AGENTHUB_TOKENDANCE_ID_ISSUER_URL=http://127.0.0.1:3000
+AGENTHUB_ACCOUNT_OIDC_ISSUER_URL=https://account.example
+AGENTHUB_ACCOUNT_OIDC_CLIENT_ID=<client-id>
+AGENTHUB_ACCOUNT_OIDC_CLIENT_SECRET=<client-secret>
+AGENTHUB_ACCOUNT_OIDC_REDIRECT_URI=http://127.0.0.1:53682/callback
+# 可选：额外精确 callback
+AGENTHUB_ACCOUNT_OIDC_ALLOWED_REDIRECT_URIS=http://localhost:5174/workbench/auth/account/callback,http://127.0.0.1:5174/workbench/auth/account/callback
 ```
+
+Web 当前把 Hub access/refresh token 存在 tab-scoped `sessionStorage`，不是 HttpOnly cookie session。Mobile 默认 fixture-only；真实登录需要显式设置 `EXPO_PUBLIC_AGENTHUB_ACCOUNT_LOGIN_ENABLED=true` 和非空 `EXPO_PUBLIC_ACCOUNT_OIDC_ISSUER`。
 
 ## 测试速查
 
@@ -128,7 +133,7 @@ AGENTHUB_TOKENDANCE_ID_ISSUER_URL=http://127.0.0.1:3000
 
 本机只跑改动相关的最小集：后端在模块目录执行 `cd hub-server && go test ./internal/<pkg> -short`（Edge 同理），前端 `make fe-test-changed`；`-race`、L1、打包和浏览器 lane 放 L3/CI。
 
-L3 需要单独准备的全栈环境。`scripts/dev/dev-up.sh` 默认启动 PostgreSQL/Redis 后在前台运行 `go run ./hub-server/cmd/server-hub/`（Ctrl+C 结束）；`--full` 构建并启动 Hub 容器后返回；两者都不启动 TokenDance ID、Edge 或 Web。维护者远程模式用 `scripts/dev/devserver.sh`（SSH 目标与仓库路径由本地配置，见 `scripts/dev/README.md`）。完整 WSL 栈用 `bash scripts/e2e/wsl-full-stack-e2e.sh`，需要 `AGENTHUB_E2E_SRC_ROOT`（包含 `AgentHub/` 的父目录）与 `AGENTHUB_E2E_ID_SRC`（TokenDance ID checkout）。真实 OIDC 浏览器 lane 执行 `bash scripts/e2e/run-real-e2e-lane.sh`；CI 中该 lane 由 `checks.yml` 的 `real-e2e-stack` job 调用，仅 `workflow_dispatch` 触发，不阻塞 PR。
+L3 需要单独准备的全栈环境。`scripts/dev/dev-up.sh` 默认启动 PostgreSQL/Redis 后在前台运行 Hub；`--full` 构建并启动 Hub 容器后返回；两者都不启动 Account、Edge 或 Web。真实 Account L3 需要可达的真实 Account issuer、已注册的 confidential client、真实浏览器 Authorization Code + PKCE、UserInfo 和 Hub session。fixture、stub、自签 Hub JWT 或只验证 OIDC 配置形状的运行只能算较低证据层；在 Account 专用 lane 未产出通过的 manifest 前，该项保持 pending。
 
 文档/API：
 
@@ -150,7 +155,7 @@ E2E/Visual QA 只证明实际跑过的层级；PR 中写明证据等级（9 级�
 | Hub 连接数据库失败 | PostgreSQL 是否启动，`.env` 数据库变量是否匹配 |
 | Edge 3210 被占用 / Hub WS 连接失败 | 查残留进程后重启；确认 Hub-issued session 与 CORS origin 允许当前前端端口 |
 | 只改前端是否需要 Rust | 不需要；只有 Tauri native 或 packaging 工作需要 Rust |
-| OIDC 登录报 `redirect_uri not allowed` | `AGENTHUB_TOKENDANCE_ID_REDIRECT_URI`/`ALLOWED_REDIRECT_URIS` 与 TDID 侧 `oauth_clients.redirect_uris` 不同步；重开登录、清浏览器 session 后重试，见 [05-deployment.md](architecture/05-deployment.md) §OIDC 回调契约 |
+| Account 登录报 `redirect_uri not allowed` | `AGENTHUB_ACCOUNT_OIDC_REDIRECT_URI`/`ALLOWED_REDIRECT_URIS` 与 Account client 注册值未精确一致；重开登录、清浏览器 session 后重试，见 [05-deployment.md](architecture/05-deployment.md) §Account OIDC 契约 |
 | 接口 429/503 `rate_limited`/`rate_limit_unavailable` | Redis 故障或超配额；429 带 `Retry-After` 须遵守；503 多为 Redis 中断（认证路径恒 fail-closed），见 [conventions.md](../api/conventions.md) §Errors |
 | 启动报 JWT secret 弱被拒 | `change-me-production*`/`dev-secret-change-in-production*` 前缀被 blocklist 拒；换随机 ≥32 字符值 |
 

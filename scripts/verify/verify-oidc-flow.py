@@ -1,21 +1,9 @@
 #!/usr/bin/env python3
-"""AgentHub TokenDance ID OIDC Full-Link Smoke Verification。
+"""Verify the AgentHub TokenDance Account OIDC relying-party contract.
 
-验证 Desktop → Hub → TokenDance ID 的完整 OIDC PKCE 流程。连接 live 服务。
-除需要有效凭据的 token exchange 模拟外，所有检查均为只读。
-
-前置条件：
-  - TokenDance ID 运行在 http://localhost:3000
-  - Hub Server 运行在 http://localhost:8080
-  - TokenDance ID 中注册了有效 OAuth client（运行 setup-tokendance-oidc.sh）
-  - Hub Server .env 配置了 AGENTHUB_TOKENDANCE_ID_* 变量
-
-用法：
-  python scripts/verify/verify-oidc-flow.py                       # Full check
-  python scripts/verify/verify-oidc-flow.py --LocalOnly           # Local fake/static gate; no live Hub/TokenDance ID calls
-  python scripts/verify/verify-oidc-flow.py --SkipHub             # Check only TokenDance ID
-  python scripts/verify/verify-oidc-flow.py --SkipTD              # Check only Hub Server
-  python scripts/verify/verify-oidc-flow.py --Interactive         # Run manual browser flow guide
+--LocalOnly is deterministic and performs no network calls. Live mode requires
+an explicitly supplied operator Account issuer and optionally checks a running
+Hub. The script never starts, discovers or clones an internal Account provider.
 """
 
 import argparse
@@ -32,6 +20,7 @@ import urllib.request
 
 PASSED = 0
 FAILED = 0
+USER_AGENT = "AgentHub-OIDC-Verifier/1"
 
 
 def pass_check(text):
@@ -55,491 +44,420 @@ def step(text):
 
 
 def banner(text):
-    print(f"\n{'=' * 60}")
-    print(f"  {text}")
-    print(f"{'=' * 60}")
+    print(f"\n{'=' * 64}\n  {text}\n{'=' * 64}")
 
 
 def fetch_json(url, label, timeout):
     try:
-        request = urllib.request.Request(url)
+        request = urllib.request.Request(
+            url,
+            headers={"Accept": "application/json", "User-Agent": USER_AGENT},
+        )
         with urllib.request.urlopen(request, timeout=timeout) as response:
             body = json.load(response)
-        pass_check(f"{label} — {url}")
+        pass_check(label)
         return body
     except (urllib.error.URLError, ValueError, OSError) as exc:
-        fail_check(f"{label} — {url} ({exc})")
+        fail_check(f"{label} failed ({type(exc).__name__})")
         return None
 
 
-def unwrap_envelope(obj):
-    if isinstance(obj, dict) and obj.get("data") is not None and obj.get("code") is not None:
-        return obj["data"]
-    return obj
-
-
-def test_health_ok(health):
-    body = unwrap_envelope(health)
-    if isinstance(body, str):
-        return body.strip() == "ok"
-    return body is not None and body.get("status") == "ok"
-
-
-def assert_field(obj, field, label):
-    if obj is not None and obj.get(field):
-        pass_check(f"{label} = {obj[field]}")
-    else:
-        fail_check(f"{label} — field '{field}' missing or empty")
-
-
-def assert_contains(haystack, needle, label):
-    if needle in haystack:
-        pass_check(label)
-    else:
-        fail_check(f"{label} — expected '{needle}' not found")
-
-
-def assert_status(actual, expected, label):
-    if actual == expected:
-        pass_check(f"{label} (HTTP {actual})")
-    else:
-        fail_check(f"{label} — expected HTTP {expected}, got {actual}")
-
-
-def assert_field_present(obj, field, label):
-    if obj is not None and obj.get(field):
-        pass_check(f"{label} is present")
-    else:
-        fail_check(f"{label} — field '{field}' missing or empty")
+def unwrap_envelope(value):
+    if isinstance(value, dict) and value.get("code") is not None and value.get("data") is not None:
+        return value["data"]
+    return value
 
 
 def assert_file_contains(path, pattern, label):
-    if not os.path.isfile(path):
-        fail_check(f"{label} — missing file: {path}")
-        return
     try:
         with open(path, encoding="utf-8") as handle:
             content = handle.read()
-    except OSError as exc:
-        fail_check(f"{label} — unreadable file: {path} ({exc})")
+    except OSError:
+        fail_check(f"{label}: file unavailable")
         return
     if re.search(pattern, content):
         pass_check(label)
     else:
-        fail_check(f"{label} — expected pattern not found")
+        fail_check(label)
 
 
-def check_packaged_desktop_readiness(root):
-    step("Packaged Desktop loopback/keyring readiness")
+def check_local_contract(root):
+    step("Local Account OIDC contract")
+    config = os.path.join(root, "hub-server", "internal", "config", "config_account_oidc.go")
+    service = os.path.join(root, "hub-server", "internal", "service", "oidc", "oidc.go")
+    handler = os.path.join(root, "hub-server", "internal", "handler", "oidc.go")
+    verifier = os.path.join(root, "hub-server", "internal", "jwtutil", "account_oidc.go")
+    fixture = os.path.join(root, "pkg", "testkit", "oidcfixture", "oidcfixture.go")
+    web_ports = os.path.join(root, "app", "web", "src", "api", "auth", "webPorts.ts")
+    desktop_ports = os.path.join(root, "app", "desktop", "src", "api", "auth", "desktopPorts.ts")
 
-    oidc_server_path = os.path.join(root, "app", "desktop", "src-tauri", "src", "oidc_server.rs")
-    secure_store_path = os.path.join(root, "app", "desktop", "src-tauri", "src", "secure_store.rs")
-    auth_path = os.path.join(root, "app", "desktop", "src-tauri", "src", "host", "auth.rs")
-    edge_host_path = os.path.join(root, "app", "desktop", "src-tauri", "src", "host", "edge.rs")
-
-    assert_file_contains(oidc_server_path, r"pub fn check_loopback_callback_readiness\(\)", "  Desktop loopback readiness source is wired")
-    assert_file_contains(oidc_server_path, r'TcpListener::bind\("127\.0\.0\.1:0"\)', "  Desktop loopback readiness uses random localhost bind")
-    assert_file_contains(secure_store_path, r"pub fn check_credential_store_readiness\(\)", "  Desktop keyring readiness source is wired")
-    assert_file_contains(secure_store_path, r"Entry::new\(SERVICE, HUB_REFRESH_TOKEN_USER\)", "  Desktop keyring readiness checks Hub refresh-token credential entry")
-    assert_file_contains(auth_path, r"pub fn build_packaged_login_readiness\(\)", "  Desktop packaged login readiness builder exists")
-    assert_file_contains(auth_path, r'status: "proposal_only"\.to_string\(\)', "  Real packaged login E2E remains proposal-only")
-    assert_file_contains(edge_host_path, r"build_packaged_login_readiness\(\)", "  Desktop readiness builder is consumed by the Edge host")
-
-
-def sha256_prefix(text):
-    return hashlib.sha256(text.encode("utf-8")).hexdigest()[:12]
-
-
-def redact_oidc_config_value(name, value):
-    if re.search(r"(?i)secret|token|password|key", name):
-        return f"<redacted len={len(value)} sha256_prefix={sha256_prefix(value)}>"
-    return value
-
-
-def redact_url_query(url):
-    query_start = url.find("?")
-    if query_start < 0:
-        return url
-
-    prefix = url[:query_start]
-    query_and_fragment = url[query_start + 1:]
-    fragment = ""
-    fragment_start = query_and_fragment.find("#")
-    if fragment_start >= 0:
-        fragment = query_and_fragment[fragment_start:]
-        query_and_fragment = query_and_fragment[:fragment_start]
-
-    redacted_pairs = []
-    for pair in query_and_fragment.split("&"):
-        if not pair.strip():
-            continue
-        key = pair.split("=", 1)[0]
-        if not key.strip():
-            redacted_pairs.append("<redacted>")
-        else:
-            redacted_pairs.append(f"{key}=<redacted>")
-
-    if not redacted_pairs:
-        return f"{prefix}?{fragment}"
-    return f"{prefix}?{'&'.join(redacted_pairs)}{fragment}"
-
-
-def base64_url_encode(data):
-    return base64.urlsafe_b64encode(data).rstrip(b"=").decode("ascii")
-
-
-def main() -> int:
-    global PASSED, FAILED
-    parser = argparse.ArgumentParser(
-        description="AgentHub TokenDance ID OIDC Full-Link Smoke Verification"
+    assert_file_contains(
+        config,
+        r'IssuerURL\s+string\s+`mapstructure:"issuer_url"`',
+        "Hub config exposes only the canonical Account issuer",
     )
-    parser.add_argument("--LocalOnly", action="store_true", help="local fake/static gate; no live Hub/TokenDance ID calls")
-    parser.add_argument("--SkipHub", action="store_true", help="skip live Hub Server phase")
-    parser.add_argument("--SkipTD", action="store_true", help="skip live TokenDance ID phase")
-    parser.add_argument("--Interactive", action="store_true", help="print the manual browser flow guide")
-    parser.add_argument("--HubUrl", default="http://localhost:8080", help="Hub Server base URL")
-    parser.add_argument("--TdUrl", default="http://localhost:3000", help="TokenDance ID base URL")
-    parser.add_argument("--TimeoutSec", type=int, default=10, help="HTTP timeout in seconds")
-    parser.add_argument("--RepoRoot", default="", help="repository root (defaults to the script's repository root)")
+    assert_file_contains(
+        service,
+        r'accountOIDCScopes\s*=\s*"openid profile"',
+        "Hub requests exactly openid profile",
+    )
+    assert_file_contains(
+        service,
+        r'q\.Set\("nonce",\s*nonce\)',
+        "authorization requests include a fresh nonce",
+    )
+    assert_file_contains(
+        service,
+        r'IssuerEqual\(issuerParam,\s*s\.cfg\.IssuerURL\)',
+        "callback requires exact RFC 9207 issuer before exchange",
+    )
+    assert_file_contains(
+        service,
+        r'authorization_response_iss_parameter_supported',
+        "discovery requires RFC 9207 issuer-response support",
+    )
+    assert_file_contains(
+        service,
+        r'client_secret_basic',
+        "confidential token exchange requires Basic authentication",
+    )
+    assert_file_contains(
+        handler,
+        r'Issuer\s+string\s+`json:"iss"\s+binding:"required"`',
+        "Hub callback JSON requires iss",
+    )
+    assert_file_contains(
+        verifier,
+        r'jwt\.WithIssuer\(expectedIssuer\)',
+        "ID token verification pins issuer",
+    )
+    assert_file_contains(
+        verifier,
+        r'jwt\.WithAudience\(expectedAudience\)',
+        "ID token verification pins audience",
+    )
+    assert_file_contains(
+        verifier,
+        r'jwt\.WithExpirationRequired\(\)',
+        "ID token verification requires exp",
+    )
+    assert_file_contains(
+        verifier,
+        r'jwt\.WithValidMethods\(\[\]string\{"RS256"\}\)',
+        "ID token verification allows only RS256",
+    )
+    assert_file_contains(
+        verifier,
+        r'claims\.Nonce',
+        "ID token verification requires the authorization nonce",
+    )
+    assert_file_contains(
+        verifier,
+        r'claims\.Azp',
+        "ID token verification validates azp when present",
+    )
+    assert_file_contains(
+        verifier,
+        r'claims\.IssuedAt',
+        "ID token verification validates iat",
+    )
+    assert_file_contains(
+        service,
+        r'out\.Sub\s*==\s*""\s*\|\|\s*out\.Sub\s*!=\s*expectedSubject',
+        "UserInfo sub must match the ID-token subject",
+    )
+    for capability in (
+        "/.well-known/openid-configuration",
+        "/oauth/authorize",
+        "/oauth/token",
+        "/oauth/userinfo",
+        "/oauth/jwks",
+        "/oauth/end-session",
+    ):
+        assert_file_contains(
+            fixture,
+            re.escape(capability),
+            f"repo-local public fixture exposes {capability}",
+        )
+    assert_file_contains(
+        web_ports,
+        r'/auth/account/callback',
+        "Web callback uses /auth/account/callback under the Vite base path",
+    )
+    assert_file_contains(
+        desktop_ports,
+        r'OIDC_LOOPBACK_PORT\s*=\s*53682',
+        "Desktop uses the fixed loopback port 53682",
+    )
+    assert_file_contains(
+        desktop_ports,
+        r'http://127\.0\.0\.1:\$\{port\}/callback',
+        "Desktop callback URI is http://127.0.0.1:53682/callback",
+    )
+
+
+def same_origin(url, issuer):
+    try:
+        candidate = urllib.parse.urlparse(url)
+        canonical = urllib.parse.urlparse(issuer)
+    except ValueError:
+        return False
+    return (
+        candidate.scheme in ("https", "http")
+        and candidate.scheme == canonical.scheme
+        and candidate.netloc.lower() == canonical.netloc.lower()
+        and not candidate.username
+        and not candidate.password
+    )
+
+
+def check_account_discovery(issuer, timeout):
+    step("External Account discovery/JWKS")
+    issuer = issuer.rstrip("/")
+    if not issuer:
+        fail_check("Account issuer must be supplied explicitly")
+        return None
+    parsed = urllib.parse.urlparse(issuer)
+    if parsed.scheme != "https" and not (
+        parsed.scheme == "http" and parsed.hostname in ("127.0.0.1", "::1", "localhost")
+    ):
+        fail_check("Account issuer must use HTTPS outside loopback")
+        return None
+
+    discovery = fetch_json(
+        issuer + "/.well-known/openid-configuration",
+        "Account OIDC discovery is reachable",
+        timeout,
+    )
+    if not discovery:
+        return None
+    if discovery.get("issuer") == issuer:
+        pass_check("discovery issuer exactly matches configured issuer")
+    else:
+        fail_check("discovery issuer does not exactly match configured issuer")
+
+    expected = {
+        "authorization_endpoint": "/oauth/authorize",
+        "token_endpoint": "/oauth/token",
+        "userinfo_endpoint": "/oauth/userinfo",
+        "jwks_uri": "/oauth/jwks",
+    }
+    for field, path in expected.items():
+        endpoint = str(discovery.get(field) or "")
+        parsed_endpoint = urllib.parse.urlparse(endpoint)
+        if parsed_endpoint.path == path and same_origin(endpoint, issuer):
+            pass_check(f"discovery {field} uses public Account origin")
+        else:
+            fail_check(f"discovery {field} is not the expected public endpoint")
+
+    capabilities = {
+        "response_types_supported": "code",
+        "response_modes_supported": "query",
+        "grant_types_supported": "authorization_code",
+        "id_token_signing_alg_values_supported": "RS256",
+        "code_challenge_methods_supported": "S256",
+        "token_endpoint_auth_methods_supported": "client_secret_basic",
+    }
+    for field, value in capabilities.items():
+        values = discovery.get(field)
+        if isinstance(values, list) and value in values:
+            pass_check(f"discovery advertises {field}={value}")
+        else:
+            fail_check(f"discovery missing {field}={value}")
+    if discovery.get("authorization_response_iss_parameter_supported") is True:
+        pass_check("discovery advertises RFC 9207 authorization response issuer")
+    else:
+        fail_check("discovery does not advertise RFC 9207 authorization response issuer")
+
+    jwks = fetch_json(str(discovery.get("jwks_uri") or issuer + "/oauth/jwks"), "Account JWKS is reachable", timeout)
+    keys = jwks.get("keys") if isinstance(jwks, dict) else None
+    if isinstance(keys, list) and any(
+        isinstance(key, dict) and key.get("kty") == "RSA" for key in keys
+    ):
+        pass_check("Account JWKS contains an RSA verification key")
+    else:
+        fail_check("Account JWKS contains no RSA verification key")
+    return discovery
+
+
+def check_hub_contract(hub_url, issuer, timeout, redirect_uri):
+    step("Hub Account OIDC relying party")
+    hub_url = hub_url.rstrip("/")
+    verifier = base64.urlsafe_b64encode(secrets.token_bytes(48)).rstrip(b"=").decode()
+    challenge = base64.urlsafe_b64encode(
+        hashlib.sha256(verifier.encode()).digest()
+    ).rstrip(b"=").decode()
+    device_id = "00000000-0000-4000-8000-000000000002"
+    payload = json.dumps(
+        {
+            "code_challenge": challenge,
+            "code_challenge_method": "S256",
+            "device_type": "desktop",
+            "device_id": device_id,
+            "redirect_uri": redirect_uri,
+        }
+    ).encode()
+    try:
+        request = urllib.request.Request(
+            hub_url + "/client/auth/oidc/authorize",
+            data=payload,
+            headers={"Content-Type": "application/json", "User-Agent": USER_AGENT},
+            method="POST",
+        )
+        with urllib.request.urlopen(request, timeout=timeout) as response:
+            auth = unwrap_envelope(json.load(response))
+    except urllib.error.HTTPError as exc:
+        fail_check(f"Hub authorize rejected the redirect (HTTP {exc.code})")
+        return
+    except (urllib.error.URLError, ValueError, OSError) as exc:
+        fail_check(f"Hub authorize unavailable ({type(exc).__name__})")
+        return
+
+    if auth.get("issuer") == issuer.rstrip("/"):
+        pass_check("Hub pins the configured Account issuer")
+    else:
+        fail_check("Hub did not return the configured Account issuer")
+
+    authorization_url = str(auth.get("authorization_url") or "")
+    parsed = urllib.parse.urlparse(authorization_url)
+    query = urllib.parse.parse_qs(parsed.query, keep_blank_values=True)
+    if parsed.path == "/oauth/authorize" and same_origin(authorization_url, issuer):
+        pass_check("Hub authorization URL uses discovered /oauth/authorize")
+    else:
+        fail_check("Hub authorization URL does not use the Account endpoint")
+    checks = {
+        "response_type": "code",
+        "scope": "openid profile",
+        "redirect_uri": redirect_uri,
+        "code_challenge_method": "S256",
+        "prompt": "consent",
+    }
+    for key, value in checks.items():
+        if query.get(key) == [value]:
+            pass_check(f"Hub authorization URL carries exact {key}")
+        else:
+            fail_check(f"Hub authorization URL has invalid {key}")
+    for key in ("client_id", "state", "nonce", "code_challenge"):
+        if query.get(key, [""])[0]:
+            pass_check(f"Hub authorization URL carries {key}")
+        else:
+            fail_check(f"Hub authorization URL is missing {key}")
+
+    negative = json.dumps(
+        {
+            "code": "invalid-code",
+            "state": "invalid-state",
+            "code_verifier": verifier,
+            "device_type": "desktop",
+            "device_id": device_id,
+            "redirect_uri": redirect_uri,
+        }
+    ).encode()
+    try:
+        request = urllib.request.Request(
+            hub_url + "/client/auth/oidc/callback",
+            data=negative,
+            headers={"Content-Type": "application/json", "User-Agent": USER_AGENT},
+            method="POST",
+        )
+        urllib.request.urlopen(request, timeout=timeout)
+        fail_check("Hub accepted a callback without iss")
+    except urllib.error.HTTPError as exc:
+        if exc.code == 400:
+            pass_check("Hub rejects a callback without iss before code exchange")
+        else:
+            fail_check(f"Hub callback without iss returned HTTP {exc.code}, expected 400")
+    except (urllib.error.URLError, OSError) as exc:
+        fail_check(f"Hub callback unavailable ({type(exc).__name__})")
+
+
+def check_env_names(root):
+    step("Account configuration names")
+    path = os.path.join(root, "hub-server", ".env")
+    if not os.path.isfile(path):
+        warn_check("hub-server/.env is absent; use .env.example and operator secrets for live mode")
+        return
+    try:
+        with open(path, encoding="utf-8") as handle:
+            names = {
+                line.split("=", 1)[0].strip()
+                for line in handle
+                if "=" in line and not line.lstrip().startswith("#")
+            }
+    except OSError:
+        warn_check("hub-server/.env is unreadable")
+        return
+    for name in (
+        "AGENTHUB_ACCOUNT_OIDC_ISSUER_URL",
+        "AGENTHUB_ACCOUNT_OIDC_CLIENT_ID",
+        "AGENTHUB_ACCOUNT_OIDC_CLIENT_SECRET",
+        "AGENTHUB_ACCOUNT_OIDC_REDIRECT_URI",
+        "AGENTHUB_ACCOUNT_OIDC_ALLOWED_REDIRECT_URIS",
+    ):
+        if name in names:
+            pass_check(f"{name} is configured")
+        else:
+            fail_check(f"{name} is missing")
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument("--LocalOnly", action="store_true", help="static contract checks; no network calls")
+    parser.add_argument("--SkipHub", action="store_true", help="check only the external Account discovery")
+    parser.add_argument("--Interactive", action="store_true", help="print the manual Account login checklist")
+    parser.add_argument("--HubUrl", default="http://127.0.0.1:8080")
+    parser.add_argument(
+        "--AccountIssuer",
+        default=os.environ.get("AGENTHUB_ACCOUNT_OIDC_ISSUER_URL", ""),
+        help="canonical external TokenDance Account issuer",
+    )
+    parser.add_argument(
+        "--RedirectUri",
+        default="http://127.0.0.1:53682/callback",
+        help="registered desktop loopback redirect",
+    )
+    parser.add_argument("--TimeoutSec", type=int, default=10)
+    parser.add_argument("--RepoRoot", default="")
     args = parser.parse_args()
 
-    repo_root = args.RepoRoot.strip() or os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
-
-    banner("TokenDance ID OIDC Full-Link Smoke Verification")
+    root = args.RepoRoot.strip() or os.path.abspath(
+        os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..")
+    )
+    banner("AgentHub TokenDance Account OIDC contract")
+    check_local_contract(root)
 
     if args.LocalOnly:
-        args.SkipHub = True
-        args.SkipTD = True
-        step("Local-only fake/static gate")
-        pass_check("Live Hub and TokenDance ID phases are skipped")
-        check_packaged_desktop_readiness(repo_root)
-
-    # ═══════════════════════════════════════════════════
-    # Phase 1: TokenDance ID Provider
-    # ═══════════════════════════════════════════════════
-
-    if not args.SkipTD:
-        step(f"Phase 1 — TokenDance ID OIDC Provider ({args.TdUrl})")
-
-        # 1.1 Health / reachability
-        try:
-            request = urllib.request.Request(f"{args.TdUrl}/health")
-            with urllib.request.urlopen(request, timeout=5) as response:
-                health = json.load(response)
-            if test_health_ok(health):
-                pass_check("TokenDance ID health endpoint reachable")
-            else:
-                fail_check(f"TokenDance ID health returned: {json.dumps(health)}")
-        except (urllib.error.URLError, ValueError, OSError):
-            fail_check("TokenDance ID health endpoint unreachable — is it running? (cd tokendance-id && go run ./cmd/tokendance-id)")
-
-        # 1.2 OIDC Discovery document
-        discovery = fetch_json(f"{args.TdUrl}/.well-known/openid-configuration", "OIDC Discovery document", args.TimeoutSec)
-        if discovery:
-            assert_field(discovery, "issuer", "  issuer")
-            assert_field(discovery, "authorization_endpoint", "  authorization_endpoint")
-            assert_field(discovery, "token_endpoint", "  token_endpoint")
-            assert_field(discovery, "jwks_uri", "  jwks_uri")
-            assert_field(discovery, "userinfo_endpoint", "  userinfo_endpoint")
-            code_challenge_methods = ",".join(discovery.get("code_challenge_methods_supported", []) or [])
-            assert_contains(code_challenge_methods, "S256", "  code_challenge_methods_supported includes S256")
-            grant_types = ",".join(discovery.get("grant_types_supported", []) or [])
-            assert_contains(grant_types, "authorization_code", "  grant_types_supported includes authorization_code")
-            scopes = ",".join(discovery.get("scopes_supported", []) or [])
-            assert_contains(scopes, "openid", "  scopes_supported includes openid")
-            assert_contains(scopes, "profile", "  scopes_supported includes profile")
-            assert_contains(scopes, "email", "  scopes_supported includes email")
-
-        # 1.3 JWKS endpoint
-        jwks = fetch_json(f"{args.TdUrl}/oidc/jwks", "JWKS endpoint", args.TimeoutSec)
-        if jwks:
-            keys = jwks.get("keys")
-            if keys:
-                pass_check(f"  JWKS has {len(keys)} key(s)")
-                rsa_keys = [key for key in keys if key.get("kty") == "RSA"]
-                if rsa_keys:
-                    pass_check(f"  JWKS contains RSA key(s): {len(rsa_keys)} found")
-                else:
-                    fail_check("  JWKS has no RSA keys")
-            else:
-                fail_check("  JWKS keys array empty or missing")
-
-        # 1.4 CORS headers for Hub Server
-        try:
-            request = urllib.request.Request(
-                f"{args.TdUrl}/.well-known/openid-configuration",
-                method="OPTIONS",
-                headers={
-                    "Origin": args.HubUrl,
-                    "Access-Control-Request-Method": "GET",
-                },
-            )
-            with urllib.request.urlopen(request, timeout=5) as response:
-                cors_status = response.status
-                allow_origin = response.headers.get("Access-Control-Allow-Origin")
-            if allow_origin or cors_status == 204:
-                pass_check("  TokenDance ID responds to CORS preflight from Hub")
-            else:
-                warn_check("  TokenDance ID CORS headers not verified (may need allowed_origins config)")
-        except (urllib.error.URLError, OSError) as exc:
-            warn_check(f"  CORS preflight check skipped ({exc})")
-
-    # ═══════════════════════════════════════════════════
-    # Phase 2: Hub Server OIDC Endpoints
-    # ═══════════════════════════════════════════════════
-
-    verify_auth_url = None
-
-    if not args.SkipHub:
-        step(f"Phase 2 — Hub Server ({args.HubUrl})")
-
-        # 2.1 Hub health
-        try:
-            request = urllib.request.Request(f"{args.HubUrl}/health")
-            with urllib.request.urlopen(request, timeout=5) as response:
-                hub_health = json.load(response)
-            if test_health_ok(hub_health):
-                pass_check("Hub Server health endpoint reachable")
-            else:
-                fail_check(f"Hub Server health returned: {json.dumps(hub_health)}")
-        except (urllib.error.URLError, ValueError, OSError):
-            fail_check("Hub Server unreachable — start with: docker compose up -d postgres redis && cd hub-server && go run ./cmd/server-hub")
-
-        # 2.2 OIDC Authorize endpoint
-        authorize_url = f"{args.HubUrl}/client/auth/oidc/authorize"
-        try:
-            code_verifier = base64_url_encode(secrets.token_bytes(32))
-            code_challenge = base64_url_encode(hashlib.sha256(code_verifier.encode("utf-8")).digest())
-            device_id = str(secrets.token_hex(16))
-
-            authorize_body = json.dumps({
-                "code_challenge": code_challenge,
-                "code_challenge_method": "S256",
-                "device_type": "desktop",
-                "device_id": device_id,
-                "redirect_uri": "http://127.0.0.1/callback",
-            }).encode("utf-8")
-
-            request = urllib.request.Request(
-                authorize_url,
-                data=authorize_body,
-                headers={"Content-Type": "application/json"},
-                method="POST",
-            )
-            with urllib.request.urlopen(request, timeout=args.TimeoutSec) as response:
-                auth_resp = json.load(response)
-
-            auth_data = unwrap_envelope(auth_resp)
-
-            if auth_data.get("state") and auth_data.get("authorization_url"):
-                pass_check("  POST /client/auth/oidc/authorize — returns state + authorization_url")
-                assert_field_present(auth_data, "state", "    state")
-                assert_field_present(auth_data, "authorization_url", "    authorization_url")
-
-                auth_url_parsed = auth_data["authorization_url"]
-                assert_contains(auth_url_parsed, "response_type=code", "    auth URL includes response_type=code")
-                assert_contains(auth_url_parsed, "client_id=", "    auth URL includes client_id")
-                assert_contains(auth_url_parsed, "redirect_uri=", "    auth URL includes redirect_uri")
-                assert_contains(auth_url_parsed, "scope=openid", "    auth URL includes scope=openid")
-                assert_contains(auth_url_parsed, "code_challenge=", "    auth URL includes code_challenge")
-                assert_contains(auth_url_parsed, "code_challenge_method=S256", "    auth URL includes code_challenge_method=S256")
-
-                verify_auth_url = redact_url_query(auth_data["authorization_url"])
-                pass_check("  Authorization URL is well-formed OIDC PKCE request")
-            else:
-                fail_check("  POST /client/auth/oidc/authorize — missing state or authorization_url")
-        except urllib.error.HTTPError as exc:
-            if exc.code:
-                assert_status(exc.code, 400, "  POST /client/auth/oidc/authorize")
-            fail_check(f"  OIDC authorize failed: {exc}")
-        except (urllib.error.URLError, ValueError, OSError) as exc:
-            fail_check(f"  OIDC authorize failed: {exc}")
-
-        # 2.3 OIDC Callback endpoint (negative test — should reject bad code)
-        callback_url = f"{args.HubUrl}/client/auth/oidc/callback"
-        try:
-            bad_callback = json.dumps({
-                "code": "invalid-code-abc123",
-                "state": "invalid-state",
-                "code_verifier": "invalid-verifier",
-                "device_type": "desktop",
-                "device_id": str(secrets.token_hex(16)),
-            }).encode("utf-8")
-
-            request = urllib.request.Request(
-                callback_url,
-                data=bad_callback,
-                headers={"Content-Type": "application/json"},
-                method="POST",
-            )
-            with urllib.request.urlopen(request, timeout=args.TimeoutSec) as response:
-                pass  # expected rejection
-
-            fail_check("  POST /client/auth/oidc/callback — expected rejection but got 200")
-        except urllib.error.HTTPError as exc:
-            if exc.code >= 400:
-                pass_check(f"  POST /client/auth/oidc/callback — correctly rejects invalid code (HTTP {exc.code})")
-            else:
-                fail_check(f"  OIDC callback test failed: {exc}")
-        except (urllib.error.URLError, ValueError, OSError) as exc:
-            fail_check(f"  OIDC callback test failed: {exc}")
-
-        # 2.4 CORS headers for Desktop dev
-        try:
-            request = urllib.request.Request(
-                f"{args.HubUrl}/health",
-                method="OPTIONS",
-                headers={
-                    "Origin": "http://localhost:5173",
-                    "Access-Control-Request-Method": "GET",
-                },
-            )
-            with urllib.request.urlopen(request, timeout=5) as response:
-                allow_origin = response.headers.get("Access-Control-Allow-Origin")
-            if allow_origin == "http://localhost:5173":
-                pass_check("  Hub CORS allows Desktop Vite dev origin (localhost:5173)")
-            else:
-                warn_check(f"  Hub CORS origin for localhost:5173 = {allow_origin} (expected http://localhost:5173)")
-        except (urllib.error.URLError, OSError) as exc:
-            warn_check(f"  Hub CORS check skipped ({exc})")
-
-    # ═══════════════════════════════════════════════════
-    # Phase 3: Full Flow Diagnostics
-    # ═══════════════════════════════════════════════════
-
-    step("Phase 3 — Full-Flow Diagnostics")
-
-    # 3.1 Verify auth URL can be opened
-    if verify_auth_url:
-        pass_check("  Authorization URL generated — redacted diagnostic form:")
-        print(f"    {redact_url_query(verify_auth_url)}")
+        pass_check("live Account and Hub calls skipped")
     else:
-        if args.LocalOnly:
-            warn_check("  Authorization URL not available because live Hub authorize is skipped")
+        if not args.AccountIssuer:
+            fail_check("live mode requires --AccountIssuer or AGENTHUB_ACCOUNT_OIDC_ISSUER_URL")
         else:
-            warn_check("  Authorization URL not available because Hub authorize did not complete")
-
-    # 3.2 Check required env vars in hub-server/.env
-    hub_env_path = os.path.join(repo_root, "hub-server", ".env")
-    if os.path.isfile(hub_env_path):
-        try:
-            with open(hub_env_path, encoding="utf-8") as handle:
-                hub_env = handle.read()
-        except OSError as exc:
-            warn_check(f"  hub-server/.env unreadable ({exc})")
-            hub_env = ""
-        env_vars = [
-            {"Name": "AGENTHUB_TOKENDANCE_ID_ISSUER_URL", "Pattern": r"AGENTHUB_TOKENDANCE_ID_ISSUER_URL=(.+)"},
-            {"Name": "AGENTHUB_TOKENDANCE_ID_CLIENT_ID", "Pattern": r"AGENTHUB_TOKENDANCE_ID_CLIENT_ID=(.+)"},
-            {"Name": "AGENTHUB_TOKENDANCE_ID_CLIENT_SECRET", "Pattern": r"AGENTHUB_TOKENDANCE_ID_CLIENT_SECRET=(.+)"},
-            {"Name": "AGENTHUB_TOKENDANCE_ID_REDIRECT_URI", "Pattern": r"AGENTHUB_TOKENDANCE_ID_REDIRECT_URI=(.+)"},
-        ]
-
-        for var in env_vars:
-            match = re.search(var["Pattern"], hub_env)
-            if match:
-                value = match.group(1).strip()
-                display_value = redact_oidc_config_value(var["Name"], value)
-                if value and "fill in" not in value and "your-" not in value and not value.startswith("<"):
-                    pass_check(f"  {var['Name']} is configured ({display_value})")
-                else:
-                    fail_check(f"  {var['Name']} has placeholder value: \"{display_value}\" — fill in real value")
-            else:
-                fail_check(f"  {var['Name']} is not in hub-server/.env")
-    else:
-        warn_check("  hub-server/.env not found — copy from .env.example and fill in TokenDance ID values")
-
-    # 3.3 Config code validation
-    config_dir = os.path.join(repo_root, "hub-server", "internal", "config")
-    config_go = ""
-    for config_name in ("config.go", "config_validate.go"):
-        config_path = os.path.join(config_dir, config_name)
-        if not os.path.isfile(config_path):
-            continue
-        try:
-            with open(config_path, encoding="utf-8") as handle:
-                config_go += handle.read() + "\n"
-        except OSError as exc:
-            warn_check(f"  {config_name} unreadable ({exc})")
-    if config_go:
-        if re.search(r"tokendance_id\.issuer_url is required when", config_go):
-            pass_check("  Hub config validates interdependency (issuer_url required when client_id set)")
-        else:
-            fail_check("  Hub config missing interdependency validation")
-        if re.search(r"tokendance_id\.client_secret is required when", config_go):
-            pass_check("  Hub config validates client_secret required when client_id set")
-        else:
-            fail_check("  Hub config missing client_secret validation")
-        if re.search(r"tokendance_id\.redirect_uri is required when", config_go):
-            pass_check("  Hub config validates redirect_uri required when client_id set")
-        else:
-            fail_check("  Hub config missing redirect_uri validation")
-
-    # ═══════════════════════════════════════════════════
-    # Phase 4: Interactive Manual Flow Guide
-    # ═══════════════════════════════════════════════════
+            check_account_discovery(args.AccountIssuer, args.TimeoutSec)
+            if not args.SkipHub:
+                check_hub_contract(
+                    args.HubUrl,
+                    args.AccountIssuer,
+                    args.TimeoutSec,
+                    args.RedirectUri,
+                )
+                check_env_names(root)
 
     if args.Interactive:
-        step("Phase 4 — Interactive Manual Flow")
+        step("Manual Account login checklist")
+        print("  1. Start Hub with operator-provided AGENTHUB_ACCOUNT_OIDC_* values.")
+        print("  2. Start Web/Desktop from this repository.")
+        print("  3. Use 'Continue with TokenDance Account' / '使用 TokenDance Account 登录'.")
+        print("  4. Sign in with a disposable Account test identity and approve consent.")
+        print("  5. Confirm the callback URL contains code, state and iss; Hub returns a Hub session.")
+        print("  6. Confirm Account credentials/ID tokens never appear in Web storage or Hub audit payloads.")
 
-        print("\n  Manual OIDC flow verification:")
-        print("  1. Make sure TokenDance ID is running:  cd tokendance-id && go run ./cmd/tokendance-id")
-        print("  2. Make sure Hub Server is running:     cd hub-server && go run ./cmd/server-hub")
-        print("  3. Make sure Desktop dev is running:    cd app/desktop && pnpm dev")
-
-        print("\n  Steps:")
-        print("  a) Open http://localhost:5173 in browser")
-        print("  b) Click 'TokenDance ID 登录' button")
-        print("  c) Browser opens TokenDance ID authorization page")
-        print("  d) Login to TokenDance ID (create account if needed)")
-        print("  e) Approve authorization consent screen")
-        print("  f) Browser redirects back — Desktop receives Hub tokens")
-        print("  g) Verify /client/auth/me returns user profile")
-
-        print("\n  Check Hub Server logs:")
-        print("  docker compose logs -f hub-server")
-
-        print("\n  Check TokenDance ID logs:")
-        print("  cd tokendance-id && go run ./cmd/tokendance-id (attached)")
-
-        print("\n  Expected log lines in Hub Server:")
-        print("  - 'stored PKCE state in redis'")
-        print("  - 'token exchange: HTTP 200'")
-        print("  - 'ID token validated, sub=...'")
-        print("  - 'user found/created by TokenDance sub'")
-        print("  - 'Hub access token issued'")
-
-        print("\n  Curl to verify Hub session:")
-        print("  curl -H 'Authorization: Bearer <access_token>' http://localhost:8080/client/auth/me")
-
-    # ═══════════════════════════════════════════════════
-    # Summary
-    # ═══════════════════════════════════════════════════
-
-    print(f"\n{'=' * 60}")
-    print(f"  Passed: {PASSED}  |  Failed: {FAILED}  |  Total: {PASSED + FAILED}")
-    print(f"{'=' * 60}")
-
-    if FAILED == 0:
-        if args.LocalOnly:
-            print("\n  Local-only fake/static OIDC checks passed. No live Hub or TokenDance ID calls were made.\n")
-        else:
-            print("\n  All checks passed. The OIDC infrastructure is correctly wired.\n")
-            print("  Next step: run Desktop app for end-to-end browser flow.\n")
-    elif FAILED <= 2:
-        print("\n  Minor issues found. Review warnings above and re-run.\n")
-    else:
-        print("\n  Multiple issues found. Ensure both TokenDance ID and Hub Server are running,\n")
-        print("  and the OIDC client is registered (run: hub-server/scripts/setup-tokendance-oidc.sh)\n")
-
-    if FAILED > 0:
-        return 1
-    return 0
+    print(f"\nPassed: {PASSED}  |  Failed: {FAILED}  |  Total: {PASSED + FAILED}")
+    return 0 if FAILED == 0 else 1
 
 
 if __name__ == "__main__":
     try:
         sys.exit(main())
-    except Exception as exc:  # noqa: BLE001 —— fail closed：未捕获异常返回非零
-        print(f"ERROR: {exc}", file=sys.stderr)
+    except Exception as exc:  # noqa: BLE001 - fail closed without echoing values
+        print(f"ERROR: {type(exc).__name__}", file=sys.stderr)
         sys.exit(1)

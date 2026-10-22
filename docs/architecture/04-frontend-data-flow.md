@@ -1,12 +1,12 @@
 # Frontend Data Flow
 
-> 子文档 | 主索引：[architecture.md](../architecture.md) · Hub API：[01-hub-server.md](01-hub-server.md) · 最后更新：2026-10-18
+> 子文档 | 主索引：[architecture.md](../architecture.md) · Hub API：[01-hub-server.md](01-hub-server.md) · 最后更新：2026-10-23
 
 本文档只记录 Desktop/Web/Mobile 共享前端的数据流合同和 source owner。具体 hook、组件 props、测试用例数量以源码和测试为准，不在这里复制清单。
 
 ## 设计边界
 
-前端分三层：`app shell（Desktop/Web） -> platform adapter -> @agenthub/workbench shell + app/shared chatview -> transcript normalizer + renderer`。Mobile 当前是独立 RN fixture/边界验证 lane：不复用 workbench/chatview 渲染，数据走 MobileAppFixture/mock-hub（非 release candidate）。
+前端分三层：`app shell（Desktop/Web） -> platform adapter -> @agenthub/workbench shell + app/shared chatview -> transcript normalizer + renderer`。Mobile 默认是独立 RN fixture/边界验证 lane：不复用 workbench/chatview 渲染，数据走 MobileAppFixture/mock-hub（非 release candidate）。仅当 `EXPO_PUBLIC_AGENTHUB_ACCOUNT_LOGIN_ENABLED=true` 且配置 Account issuer 时，才进入显式开启的真实登录验证路径。
 
 规则：
 
@@ -35,7 +35,11 @@ interface AgentHubPlatform {
 
 完整接口（含 `messageActions`、`terminal`、`workspaceFiles`、`workspaceGit`、`checkpoint`、`agentActivity`）以 `app/shared/src/platform/types.ts` 为准；上面的片段只列常用成员。
 
-Desktop adapter 负责 Local Edge、Hub REST/WS、Tauri file/dialog/window/keyring/notification、workspace allowlist 和 TokenDance ID loopback callback。Web/Mobile adapters 负责 Hub session、Hub REST/WS、remote target routing、browser-safe preview 和 remote approval；Mobile native capability proof 另走 Mobile gates。
+Desktop adapter 负责 Local Edge、Hub REST/WS、Tauri file/dialog/window/keyring/notification、workspace allowlist 和 Account OIDC loopback callback。Web/Mobile adapters 负责 Hub session、Hub REST/WS、remote target routing、browser-safe preview 和 remote approval；它们只持有 Hub session token，不持有 Account access/ID token。Mobile native capability proof 另走 Mobile gates。
+
+Web 当前把 Hub access/refresh token 存入 tab-scoped `sessionStorage`，并使用内存 fallback。这是浏览器持有的 Hub token，不是 HttpOnly cookie session；任何 auth 改动都必须保持 Account token 仅在 Hub 服务端使用。
+
+Desktop 开发构建默认连接 loopback Hub，packaged build 默认连接 canonical public Hub；自建发布用 `VITE_HUB_URL` / `VITE_HUB_WS_URL` 显式覆盖。packaged CSP 与 Rust proxy 目标 allowlist 必须同步到同一 Hub origin。Rust proxy 只接受该精确 origin（开发环境为 loopback Hub），不会把 Hub bearer 转发到任意公网 HTTPS 目标。
 
 UI 可以根据 `capabilities` 隐藏或禁用动作，但不能 fork 另一套组件。
 
@@ -129,7 +133,7 @@ Settings and agent profile data are surface-aware but render through shared UI:
 | Demo | `mock` | Workbench runtime does not access Hub/Edge; Desktop entry preflight may probe Local Edge health | real replay, real login, real execution |
 | Fixture | `fixture` | No Hub/Edge runtime access | real replay, real user data |
 | Local | `auto` / local target | Desktop may use `127.0.0.1:3210`; Web/Mobile must not | Hub login or cloud sync |
-| Login/Hub | `auto` / Hub session | Desktop/Web/Mobile use Hub; real login needs Hub session evidence | TokenDance API key or model spend |
+| Login/Hub | `auto` / Hub session | Desktop/Web use Account public OIDC through Hub; Mobile requires the explicit Account-login switch. REST/WS carry only Hub HS256 tokens | Account token as Hub bearer, fixture evidence as real L3, or model spend |
 | Observed | `observed` | Read-only replay/observation | new CLI/model/API execution |
 | Approved Real | `approved-real` | Only explicitly approved Hub/Edge/CLI/API paths | silent fallback, stubbed real, packaged release |
 
@@ -144,3 +148,4 @@ Stubbed Hub, fixture, readiness-only and manifest-only outputs must set `real_te
 | Layout cleanliness | Visual QA gate: see [07-design-system-ssot.md](07-design-system-ssot.md) §7 |
 | Data boundary | `app/shared/src/testing/e2eDataModeContract.ts` plus surface-specific E2E assertions |
 | Packaged Desktop | Tauri package/sidecar/icon/installer evidence, not Vite-only |
+| Real Account login | Real Account issuer + browser code exchange + Hub session; fixture/stubbed Hub remains `real_tested=false` |

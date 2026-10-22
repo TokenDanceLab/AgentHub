@@ -1,230 +1,274 @@
 #!/usr/bin/env bash
 # ─────────────────────────────────────────────────────────────
-# AgentHub 真实 OIDC E2E 账号供给（本机全栈 dev 栈；幂等，可重复运行）
+# AgentHub real Account OIDC E2E preflight.
 #
-# 职责：
-#   1. 确保 TokenDance ID 中注册了 hub 侧正在使用的 OAuth client
-#      （client_id/secret 与启动器注入 hub 的完全一致；供 OIDC
-#      Authorization Code + PKCE 交换使用）。
-#   2. 注册/复用一枚随机测试账号（真实注册 API），并验证可登录。
-#   3. 凭据写入 tests/artifacts/real-e2e-account.env（gitignored，
-#      chmod 600），供 playwright real 配置与 spec 读取。
+# This script never creates clients, registers accounts, reads a provider
+# database, or starts/clones an internal Account checkout. Operators must
+# pre-register the AgentHub Account client and provide disposable test
+# identities through the environment. The script validates the public Account
+# contract and the already-running Hub, then writes only runtime E2E settings
+# to tests/artifacts/real-e2e-account.env (gitignored, mode 0600).
 #
-# 隐私：本脚本不持有、不打印任何 secret 字面量。client secret 只
-# 经环境变量或运行期从启动器提取（内存内使用），绝不写入仓库。
-#
-# 用法：
-#   bash provision-real-e2e-stack.sh
-#   AGENTHUB_E2E_USER_EMAIL=x AGENTHUB_E2E_USER_PASSWORD=y bash provision-real-e2e-stack.sh
-#
-# 环境变量（均可选，有合理默认）：
-#   AGENTHUB_E2E_ID_BASE_URL    TokenDance ID 地址（默认 http://127.0.0.1:3000）
-#   AGENTHUB_E2E_HUB_BASE_URL   hub 地址（默认 http://127.0.0.1:8080）
-#   AGENTHUB_E2E_WEB_BASE_URL   web 地址（默认 http://127.0.0.1:5174）
-#   AGENTHUB_E2E_ID_DB          ID 的 sqlite 文件（必填，无默认值）
-#   AGENTHUB_E2E_START_SH       提取 hub OIDC client 凭据的启动脚本（**无默认值**：仓库里不写
-#                               任何人的本机路径；未设置时必须改用 AGENTHUB_E2E_ID_CLIENT_ID/SECRET 直供）
-#   AGENTHUB_E2E_ID_CLIENT_ID / AGENTHUB_E2E_ID_CLIENT_SECRET
-#                               优先直接给出 client 凭据（绕过启动器提取）
+# Required operator inputs:
+#   AGENTHUB_E2E_ACCOUNT_ISSUER (or AGENTHUB_ACCOUNT_OIDC_ISSUER_URL)
 #   AGENTHUB_E2E_USER_EMAIL / AGENTHUB_E2E_USER_PASSWORD
-#                               复用既有主账号（否则随机生成并注册）
 #   AGENTHUB_E2E_PARTNER_EMAIL / AGENTHUB_E2E_PARTNER_PASSWORD
-#                               复用既有陪聊账号（聊天动线需要好友关系，
-#                               故供给第二枚账号；否则随机生成并注册）
+#
+# Optional:
+#   AGENTHUB_E2E_HUB_BASE_URL (default http://127.0.0.1:8080)
+#   AGENTHUB_E2E_EDGE_BASE_URL (default http://127.0.0.1:3210)
+#   AGENTHUB_E2E_WEB_BASE_URL (default http://127.0.0.1:5174)
+#   AGENTHUB_E2E_WEB_CALLBACK_URL (default <web>/workbench/auth/account/callback)
 # ─────────────────────────────────────────────────────────────
 set -euo pipefail
+umask 077
 
-ID_BASE_URL="${AGENTHUB_E2E_ID_BASE_URL:-http://127.0.0.1:3000}"
+ISSUER="${AGENTHUB_E2E_ACCOUNT_ISSUER:-${AGENTHUB_ACCOUNT_OIDC_ISSUER_URL:-}}"
+ISSUER="${ISSUER%/}"
 HUB_BASE_URL="${AGENTHUB_E2E_HUB_BASE_URL:-http://127.0.0.1:8080}"
+EDGE_BASE_URL="${AGENTHUB_E2E_EDGE_BASE_URL:-http://127.0.0.1:3210}"
 WEB_BASE_URL="${AGENTHUB_E2E_WEB_BASE_URL:-http://127.0.0.1:5174}"
-ID_DB="${AGENTHUB_E2E_ID_DB:-}"
-START_SH="${AGENTHUB_E2E_START_SH:-}"
+WEB_CALLBACK_URL="${AGENTHUB_E2E_WEB_CALLBACK_URL:-${WEB_BASE_URL%/}/workbench/auth/account/callback}"
+USER_EMAIL="${AGENTHUB_E2E_USER_EMAIL:-}"
+USER_PASSWORD="${AGENTHUB_E2E_USER_PASSWORD:-}"
+PARTNER_EMAIL="${AGENTHUB_E2E_PARTNER_EMAIL:-}"
+PARTNER_PASSWORD="${AGENTHUB_E2E_PARTNER_PASSWORD:-}"
 
-# 仓库根（本文件位于 scripts/e2e/ 下两级）
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 ARTIFACT_DIR="$REPO_ROOT/tests/artifacts"
 ACCOUNT_ENV="$ARTIFACT_DIR/real-e2e-account.env"
 
-CLIENT_ID=""
-CLIENT_SECRET=""
-USER_EMAIL="${AGENTHUB_E2E_USER_EMAIL:-}"
-USER_PASSWORD="${AGENTHUB_E2E_USER_PASSWORD:-}"
+info() { echo "E2E-INFO: $*"; }
+ok() { echo "E2E-PASS: $*"; }
+die() { echo "E2E-FAIL: $*" >&2; exit 1; }
 
-info()  { echo "E2E-INFO: $*"; }
-die()   { echo "E2E-FAIL: $*" >&2; exit 1; }
-ok()    { echo "E2E-PASS: $*"; }
-
-require_cmd() {
-  command -v "$1" >/dev/null 2>&1 || die "missing command: $1"
+require_value() { # name value
+  [ -n "$2" ] || die "$1 is required; internal provider setup is not a fallback"
 }
 
-wait_http() { # url attempts interval_s
-  local url="$1" attempts="${2:-30}" interval="${3:-2}"
-  for _ in $(seq 1 "$attempts"); do
-    if curl -sf -m 3 "$url" >/dev/null 2>&1; then return 0; fi
-    sleep "$interval"
-  done
-  return 1
-}
+command -v curl >/dev/null 2>&1 || die "missing command: curl"
+command -v python3 >/dev/null 2>&1 || die "missing command: python3"
 
-# ── 阶段 1：环境自检 ─────────────────────────────────────────
-require_cmd curl
-require_cmd sqlite3
-require_cmd python3
-python3 -c 'import bcrypt' 2>/dev/null || die "python3 bcrypt module missing"
+require_value AGENTHUB_E2E_ACCOUNT_ISSUER "$ISSUER"
+require_value AGENTHUB_E2E_USER_EMAIL "$USER_EMAIL"
+require_value AGENTHUB_E2E_USER_PASSWORD "$USER_PASSWORD"
+require_value AGENTHUB_E2E_PARTNER_EMAIL "$PARTNER_EMAIL"
+require_value AGENTHUB_E2E_PARTNER_PASSWORD "$PARTNER_PASSWORD"
 
-info "resolving OAuth client credentials"
-if [ -n "${AGENTHUB_E2E_ID_CLIENT_ID:-}" ] && [ -n "${AGENTHUB_E2E_ID_CLIENT_SECRET:-}" ]; then
-  CLIENT_ID="$AGENTHUB_E2E_ID_CLIENT_ID"
-  CLIENT_SECRET="$AGENTHUB_E2E_ID_CLIENT_SECRET"
-elif [ -f "$START_SH" ]; then
-  # 启动器通过 export/source 行注入 Hub 凭据。只对这两类行按启动器同一语义
-  # 求值，不执行启动命令；否则未展开的表达式会被写进 ID 的
-  # oauth_clients.secret_hash，而 Hub 发的是求值后的值，token 交换会恒失败。
-  resolved_creds="$(
-    cd "$(dirname "$START_SH")" 2>/dev/null || true
-    set -a
-    eval "$(grep -E '^[[:space:]]*(source|[.])[[:space:]]|^export ' "$START_SH")" >/dev/null 2>&1 || true
-    printf '%s\n%s\n' "${AGENTHUB_TOKENDANCE_ID_CLIENT_ID:-}" "${AGENTHUB_TOKENDANCE_ID_CLIENT_SECRET:-}"
-  )"
-  CLIENT_ID="$(printf '%s' "$resolved_creds" | sed -n 1p)"
-  CLIENT_SECRET="$(printf '%s' "$resolved_creds" | sed -n 2p)"
-  # fail-closed：求值后仍残留未展开的 shell 语法，说明解析口径不一致。此时
-  # 立即退出，绝不把命令文本当凭据 seed 进 ID 库。
-  case "$CLIENT_ID$CLIENT_SECRET" in
-    *'${'*|*'$('*|*'`'*)
-      die "launcher credential resolution left unexpanded shell syntax (got a value containing \${ / \$( / backtick); pass AGENTHUB_E2E_ID_CLIENT_ID/SECRET explicitly"
-      ;;
+for value in "$USER_EMAIL" "$USER_PASSWORD" "$PARTNER_EMAIL" "$PARTNER_PASSWORD"; do
+  case "$value" in
+    *$'\n'*|*$'\r'*) die "test account values must not contain newlines" ;;
   esac
-else
-  die "client credentials missing: set AGENTHUB_E2E_ID_CLIENT_ID/SECRET or AGENTHUB_E2E_START_SH"
-fi
-[ -n "$CLIENT_ID" ] || die "could not resolve OAuth client id"
-[ -n "$CLIENT_SECRET" ] || die "could not resolve OAuth client secret"
-ok "oauth client credentials resolved (values kept in memory)"
+done
 
-# ── 阶段 2：栈健康 ───────────────────────────────────────────
-info "waiting for TokenDance ID ($ID_BASE_URL/health)"
-wait_http "$ID_BASE_URL/health" 20 2 || die "TokenDance ID not healthy at $ID_BASE_URL"
-ok "TokenDance ID healthy"
-info "waiting for hub ($HUB_BASE_URL/health)"
-wait_http "$HUB_BASE_URL/health" 20 2 || die "hub not healthy at $HUB_BASE_URL"
-ok "hub healthy"
-[ -n "$ID_DB" ] || die "set AGENTHUB_E2E_ID_DB to the OIDC provider sqlite file"
-[ -f "$ID_DB" ] || die "OIDC provider sqlite db not found at $ID_DB"
+info "validating external Account discovery and Hub OIDC contract"
+ACCOUNT_ISSUER="$ISSUER" HUB_BASE_URL="$HUB_BASE_URL" WEB_CALLBACK_URL="$WEB_CALLBACK_URL" \
+python3 - <<'PYEOF'
+import base64
+import hashlib
+import json
+import os
+import secrets
+import string
+import sys
+import urllib.error
+import urllib.parse
+import urllib.request
 
-# ── 阶段 3：hub 所用 OAuth client 注册（幂等）────────────────
-# hub 侧 client_id/secret 由启动器固定注入，ID API 只能服务端生成
-# client_id（无法指定），因此此处直接 seed 进 ID 的 sqlite：redirect_uris
-# 覆盖 hub 回调与 web 回调，is_trusted=0 以走真实 consent 页。
-info "ensuring hub OAuth client in ID database"
-# web SPA 以 /workbench/ 为 base（vite），OIDC 回调真实落在
-# <web>/workbench/auth/tokendance/callback；同时保留无 base 变体兼容。
-CLIENT_JSON_URI="[\"$HUB_BASE_URL/client/auth/oidc/callback\",\"$WEB_BASE_URL/auth/tokendance/callback\",\"http://localhost:5174/auth/tokendance/callback\",\"$WEB_BASE_URL/workbench/auth/tokendance/callback\",\"http://localhost:5174/workbench/auth/tokendance/callback\"]"
-HASH="$(python3 -c "import bcrypt,sys;print(bcrypt.hashpw(sys.argv[1].encode(),bcrypt.gensalt(rounds=12)).decode())" "$CLIENT_SECRET")"
-OWNER_ID="$(sqlite3 "$ID_DB" "SELECT id FROM users WHERE email='dev@local.test' LIMIT 1" 2>/dev/null || true)"
-[ -n "$OWNER_ID" ] || OWNER_ID="$(sqlite3 "$ID_DB" 'SELECT id FROM users ORDER BY created_at ASC LIMIT 1' 2>/dev/null || true)"
-[ -n "$OWNER_ID" ] || die "ID database has no user to own the oauth client"
-NEW_CLIENT_ID="$(python3 -c 'import uuid;print(uuid.uuid4())')"
-NOW="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-if sqlite3 "$ID_DB" "SELECT 1 FROM oauth_clients WHERE client_id='$CLIENT_ID' AND deleted_at IS NULL LIMIT 1" 2>/dev/null | grep -q 1; then
-  sqlite3 "$ID_DB" "UPDATE oauth_clients SET secret_hash='$HASH', redirect_uris='$CLIENT_JSON_URI', enabled=1, is_trusted=0, updated_at='$NOW' WHERE client_id='$CLIENT_ID'"
-  ok "oauth client refreshed (redirect_uris/secret_hash up to date)"
-else
-  sqlite3 "$ID_DB" "INSERT INTO oauth_clients (id, client_id, secret_hash, name, redirect_uris, grant_types, scopes, user_id, enabled, is_trusted, created_at, updated_at) VALUES ('$NEW_CLIENT_ID', '$CLIENT_ID', '$HASH', 'AgentHub Hub (local dev)', '$CLIENT_JSON_URI', '[\"authorization_code\",\"refresh_token\"]', '[\"openid\",\"profile\",\"email\"]', '$OWNER_ID', 1, 0, '$NOW', '$NOW')"
-  ok "oauth client seeded"
-fi
+issuer = os.environ["ACCOUNT_ISSUER"].strip().rstrip("/")
+hub = os.environ["HUB_BASE_URL"].strip().rstrip("/")
+redirect_uri = os.environ["WEB_CALLBACK_URL"].strip()
 
-# ── 阶段 3b：hub 侧 redirect_uri 白名单预检 ──────────────────
-# web 真实回调带 /workbench 前缀；hub 的
-# AGENTHUB_TOKENDANCE_ID_ALLOWED_REDIRECT_URIS 必须包含该变体，
-# 否则 /client/auth/oidc/authorize 直接 400。此处用一次性 PKCE
-# authorize 探测（不回显响应体，避免泄露 client_id 等参数）。
-WEB_REDIRECT_URI="$WEB_BASE_URL/workbench/auth/tokendance/callback"
-AUTHZ_PROBE_FILE="$(mktemp)"
-PKCE_JSON="$(python3 - <<'PYEOF'
-import base64, hashlib, json, secrets, string, uuid
-verifier = ''.join(secrets.choice(string.ascii_letters + string.digits + '-._~') for _ in range(64))
-challenge = base64.urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest()).rstrip(b'=').decode()
-print(json.dumps({'challenge': challenge, 'device_id': str(uuid.uuid4())}))
-PYEOF
-)"
-PROBE_CHALLENGE="$(echo "$PKCE_JSON" | python3 -c 'import json,sys;print(json.load(sys.stdin)["challenge"])')"
-PROBE_DEVICE_ID="$(echo "$PKCE_JSON" | python3 -c 'import json,sys;print(json.load(sys.stdin)["device_id"])')"
-AUTHZ_HTTP="$(curl -s -o "$AUTHZ_PROBE_FILE" -w '%{http_code}' -m 10 -X POST "$HUB_BASE_URL/client/auth/oidc/authorize" \
-  -H 'Content-Type: application/json' \
-  -d "{\"code_challenge\":\"$PROBE_CHALLENGE\",\"code_challenge_method\":\"S256\",\"device_type\":\"web\",\"device_id\":\"$PROBE_DEVICE_ID\",\"redirect_uri\":\"$WEB_REDIRECT_URI\"}" || true)"
-if [ "$AUTHZ_HTTP" = "200" ] && grep -q 'authorization_url' "$AUTHZ_PROBE_FILE" 2>/dev/null; then
-  rm -f "$AUTHZ_PROBE_FILE"
-  ok "hub accepts web redirect_uri ($WEB_REDIRECT_URI)"
-else
-  rm -f "$AUTHZ_PROBE_FILE"
-  die "hub authorize rejected web redirect_uri (HTTP ${AUTHZ_HTTP:-n/a}). hub 需以包含 $WEB_REDIRECT_URI 的 AGENTHUB_TOKENDANCE_ID_ALLOWED_REDIRECT_URIS 重启"
-fi
 
-# ── 阶段 4：测试账号供给（主账号 + 陪聊账号）─────────────────
-# 聊天动线断言需要两个互为好友的真实账号；私聊会话禁止 self 目标，
-# 故第二枚账号是必需品而不是可选项。
-PARTNER_EMAIL="${AGENTHUB_E2E_PARTNER_EMAIL:-}"
-PARTNER_PASSWORD="${AGENTHUB_E2E_PARTNER_PASSWORD:-}"
+def fail(message):
+    print(f"E2E-FAIL: {message}", file=sys.stderr)
+    raise SystemExit(1)
 
-provision_identity() { # email password display_name -> 设置 REPLY_EMAIL / REPLY_PASSWORD
-  local email="$1" password="$2" display_name="$3"
-  if [ -z "$email" ] || [ -z "$password" ]; then
-    email="agenthub-e2e-$(date +%s)-$(head -c4 /dev/urandom | od -An -tx1 | tr -d ' \n')@test.local"
-    password="E2E-Passw0rd!$(head -c4 /dev/urandom | od -An -tx1 | tr -d ' \n')"
-    local register
-    register="$(curl -sf -m 10 -X POST "$ID_BASE_URL/api/auth/register" \
-      -H 'Content-Type: application/json' \
-      -d "{\"email\":\"$email\",\"password\":\"$password\",\"display_name\":\"$display_name\"}" || true)"
-    if [ -z "$register" ]; then
-      die "register failed for $email (existing account? rate limit?)"
-    fi
-    ok "test account registered: $email"
-  else
-    info "reusing provided test account $email"
-  fi
-  local jar login
-  jar="$(mktemp)"
-  login="$(curl -sf -m 10 -c "$jar" -b "$jar" -X POST "$ID_BASE_URL/api/auth/login" \
-    -H 'Content-Type: application/json' \
-    -d "{\"email\":\"$email\",\"password\":\"$password\"}" || true)"
-  if ! grep -q '^#HttpOnly_' "$jar" && ! grep -q 'td_session' "$jar"; then
-    rm -f "$jar"
-    die "login did not issue td_session cookie for $email"
-  fi
-  rm -f "$jar"
-  ok "test account login verified: $email"
-  REPLY_EMAIL="$email"
-  REPLY_PASSWORD="$password"
+
+def get_json(url, label):
+    try:
+        request = urllib.request.Request(url, headers={"Accept": "application/json"})
+        with urllib.request.urlopen(request, timeout=15) as response:
+            return json.load(response)
+    except (urllib.error.URLError, ValueError, OSError):
+        fail(f"{label} is unavailable")
+
+
+def same_origin(endpoint, canonical_issuer):
+    parsed = urllib.parse.urlparse(endpoint)
+    canonical = urllib.parse.urlparse(canonical_issuer)
+    return (
+        parsed.scheme in ("https", "http")
+        and parsed.scheme == canonical.scheme
+        and parsed.netloc.lower() == canonical.netloc.lower()
+        and not parsed.username
+        and not parsed.password
+    )
+
+
+parsed_issuer = urllib.parse.urlparse(issuer)
+if parsed_issuer.scheme not in ("https", "http") or not parsed_issuer.netloc:
+    fail("Account issuer must be an absolute http(s) URL")
+if parsed_issuer.scheme != "https" and parsed_issuer.hostname not in ("127.0.0.1", "::1", "localhost"):
+    fail("non-loopback Account issuers must use HTTPS")
+
+discovery = get_json(issuer + "/.well-known/openid-configuration", "Account discovery")
+if discovery.get("issuer") != issuer:
+    fail("Account discovery issuer does not exactly match the configured issuer")
+
+required_endpoints = {
+    "authorization_endpoint": issuer + "/oauth/authorize",
+    "token_endpoint": issuer + "/oauth/token",
+    "userinfo_endpoint": issuer + "/oauth/userinfo",
+    "jwks_uri": issuer + "/oauth/jwks",
 }
+for field, expected in required_endpoints.items():
+    actual = str(discovery.get(field) or "")
+    if actual != expected or not same_origin(actual, issuer):
+        fail(f"Account discovery {field} does not match the public /oauth contract")
 
-info "provisioning primary identity"
-REPLY_EMAIL="" REPLY_PASSWORD=""
-provision_identity "$USER_EMAIL" "$USER_PASSWORD" "AgentHub E2E User"
-USER_EMAIL="$REPLY_EMAIL"
-USER_PASSWORD="$REPLY_PASSWORD"
 
-info "provisioning partner identity"
-REPLY_EMAIL="" REPLY_PASSWORD=""
-provision_identity "$PARTNER_EMAIL" "$PARTNER_PASSWORD" "AgentHub E2E Partner"
-PARTNER_EMAIL="$REPLY_EMAIL"
-PARTNER_PASSWORD="$REPLY_PASSWORD"
+def supports(field, value):
+    values = discovery.get(field)
+    return isinstance(values, list) and value in values
 
-# ── 阶段 5：凭据落盘（gitignored） ───────────────────────────
+
+if not supports("response_types_supported", "code"):
+    fail("Account discovery must support response_type=code")
+if not supports("response_modes_supported", "query"):
+    fail("Account discovery must support response_mode=query")
+if not supports("grant_types_supported", "authorization_code"):
+    fail("Account discovery must support authorization_code")
+if not supports("id_token_signing_alg_values_supported", "RS256"):
+    fail("Account discovery must support RS256 ID tokens")
+if not supports("code_challenge_methods_supported", "S256"):
+    fail("Account discovery must require PKCE S256")
+if not supports("token_endpoint_auth_methods_supported", "client_secret_basic"):
+    fail("Account discovery must support confidential client_secret_basic")
+if discovery.get("authorization_response_iss_parameter_supported") is not True:
+    fail("Account discovery must advertise RFC 9207 authorization response issuer support")
+
+jwks = get_json(required_endpoints["jwks_uri"], "Account JWKS")
+keys = jwks.get("keys") if isinstance(jwks, dict) else None
+if not isinstance(keys, list) or not any(
+    key.get("kty") == "RSA" for key in keys if isinstance(key, dict)
+):
+    fail("Account JWKS must contain an RSA signing key")
+
+# Starting authorization is read-only and proves that Hub is configured with
+# the external client/issuer. It deliberately does not exchange a code.
+verifier = "".join(
+    secrets.choice(string.ascii_letters + string.digits + "-._~") for _ in range(64)
+)
+challenge = base64.urlsafe_b64encode(
+    hashlib.sha256(verifier.encode("utf-8")).digest()
+).rstrip(b"=").decode("ascii")
+payload = json.dumps(
+    {
+        "code_challenge": challenge,
+        "code_challenge_method": "S256",
+        "device_type": "web",
+        "device_id": "00000000-0000-4000-8000-000000000002",
+        "redirect_uri": redirect_uri,
+    }
+).encode("utf-8")
+
+try:
+    request = urllib.request.Request(
+        hub + "/client/auth/oidc/authorize",
+        data=payload,
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    with urllib.request.urlopen(request, timeout=15) as response:
+        envelope = json.load(response)
+except urllib.error.HTTPError as exc:
+    fail(f"Hub rejected the registered web redirect (HTTP {exc.code})")
+except (urllib.error.URLError, ValueError, OSError):
+    fail("Hub Account authorize endpoint is unavailable or returned invalid JSON")
+
+auth = (
+    envelope.get("data")
+    if isinstance(envelope, dict) and envelope.get("data") is not None
+    else envelope
+)
+if not isinstance(auth, dict):
+    fail("Hub Account authorize response is invalid")
+if auth.get("issuer") != issuer:
+    fail("Hub did not pin the configured Account issuer")
+
+authorization_url = str(auth.get("authorization_url") or "")
+parsed_auth = urllib.parse.urlparse(authorization_url)
+if not same_origin(authorization_url, issuer) or parsed_auth.path != "/oauth/authorize":
+    fail("Hub authorization URL does not use the discovered Account endpoint")
+params = urllib.parse.parse_qs(parsed_auth.query, keep_blank_values=True)
+expected_query = {
+    "response_type": "code",
+    "scope": "openid profile",
+    "redirect_uri": redirect_uri,
+    "code_challenge_method": "S256",
+    "prompt": "consent",
+}
+for key, expected in expected_query.items():
+    if params.get(key) != [expected]:
+        fail(f"Hub authorization URL has an invalid {key}")
+for key in ("client_id", "state", "nonce", "code_challenge"):
+    if not params.get(key, [""])[0]:
+        fail(f"Hub authorization URL is missing {key}")
+if auth.get("state") != params.get("state", [""])[0]:
+    fail("Hub authorization state is not bound to the returned URL")
+
+# RFC 9207 iss is mandatory at callback binding, before state/code exchange.
+negative = json.dumps(
+    {
+        "code": "invalid-code",
+        "state": "invalid-state",
+        "code_verifier": verifier,
+        "device_type": "web",
+        "device_id": "00000000-0000-4000-8000-000000000002",
+        "redirect_uri": redirect_uri,
+    }
+).encode("utf-8")
+try:
+    request = urllib.request.Request(
+        hub + "/client/auth/oidc/callback",
+        data=negative,
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    urllib.request.urlopen(request, timeout=15)
+    fail("Hub accepted an Account callback without RFC 9207 iss")
+except urllib.error.HTTPError as exc:
+    if exc.code != 400:
+        fail(f"Hub callback without iss must fail with HTTP 400, got {exc.code}")
+except (urllib.error.URLError, OSError):
+    fail("Hub Account callback endpoint is unavailable")
+
+print("E2E-PASS: external Account discovery matches the canonical issuer")
+print(
+    "E2E-PASS: Account advertises code/query, authorization_code, RS256, S256, "
+    "client_secret_basic and RFC 9207"
+)
+print(
+    "E2E-PASS: Hub authorize uses /oauth/authorize, openid profile, nonce, "
+    "state and exact redirect_uri"
+)
+print("E2E-PASS: Hub rejects an Account callback without iss")
+PYEOF
+
 mkdir -p "$ARTIFACT_DIR"
-cat > "$ACCOUNT_ENV" <<EOF
-AGENTHUB_E2E_ID_BASE_URL=$ID_BASE_URL
-AGENTHUB_E2E_HUB_BASE_URL=$HUB_BASE_URL
-AGENTHUB_E2E_WEB_BASE_URL=$WEB_BASE_URL
-AGENTHUB_E2E_USER_EMAIL=$USER_EMAIL
-AGENTHUB_E2E_USER_PASSWORD=$USER_PASSWORD
-AGENTHUB_E2E_PARTNER_EMAIL=$PARTNER_EMAIL
-AGENTHUB_E2E_PARTNER_PASSWORD=$PARTNER_PASSWORD
-EOF
-# 不落盘 Hub 签名密钥：chat-real.spec.ts 的 mintTestJWT 优先读取
-# AGENTHUB_JWT_SECRET 环境变量，凭据文件只保留测试账号。
+chmod 700 "$ARTIFACT_DIR"
+{
+  printf 'AGENTHUB_E2E_ACCOUNT_ISSUER=%s\n' "$ISSUER"
+  printf 'AGENTHUB_E2E_HUB_BASE_URL=%s\n' "$HUB_BASE_URL"
+  printf 'AGENTHUB_E2E_EDGE_BASE_URL=%s\n' "$EDGE_BASE_URL"
+  printf 'AGENTHUB_E2E_WEB_BASE_URL=%s\n' "$WEB_BASE_URL"
+  printf 'AGENTHUB_E2E_USER_EMAIL=%s\n' "$USER_EMAIL"
+  printf 'AGENTHUB_E2E_USER_PASSWORD=%s\n' "$USER_PASSWORD"
+  printf 'AGENTHUB_E2E_PARTNER_EMAIL=%s\n' "$PARTNER_EMAIL"
+  printf 'AGENTHUB_E2E_PARTNER_PASSWORD=%s\n' "$PARTNER_PASSWORD"
+} >"$ACCOUNT_ENV"
 chmod 600 "$ACCOUNT_ENV"
-ok "test credentials written to $ACCOUNT_ENV (chmod 600, gitignored)"
+ok "operator-provided test accounts accepted; credentials written to $ACCOUNT_ENV (mode 0600)"
 
 echo "E2E-RESULT: PASS"
