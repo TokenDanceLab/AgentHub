@@ -1,7 +1,7 @@
 /**
  * E2E: Account screen — auth flow, interaction, error, and loading state tests.
  *
- * Verifies account drawer, TokenDance ID status, Hub session state,
+ * Verifies account drawer, TokenDance Account status, Hub session state,
  * notification permission, theme toggling, and error/recovery states.
  */
 import { test, expect } from '@playwright/test';
@@ -19,7 +19,7 @@ test.describe('Auth flow via mock hub (smoke)', () => {
     await expect(avatarButton).toBeVisible({ timeout: 15000 });
   });
 
-  test('opens account drawer and shows TokenDance ID signed-in status', async ({ page }) => {
+  test('opens account drawer and shows TokenDance Account signed-in status', async ({ page }) => {
     const avatarButton = page.getByRole('button', { name: /account/i });
     await avatarButton.click();
     await page.waitForTimeout(1000);
@@ -145,7 +145,7 @@ test.describe('Account interaction tests', () => {
     }
   });
 
-  test('identity section shows TokenDance ID and Hub session items', async ({ page }) => {
+  test('identity section shows TokenDance Account and Hub session items', async ({ page }) => {
     const avatarButton = page.getByRole('button', { name: /account/i });
     await avatarButton.click();
     await page.waitForTimeout(1000);
@@ -154,8 +154,8 @@ test.describe('Account interaction tests', () => {
     const identitySection = page.getByText(/identity|身份|session/).first();
     await expect(identitySection).toBeVisible({ timeout: 10000 });
 
-    // TokenDance ID entry
-    const tdEntry = page.getByText(/TokenDance ID/).first();
+    // TokenDance Account entry
+    const tdEntry = page.getByText(/TokenDance Account/).first();
     await expect(tdEntry).toBeVisible({ timeout: 10000 });
   });
 

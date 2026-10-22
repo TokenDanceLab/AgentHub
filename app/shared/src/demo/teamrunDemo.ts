@@ -146,7 +146,7 @@ export const teamRunDemoScenario: TeamRunDemoScenario = {
       'TeamRun route, task, and event fixture list',
     ],
     forbiddenRuntimeTouches: [
-      'TokenDance ID login',
+      'TokenDance Account login',
       'Hub or Edge service mutation',
       'real CLI or model execution',
       'secret reads',

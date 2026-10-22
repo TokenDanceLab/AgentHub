@@ -32,12 +32,14 @@ func testConfig() *config.Config {
 }
 
 // newTestAuthMW builds an AuthMiddleware for tests (#1551): instance-owned
-// deps, no package globals.
-func newTestAuthMW(cfg *config.Config, deps AuthDependencies, tdVerifier *jwtutil.TokenDanceVerifier) *AuthMiddleware {
+// deps, no package globals. The trailing parameter is ignored; call sites keep
+// it only to make accidental reintroduction of an external-token verifier a
+// compile-time test failure rather than a hidden auth path.
+func newTestAuthMW(cfg *config.Config, deps AuthDependencies, _ ...any) *AuthMiddleware {
 	if cfg == nil {
 		cfg = testConfig()
 	}
-	return NewAuthMiddleware(cfg, deps, tdVerifier)
+	return NewAuthMiddleware(cfg, deps)
 }
 
 func makeToken(userID, deviceType, deviceID string) string {
@@ -98,23 +100,6 @@ func TestAuthMiddlewareInvalidToken(t *testing.T) {
 
 	if !c.IsAborted() {
 		t.Fatal("expected request to be aborted")
-	}
-	if w.Code != http.StatusUnauthorized {
-		t.Fatalf("status = %d, want 401", w.Code)
-	}
-}
-
-func TestAuthMiddlewareRejectsTokenDanceTokenWithoutExpectedAudience(t *testing.T) {
-	authHeaderValue := "not-a-valid-local-token"
-	cfg := testConfig()
-	cfg.TokenDanceID.IssuerURL = "https://id.example"
-	cfg.TokenDanceID.ClientID = ""
-
-	c, w := ginRequest(http.MethodGet, "/client/users/me", "Bearer "+authHeaderValue)
-	newTestAuthMW(cfg, AuthDependencies{}, nil).Handler()(c)
-
-	if !c.IsAborted() {
-		t.Fatal("expected request to be aborted when TokenDance client_id is missing")
 	}
 	if w.Code != http.StatusUnauthorized {
 		t.Fatalf("status = %d, want 401", w.Code)
@@ -190,88 +175,51 @@ func TestAuthMiddlewareSetsContextValues(t *testing.T) {
 	}
 }
 
-// TestAuthMiddlewareNilVerifierWithTokenDanceConfig is the regression for the
-// nil-receiver panic: integration tests (and any other caller) construct the
-// middleware with a nil tdVerifier while TokenDance ID IS configured — the
-// old guard checked only cfg and dereferenced nil inside the timeout
-// goroutine. With a nil verifier the RS256 path must be skipped and the
-// local HS256 token must still authenticate.
-func TestAuthMiddlewareNilVerifierWithTokenDanceConfig(t *testing.T) {
-	token := makeToken("user-nil-verifier", "desktop", "dev-nil-verifier")
-
-	cfg := testConfig()
-	cfg.TokenDanceID.IssuerURL = "https://id.example.invalid"
-	cfg.TokenDanceID.ClientID = "configured-client"
+func TestAuthMiddlewareRejectsExternalAccountTokenOnREST(t *testing.T) {
+	key := oidcfixture.NewKey(t)
+	token := oidcfixture.SignToken(
+		t,
+		key.Private,
+		key.Kid,
+		"https://account.example",
+		"agenthub-client",
+		"account-subject",
+		"user@example.com",
+		"Account User",
+	)
 
 	c, w := ginRequest(http.MethodGet, "/client/users/me", "Bearer "+token)
-	handler := newTestAuthMW(cfg, AuthDependencies{}, nil).Handler()
-	handler(c)
-	next := func(*gin.Context) {}
-	if !c.IsAborted() {
-		next(c)
-	}
+	newTestAuthMW(testConfig(), AuthDependencies{}, nil).Handler()(c)
 
-	if c.IsAborted() {
-		t.Fatalf("expected local HS256 fallback to authenticate, status=%d body=%s", w.Code, w.Body.String())
+	if !c.IsAborted() {
+		t.Fatal("Account provider token must not be a Hub REST session")
 	}
-	if got := c.GetString("user_id"); got != "user-nil-verifier" {
-		t.Fatalf("user_id = %q, want user-nil-verifier", got)
+	if w.Code != http.StatusUnauthorized {
+		t.Fatalf("status = %d, want 401", w.Code)
 	}
-	if got := c.GetString("auth_source"); got != "hub_local" {
-		t.Fatalf("auth_source = %q, want hub_local", got)
+	if got := c.GetString("auth_source"); got != "" {
+		t.Fatalf("auth_source = %q, want empty", got)
 	}
 }
 
-func TestAuthMiddlewareTokenDanceBearerDoesNotSatisfyDesktopDeviceCheck(t *testing.T) {
-	token, issuer, audience, jwks := makeTokenDanceMiddlewareToken(t)
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(jwks))
-	}))
-	t.Cleanup(server.Close)
-
-	cfg := testConfig()
-	cfg.TokenDanceID.IssuerURL = issuer
-	cfg.TokenDanceID.ClientID = audience
-
-	c, w := ginRequest(http.MethodPost, "/edge/devices/register", "Bearer "+token)
-	newTestAuthMW(cfg, AuthDependencies{}, jwtutil.NewTokenDanceVerifier(server.URL, jwtutil.VerifierConfig{})).Handler()(c)
-	if c.IsAborted() {
-		t.Fatalf("TokenDance bearer should authenticate before device gate, status=%d body=%s", w.Code, w.Body.String())
-	}
-	if got := c.GetString("auth_source"); got != "tokendance_id" {
-		t.Fatalf("auth_source = %q, want tokendance_id", got)
-	}
-	if got := c.GetString("device_type"); got != "tokendance_bearer" {
-		t.Fatalf("device_type = %q, want tokendance_bearer", got)
-	}
-
-	DeviceTypeCheck("desktop")(c)
-	if !c.IsAborted() {
-		t.Fatal("expected TokenDance bearer to be rejected by desktop device gate")
-	}
-	if w.Code != http.StatusForbidden {
-		t.Fatalf("status = %d, want 403", w.Code)
-	}
-}
-
-func TestWSHandlerRejectsTokenDanceBearer(t *testing.T) {
-	token, issuer, audience, jwks := makeTokenDanceMiddlewareToken(t)
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(jwks))
-	}))
-	t.Cleanup(server.Close)
-
-	cfg := testConfig()
-	cfg.TokenDanceID.IssuerURL = issuer
-	cfg.TokenDanceID.ClientID = audience
+func TestWSHandlerRejectsExternalAccountToken(t *testing.T) {
+	key := oidcfixture.NewKey(t)
+	token := oidcfixture.SignToken(
+		t,
+		key.Private,
+		key.Kid,
+		"https://account.example",
+		"agenthub-client",
+		"account-subject",
+		"user@example.com",
+		"Account User",
+	)
 
 	c, w := ginRequest(http.MethodGet, "/client/ws", "Bearer "+token)
-	newTestAuthMW(cfg, AuthDependencies{}, jwtutil.NewTokenDanceVerifier(server.URL, jwtutil.VerifierConfig{})).WSHandler()(c)
+	newTestAuthMW(testConfig(), AuthDependencies{}, nil).WSHandler()(c)
 
 	if !c.IsAborted() {
-		t.Fatal("expected TokenDance bearer to be rejected before WebSocket upgrade")
+		t.Fatal("Account provider token must not upgrade a Hub WebSocket")
 	}
 	if w.Code != http.StatusUnauthorized {
 		t.Fatalf("status = %d, want 401", w.Code)
@@ -504,8 +452,6 @@ func TestEnforceHubSessionRejectsPurposeAndDeviceType(t *testing.T) {
 		{"non-empty purpose edge-api", "hub_local", "desktop", "edge-api", false},
 		{"non-empty purpose run-start", "hub_local", "web", "run-start", false},
 		{"edge device_type", "hub_local", "edge", "", false},
-		{"tokendance_bearer device_type", "hub_local", "tokendance_bearer", "", false},
-		{"tokendance auth_source", "tokendance_id", "tokendance_bearer", "", false},
 		{"empty auth_source", "", "web", "", false},
 	}
 
@@ -639,15 +585,6 @@ func TestWSHandlerRejectsCapabilityToken(t *testing.T) {
 	if w.Code != http.StatusUnauthorized {
 		t.Fatalf("status = %d, want 401", w.Code)
 	}
-}
-
-func makeTokenDanceMiddlewareToken(t *testing.T) (token, issuer, audience, jwks string) {
-	t.Helper()
-	key := oidcfixture.NewKey(t)
-	issuer = "https://id.example"
-	audience = "agenthub-client"
-	token = oidcfixture.SignToken(t, key.Private, key.Kid, issuer, audience, "tokendance-user-1", "user@example.com", "Test User")
-	return token, issuer, audience, key.JWKS
 }
 
 type stubAccessBlacklist struct {
@@ -1002,8 +939,8 @@ func TestRequireHubSessionAllowsHubLocalAuth(t *testing.T) {
 	}
 }
 
-func TestRequireHubSessionBlocksTokenDanceAuth(t *testing.T) {
-	c, w := requireHubSessionGinCtx("tokendance_id")
+func TestRequireHubSessionBlocksExternalProviderAuth(t *testing.T) {
+	c, w := requireHubSessionGinCtx("account")
 	called := false
 	next := func(c *gin.Context) { called = true }
 
@@ -1014,7 +951,7 @@ func TestRequireHubSessionBlocksTokenDanceAuth(t *testing.T) {
 	}
 
 	if !c.IsAborted() {
-		t.Fatal("expected request to be aborted for TokenDance auth")
+		t.Fatal("expected request to be aborted for external provider auth")
 	}
 	if called {
 		t.Fatal("expected next handler NOT to be called")

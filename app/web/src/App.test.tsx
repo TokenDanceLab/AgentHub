@@ -76,7 +76,7 @@ vi.mock('@/components/AuthPage', () => ({
     onClose?: () => void;
     onLoginSuccess: (user: typeof authPageSuccessUser) => void;
   }) => (
-    <section role="dialog" aria-label="TokenDance ID login">
+    <section role="dialog" aria-label="TokenDance Account login">
       <button type="button" onClick={onClose}>Close auth</button>
       <button type="button" onClick={() => onLoginSuccess(authPageSuccessUser)}>Complete auth</button>
     </section>
@@ -370,22 +370,22 @@ describe('Web app root', () => {
     expect(screen.queryByText('@Hub Builder')).not.toBeInTheDocument();
   });
 
-  it('mounts Web auth bootstrap and renders the TokenDance ID auth modal from Hub state', async () => {
+  it('mounts Web auth bootstrap and renders the TokenDance Account auth modal from Hub state', async () => {
     render(<App />);
 
     expect(useWebAuthMock).toHaveBeenCalled();
-    expect(screen.queryByRole('dialog', { name: 'TokenDance ID login' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('dialog', { name: 'TokenDance Account login' })).not.toBeInTheDocument();
 
     act(() => {
       useHubStore.getState().setShowAuthModal(true);
     });
 
-    expect(await screen.findByRole('dialog', { name: 'TokenDance ID login' })).toBeInTheDocument();
+    expect(await screen.findByRole('dialog', { name: 'TokenDance Account login' })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Complete auth' }));
 
     await waitFor(() => {
-      expect(screen.queryByRole('dialog', { name: 'TokenDance ID login' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('dialog', { name: 'TokenDance Account login' })).not.toBeInTheDocument();
     });
   });
 
@@ -405,7 +405,7 @@ describe('Web app root', () => {
 
     await waitFor(() => {
       expect(logoutMock).toHaveBeenCalledTimes(1);
-      expect(screen.getByRole('dialog', { name: 'TokenDance ID login' })).toBeInTheDocument();
+      expect(screen.getByRole('dialog', { name: 'TokenDance Account login' })).toBeInTheDocument();
     });
     expect(queryClient.getQueryData(['private-session'])).toBeUndefined();
     expect(useHubStore.getState().authenticated).toBe(false);
@@ -426,7 +426,7 @@ describe('Web app root', () => {
 
     await waitFor(() => {
       expect(ensureAuthMock).toHaveBeenCalled();
-      expect(screen.getByRole('dialog', { name: 'TokenDance ID login' })).toBeInTheDocument();
+      expect(screen.getByRole('dialog', { name: 'TokenDance Account login' })).toBeInTheDocument();
     });
   });
 

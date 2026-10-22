@@ -79,15 +79,6 @@ func newGinCtxWithQuery(method, path, query string, body any, kv ...string) (*gi
 	return c, w
 }
 
-func parseResponse[T any](t *testing.T, w *httptest.ResponseRecorder) handler.Response {
-	t.Helper()
-	var resp handler.Response
-	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
-		t.Fatalf("failed to unmarshal response: %v", err)
-	}
-	return resp
-}
-
 // ── Refresh ─────────────────────────────────────────────────────────
 
 func TestAuthHandler_Refresh_Success(t *testing.T) {

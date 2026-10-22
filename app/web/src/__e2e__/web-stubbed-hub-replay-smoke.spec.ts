@@ -285,7 +285,7 @@ async function installHubStub(page: Page, scenario: HubScenario = 'healthy-targe
       return fulfillHubRoute(page, route, url.pathname, scenario);
     }
 
-    if (boundary === 'local-edge' || boundary === 'tokendance-id' || boundary === 'gateway') {
+    if (boundary === 'local-edge' || boundary === 'account-oidc' || boundary === 'gateway') {
       requests.push({ method: request.method(), url: request.url() });
       return route.fulfill({
         status: 503,

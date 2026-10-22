@@ -13,8 +13,8 @@ import { fileURLToPath } from 'node:url';
  * 私有主机分类器——只验证现有门禁 + 产出脱敏证据形状。
  *
  * ── 诚实边界：真实栈部分 ──
- *   - 全栈健康预检（TokenDance ID / hub / web）与缺栈 test.skip；
- *   - 真实 TokenDance ID OIDC Authorization Code + PKCE 浏览器登录
+ *   - 全栈健康预检（external TokenDance Account / hub / web）与缺栈 test.skip；
+ *   - 真实 TokenDance Account OIDC Authorization Code + PKCE 浏览器登录
  *     （与 real-oidc-login.spec.ts 同一登录动线，无自签 JWT/旁路）；
  *   - 已认证工作台为真实 dev server 渲染的真实页面；
  *   - 被挂载的组件（RowItem / BrowserPreview）从运行中页面的模块图
@@ -46,7 +46,7 @@ import { fileURLToPath } from 'node:url';
  *   起该门禁也会拒绝带 authority userinfo（user:pass@host 形状）的
  *   http(s) URL；本 spec 仍不对该形状做断言，也不做私有主机分类。
  *
- * 前置（本机全栈：TokenDance ID :3000 / hub :8080 / web :5174）：
+ * 前置（operator TokenDance Account + hub :8080 / web :5174）：
  *   bash scripts/e2e/provision-real-e2e-stack.sh
  *   （供给测试账号并落凭据到 tests/artifacts/real-e2e-account.env，gitignored）
  *
@@ -60,7 +60,7 @@ import { fileURLToPath } from 'node:url';
  */
 
 interface RealE2ECredentials {
-  idBaseUrl: string;
+  accountIssuer: string;
   hubBaseUrl: string;
   edgeBaseUrl: string;
   webBaseUrl: string;
@@ -106,13 +106,14 @@ function loadCredentials(): RealE2ECredentials | null {
   const file = readAccountEnvFile();
   const pick = (envKey: string, fileKey: string): string => envValue(envKey) || file[fileKey] || '';
   const credentials: RealE2ECredentials = {
-    idBaseUrl: pick('AGENTHUB_E2E_ID_BASE_URL', 'AGENTHUB_E2E_ID_BASE_URL') || 'http://127.0.0.1:3000',
+    accountIssuer: pick('AGENTHUB_E2E_ACCOUNT_ISSUER', 'AGENTHUB_E2E_ACCOUNT_ISSUER'),
     hubBaseUrl: pick('AGENTHUB_E2E_HUB_BASE_URL', 'AGENTHUB_E2E_HUB_BASE_URL') || 'http://127.0.0.1:8080',
     edgeBaseUrl: pick('AGENTHUB_E2E_EDGE_BASE_URL', 'AGENTHUB_E2E_EDGE_BASE_URL') || 'http://127.0.0.1:3210',
     webBaseUrl: pick('AGENTHUB_E2E_WEB_BASE_URL', 'AGENTHUB_E2E_WEB_BASE_URL') || 'http://127.0.0.1:5174',
     userEmail: pick('AGENTHUB_E2E_USER_EMAIL', 'AGENTHUB_E2E_USER_EMAIL'),
     userPassword: pick('AGENTHUB_E2E_USER_PASSWORD', 'AGENTHUB_E2E_USER_PASSWORD'),
   };
+  if (!credentials.accountIssuer) return null;
   if (!credentials.userEmail || !credentials.userPassword) return null;
   return credentials;
 }
@@ -129,44 +130,28 @@ async function urlReachable(url: string): Promise<boolean> {
   }
 }
 
-/** 本 spec 只依赖 id/hub/web（预览门禁是前端面）；edge 不参与预检。 */
+/** 本 spec 只依赖 Account/hub/web（预览门禁是前端面）；edge 不参与预检。 */
 async function stackIsUp(credentials: RealE2ECredentials): Promise<boolean> {
-  const idOk = await urlReachable(`${credentials.idBaseUrl}/.well-known/openid-configuration`);
+  const accountOk = await urlReachable(`${credentials.accountIssuer}/.well-known/openid-configuration`);
   const hubOk = await urlReachable(`${credentials.hubBaseUrl}/health`);
   const webOk = await urlReachable(`${credentials.webBaseUrl}${WORKBENCH_PATH}`);
-  return idOk && hubOk && webOk;
+  return accountOk && hubOk && webOk;
 }
 
 const credentials = loadCredentials();
 
 /**
- * 应用层已知外部依赖统一 route abort，使本 lane 网络面对栈外全封闭：
- * - challenges.cloudflare.com：本机离线环境无法加载 Turnstile CDN 脚本；
- *   abort 触发前端组件的错误分支从而允许提交。本 lane 使用的本地 ID 实例
- *   未配置 Turnstile challenge，因此该处理只影响测试环境。
- *   （与 real-oidc-login.spec.ts 同步。）
- * app/web 的字体已自托管（/fonts/fonts.css）；外部字体 host 不在豁免清单内，
- * 若重新引入外部字体 <link> 会作为栈外请求失败暴露。
- * 被 abort 的已知外部请求在 observeNetwork 中按「已阻断的已知外部依赖」
- * 豁免；未经阻断而成功的栈外请求仍然失败——封闭性断言不因豁免清单失效。
- */
-const KNOWN_APP_EXTERNAL_HOSTS = new Set([
-  'challenges.cloudflare.com',
-]);
-
-async function blockKnownAppExternals(context: BrowserContext): Promise<void> {
-  for (const host of KNOWN_APP_EXTERNAL_HOSTS) {
-    await context.route(`**/${host}/**`, (route) => route.abort());
-  }
-}
-
-/**
- * 真实 OIDC 浏览器登录：工作台触发 → TokenDance ID 登录页 → 提交凭据 →
+ * 真实 OIDC 浏览器登录：工作台触发 → TokenDance Account 登录页 → 提交凭据 →
  * consent 授权页 → 回调回 web → hub 交换出会话 token。
  * 返回登录后 sessionStorage 中 hub 颁发的 access token。
  * （逻辑与 real-oidc-login.spec.ts 的 performRealOidcLogin 保持同步。）
  */
-async function performRealOidcLogin(page: Page, email: string, password: string, idBaseUrl: string): Promise<string> {
+async function performRealOidcLogin(
+  page: Page,
+  email: string,
+  password: string,
+  accountIssuer: string,
+): Promise<string> {
   await page.goto(WORKBENCH_PATH, { waitUntil: 'domcontentloaded' });
 
   // 未认证时工作台无直接登录按钮；在 composer 提交触发 ensureAuth 打开登录浮层。
@@ -175,29 +160,39 @@ async function performRealOidcLogin(page: Page, email: string, password: string,
   await composer.fill('real-e2e: open sign-in');
   await composer.press('Enter');
 
-  const loginButton = page.getByRole('button', { name: /Continue with TokenDance|使用 TokenDance ID 登录/i }).first();
+  const loginButton = page.getByRole('button', {
+    name: /Continue with TokenDance Account|使用 TokenDance Account 登录/i,
+  }).first();
   await expect(loginButton).toBeVisible({ timeout: 10_000 });
   await loginButton.click();
 
-  // 真实重定向到 TokenDance ID（OIDC authorize → 302 到 /login）。
+  // 真实重定向到 external Account。
   // 用 toHaveURL 轮询而不是 waitForURL：后者绑定导航生命周期事件，
   // 在 vite 快速响应下会错过已提交的导航（实测 flake）。
-  const idHost = new URL(idBaseUrl).host.replace(/\./g, '\\.');
-  await expect(page).toHaveURL(new RegExp(`${idHost}/login`), { timeout: 20_000 });
+  const accountOrigin = new URL(accountIssuer).origin;
+  await expect.poll(() => {
+    try {
+      return new URL(page.url()).origin;
+    } catch {
+      return '';
+    }
+  }, { timeout: 20_000 }).toBe(accountOrigin);
 
-  // TokenDance ID 真实登录表单。
+  // TokenDance Account 两步登录表单。
   await expect(page.locator('#login-email')).toBeVisible({ timeout: 15_000 });
   await page.locator('#login-email').fill(email);
-  await page.locator('#login-password').fill(password);
-  const submitLogin = page.locator('button.login-submit');
+  const next = page.getByRole('button', { name: /^(Next|下一步)$/i });
+  await expect(next).toBeEnabled({ timeout: 10_000 });
+  await next.click();
+  await page.locator('#login-secret').fill(password);
+  const submitLogin = page.getByRole('button', { name: /^(Sign in|登录)$/i });
   await expect(submitLogin).toBeEnabled({ timeout: 20_000 });
   await submitLogin.click();
 
-  // consent 授权页（服务端渲染；client 未信任且 prompt=consent）。
-  const consentForm = page.locator('form[action="/oidc/authorize/confirm"]');
-  await expect(consentForm).toBeVisible({ timeout: 20_000 });
-  const approveButton = consentForm.locator('button[type="submit"]');
-  await expect(approveButton).toBeVisible();
+  await expect(page.getByRole('heading', { name: /Allow access|允许访问/ })).toBeVisible({
+    timeout: 20_000,
+  });
+  const approveButton = page.getByRole('button', { name: /^(Allow access|允许访问)$/i });
 
   await approveButton.click({ noWaitAfter: true });
 
@@ -210,7 +205,7 @@ async function performRealOidcLogin(page: Page, email: string, password: string,
     .not.toBeNull();
 
   // 回调路由被清理，回到工作台。
-  await expect(page).not.toHaveURL(/auth\/tokendance\/callback/, { timeout: 15_000 });
+  await expect(page).not.toHaveURL(/auth\/account\/callback/, { timeout: 15_000 });
   const token = await page.evaluate((key) => sessionStorage.getItem(key), 'agenthub_hub_token');
   expect(token).toBeTruthy();
   return String(token);
@@ -253,8 +248,8 @@ function canonicalHost(host: string): string {
 /**
  * context 级监听：覆盖登录 + 预览两个阶段的全部请求。
  * 栈内主机 = 四个配置化 endpoint 的 host（含端口，回环写法归一）；
- * 断言时按「预览阶段零栈外请求；全程栈外请求必须是被 route abort 的
- * 已知外部依赖（见 KNOWN_APP_EXTERNAL_HOSTS，已被阻断）」裁决。
+ * 断言时按「预览阶段零栈外请求；登录与预览全程任何未失败的栈外请求都失败」
+ * 裁决。外部 Account 的 issuer host 本身属于声明的栈内身份面。
  */
 function observeNetwork(context: BrowserContext, stackHosts: ReadonlySet<string>) {
   const observed: ObservedRequest[] = [];
@@ -278,9 +273,8 @@ function observeNetwork(context: BrowserContext, stackHosts: ReadonlySet<string>
       for (const entry of observed) {
         if (stackHosts.has(entry.host)) continue;
         const failed = entry.request.failure() !== null;
-        const isBlockedKnownExternal = KNOWN_APP_EXTERNAL_HOSTS.has(entry.host) && failed;
-        if (!isBlockedKnownExternal && !failed) nonAbortedOffStack.push(entry.request.url());
-        if (entry.phase === 'preview' && !isBlockedKnownExternal) previewPhaseOffStack.push(entry.request.url());
+        if (!failed) nonAbortedOffStack.push(entry.request.url());
+        if (entry.phase === 'preview') previewPhaseOffStack.push(entry.request.url());
       }
       return { previewPhaseOffStack, nonAbortedOffStack, total: observed.length };
     },
@@ -289,7 +283,7 @@ function observeNetwork(context: BrowserContext, stackHosts: ReadonlySet<string>
 
 function stackHostSet(credentials: RealE2ECredentials): Set<string> {
   const hosts = new Set<string>();
-  for (const base of [credentials.idBaseUrl, credentials.hubBaseUrl, credentials.edgeBaseUrl, credentials.webBaseUrl]) {
+  for (const base of [credentials.accountIssuer, credentials.hubBaseUrl, credentials.edgeBaseUrl, credentials.webBaseUrl]) {
     try {
       hosts.add(canonicalHost(new URL(base).host));
     } catch {
@@ -456,7 +450,7 @@ test.describe('私有 URL 验证真实场景 (#1922)', () => {
   test.beforeEach(async () => {
     test.skip(!credentials, 'missing test credentials: run bash scripts/e2e/provision-real-e2e-stack.sh first');
     if (credentials && !(await stackIsUp(credentials))) {
-      test.skip(true, 'local real stack not up: start TokenDance ID :3000 / hub :8080 / web :5174 first');
+      test.skip(true, 'real stack not up: configure external Account and start hub :8080 / web :5174 first');
     }
   });
 
@@ -478,8 +472,12 @@ test.describe('私有 URL 验证真实场景 (#1922)', () => {
       void dialog.dismiss();
     });
 
-    await blockKnownAppExternals(page.context());
-    const token = await performRealOidcLogin(page, creds.userEmail, creds.userPassword, creds.idBaseUrl);
+    const token = await performRealOidcLogin(
+      page,
+      creds.userEmail,
+      creds.userPassword,
+      creds.accountIssuer,
+    );
     expect(token).toBeTruthy();
     network.markPreviewPhase();
 
@@ -545,8 +543,12 @@ test.describe('私有 URL 验证真实场景 (#1922)', () => {
     });
 
     const network = observeNetwork(page.context(), stackHostSet(creds));
-    await blockKnownAppExternals(page.context());
-    const token = await performRealOidcLogin(page, creds.userEmail, creds.userPassword, creds.idBaseUrl);
+    const token = await performRealOidcLogin(
+      page,
+      creds.userEmail,
+      creds.userPassword,
+      creds.accountIssuer,
+    );
     expect(token).toBeTruthy();
     network.markPreviewPhase();
 

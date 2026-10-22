@@ -229,7 +229,7 @@ function buildSettingsConfig(pendingReviews: number): SurfaceConfig {
   return {
     eyebrow: 'AgentHub Settings',
     title: 'Settings',
-    description: 'Workspace settings stay separate from the avatar profile and TokenDance ID account surface.',
+    description: 'Workspace settings stay separate from the avatar profile and TokenDance Account surface.',
     panes: [
       { label: 'Workspace settings', value: 'workspace' },
       { label: 'Appearance', value: 'appearance' },
@@ -269,7 +269,7 @@ function buildSettingsConfig(pendingReviews: number): SurfaceConfig {
         { title: 'Local runtime', rows: [{ icon: 'status', title: 'Native build readiness', subtitle: 'Build...', meta: 'Needs action' }] },
       ],
       identity: [
-        { title: 'Identity and session', rows: [{ icon: 'shield', title: 'TokenDance ID', subtitle: 'Session...', meta: 'Account', target: 'account' }] },
+        { title: 'Identity and session', rows: [{ icon: 'shield', title: 'TokenDance Account', subtitle: 'Session...', meta: 'Account', target: 'account' }] },
       ],
       approval: [
         { title: 'Approval policy', rows: [{ icon: 'approval', title: 'Approval policy', subtitle: 'Policy...', meta: 'Tasks', target: 'tasks' }] },
@@ -659,7 +659,7 @@ describe('surface fixture scenarios', () => {
     const f = getMobileFixtureForScenario('empty');
     expect(f.threads).toHaveLength(0);
     expect(f.runs).toHaveLength(0);
-    expect(f.account.tokenDanceId).toBe('signed_in');
+    expect(f.account.accountIdentity).toBe('signed_in');
   });
 
   it('delta preview scenario has 7+ changed files', () => {

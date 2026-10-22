@@ -51,11 +51,24 @@ api/
 
 本地执行链路 `Desktop -> Local Edge -> Agent Runtime adapter -> Agent CLI` 不依赖 Hub。云端 IM、多端同步、远程查看/审批和 Hub relay 才需要 Hub session。
 
-## TokenDance ID 和鉴权边界
+## TokenDance Account OIDC 和鉴权边界
 
-最终浏览器/桌面登录由 Hub Server 作为 TokenDance ID relying party 完成 OIDC Authorization Code + PKCE code exchange，验证 ID token 的 issuer/audience/JWKS，映射 `tokendance_sub` 到 Hub user，再签发 Hub access/refresh session。
+浏览器和桌面登录只使用公开的 TokenDance Account OIDC 合同。Hub Server 作为 relying party 完成 Authorization Code + PKCE：通过公开 discovery 获取端点，服务端交换 authorization code，验证 ID token 的签名、issuer、audience、nonce 和时效，再确认 UserInfo 的 `sub` 与 ID token 一致，最后按精确 `(issuer, subject)` 映射到 Hub user，并签发 Hub-local access/refresh session。
 
-现有 TokenDance ID RS256/JWKS bearer-token middleware 只是兼容路径：它不能替代 Hub session、Hub refresh token、设备证明或 Edge 权限检查。新增受保护 API 应按 Hub session + device proof + scoped authorization 设计。
+`POST /client/auth/oidc/authorize` 返回 Hub 生成的一次性 state、固定配置的 Account issuer 和公开 authorization URL；提供 `redirect_uri` 时必须精确命中 Hub 配置的 Account client callback allowlist。浏览器回调页面和 UI 属于该 callback 地址，不属于 Hub REST 合同。
+
+`POST /client/auth/oidc/callback` 必须提交 Account 返回的 `code`、`state` 和 RFC 9207 `iss`，以及原 PKCE verifier 和授权事务绑定的 device 信息。Hub 只返回自己的 HS256 access token 和 refresh token。TokenDance Account ID token、access token、refresh token 只用于公开 OIDC 登录/身份证明，**不是 Hub bearer token**；Hub REST 和 WebSocket 只接受 Hub-issued HS256 product-session access token。
+
+本目录只描述公开登录与 Hub session 边界，不暴露 Account 管理 API、内部服务端点、数据库 schema 或内部路由。Account token 不能替代 Hub refresh token、设备证明或 Edge 权限检查。
+
+OIDC 错误码与 HTTP 状态：
+
+| HTTP | `error.code` |
+|---|---|
+| 400 | `bad_request`, `oidc_invalid_state`, `oidc_issuer_invalid`, `oidc_code_exchange_failed`, `oidc_id_token_invalid` |
+| 403 | `oidc_identity_retired` |
+| 502 | `oidc_sub_not_found`, `oidc_userinfo_invalid` |
+| 500 | `internal_error` |
 
 ## 使用规则
 

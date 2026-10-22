@@ -46,7 +46,7 @@ test.describe('AgentHub Desktop smoke', () => {
     // Desktop i18n follows navigator.language; Playwright defaults to en-US,
     // so entry buttons must match both locales (#2001, same rot as #1995).
     await expect(
-      page.getByRole('button', { name: /^(使用 TokenDance ID 继续|Continue with TokenDance ID)$/ })
+      page.getByRole('button', { name: /^(使用 TokenDance Account 继续|Continue with TokenDance Account)$/ })
     ).toBeVisible();
     await expect(page.getByRole('button', { name: /Local Edge/ })).toBeVisible();
     await expect(

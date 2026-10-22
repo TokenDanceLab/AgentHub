@@ -67,14 +67,15 @@ func runRefreshFailClosedCase(t *testing.T, failClosedEnv string, blacklisted bo
 	expiry := time.Now().Add(24 * time.Hour)
 	mock.ExpectQuery(sqlRTByHash).
 		WithArgs(sqlmock.AnyArg(), 1).
-		WillReturnRows(sqlmock.NewRows([]string{"id", "user_id", "device_type", "device_id", "token_hash", "revoked", "expires_at"}).
-			AddRow("rt-1", "user-uuid", "desktop", "dev-1", tokenHash, false, expiry))
+		WillReturnRows(refreshTokenRows("rt-1", "user-uuid", "desktop", "dev-1", tokenHash, false, expiry))
 
 	// Rows where the refresh is expected to rotate all the way through:
 	// reachable-and-not-blacklisted, or outage with the default fail-open
 	// policy. Revoke the old row, then upsert the new refresh token.
 	expectedRotation := (!outage && !blacklisted) || (outage && failClosedEnv == "")
 	if expectedRotation {
+		mock.ExpectBegin()
+		expectActiveRefreshIdentity(mock)
 		mock.ExpectExec(sqlClaimRT).
 			WithArgs(true, tokenHash, false).
 			WillReturnResult(sqlmock.NewResult(0, 1))
@@ -86,8 +87,8 @@ func runRefreshFailClosedCase(t *testing.T, failClosedEnv string, blacklisted bo
 			WillReturnResult(sqlmock.NewResult(0, 1))
 		mock.ExpectQuery(sqlRTByUserDevice).
 			WithArgs("user-uuid", "desktop", "dev-1", 1).
-			WillReturnRows(sqlmock.NewRows([]string{"id", "user_id", "device_type", "device_id", "token_hash", "revoked", "expires_at"}).
-				AddRow("rt-new", "user-uuid", "desktop", "dev-1", "newhash", false, time.Now().Add(24*time.Hour)))
+			WillReturnRows(refreshTokenRows("rt-new", "user-uuid", "desktop", "dev-1", "newhash", false, time.Now().Add(24*time.Hour)))
+		mock.ExpectCommit()
 	}
 
 	cacheClient, mr := outageCacheClient(t)
@@ -170,10 +171,11 @@ func TestRefreshBlacklistCheckErrorsCounter(t *testing.T) {
 	expiry := time.Now().Add(24 * time.Hour)
 	mock.ExpectQuery(sqlRTByHash).
 		WithArgs(sqlmock.AnyArg(), 1).
-		WillReturnRows(sqlmock.NewRows([]string{"id", "user_id", "device_type", "device_id", "token_hash", "revoked", "expires_at"}).
-			AddRow("rt-1", "user-uuid", "desktop", "dev-1", tokenHash, false, expiry))
+		WillReturnRows(refreshTokenRows("rt-1", "user-uuid", "desktop", "dev-1", tokenHash, false, expiry))
 
 	// Expect rotation (fail-open default).
+	mock.ExpectBegin()
+	expectActiveRefreshIdentity(mock)
 	mock.ExpectExec(sqlClaimRT).
 		WithArgs(true, tokenHash, false).
 		WillReturnResult(sqlmock.NewResult(0, 1))
@@ -186,8 +188,8 @@ func TestRefreshBlacklistCheckErrorsCounter(t *testing.T) {
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectQuery(sqlRTByUserDevice).
 		WithArgs("user-uuid", "desktop", "dev-1", 1).
-		WillReturnRows(sqlmock.NewRows([]string{"id", "user_id", "device_type", "device_id", "token_hash", "revoked", "expires_at"}).
-			AddRow("rt-new", "user-uuid", "desktop", "dev-1", "newhash", false, time.Now().Add(24*time.Hour)))
+		WillReturnRows(refreshTokenRows("rt-new", "user-uuid", "desktop", "dev-1", "newhash", false, time.Now().Add(24*time.Hour)))
+	mock.ExpectCommit()
 
 	cacheClient, mr := outageCacheClient(t)
 	mr.Close() // Redis outage → triggers error path in enforceRefreshBlacklist

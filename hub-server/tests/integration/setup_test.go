@@ -56,13 +56,14 @@ import (
 )
 
 var (
-	ts              *httptest.Server
-	client          *http.Client
-	mgr             *ws.Manager
-	eventBus        *bus.Bus
-	db              *gorm.DB // hold reference for cleanDB
-	testCacheClient *cache.Client
-	testJWT         config.JWTConfig
+	ts                *httptest.Server
+	client            *http.Client
+	mgr               *ws.Manager
+	eventBus          *bus.Bus
+	db                *gorm.DB // hold reference for cleanDB
+	testCacheClient   *cache.Client
+	testJWT           config.JWTConfig
+	accountOIDCIssuer string
 )
 
 type testMessageServiceWithReactions struct {
@@ -83,6 +84,34 @@ func (s testMessageServiceWithReactions) ListMessageReactions(ctx context.Contex
 }
 
 func TestMain(m *testing.M) {
+	var accountOIDC *httptest.Server
+	accountOIDC = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/.well-known/openid-configuration":
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"issuer":                                         accountOIDC.URL,
+				"authorization_endpoint":                         accountOIDC.URL + "/oauth/authorize",
+				"token_endpoint":                                 accountOIDC.URL + "/oauth/token",
+				"userinfo_endpoint":                              accountOIDC.URL + "/oauth/userinfo",
+				"jwks_uri":                                       accountOIDC.URL + "/oauth/jwks",
+				"response_types_supported":                       []string{"code"},
+				"response_modes_supported":                       []string{"query"},
+				"grant_types_supported":                          []string{"authorization_code"},
+				"id_token_signing_alg_values_supported":          []string{"RS256"},
+				"token_endpoint_auth_methods_supported":          []string{"client_secret_basic"},
+				"code_challenge_methods_supported":               []string{"S256"},
+				"authorization_response_iss_parameter_supported": true,
+			})
+		case "/oauth/authorize":
+			w.Header().Set("Content-Type", "text/html")
+			_, _ = w.Write([]byte("<html><body>Account fixture</body></html>"))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	accountOIDCIssuer = accountOIDC.URL
+
 	// No -short escape hatch: this package is `//go:build integration` and only
 	// compiles/runs under `-tags integration` (backend-integration CI job with
 	// real PostgreSQL + Redis containers). The default/coverage/race lanes
@@ -101,6 +130,7 @@ func TestMain(m *testing.M) {
 
 	cfg, err := config.Load("../../configs/config.yaml")
 	if err != nil {
+		accountOIDC.Close()
 		panic(fmt.Sprintf("failed to load config: %v", err))
 	}
 	if cfg.JWT.Secret == "" {
@@ -157,19 +187,16 @@ func TestMain(m *testing.M) {
 	healthHandler := handler.NewHealthHandler(db, cacheClient, &cfg.DB, time.Now(), "test")
 	publicHandler := handler.NewPublicHandler(publicstats.NewPublicStatsService(db), time.Now())
 
-	// Handlers covered by the integration suite
-	// config.yaml ships production-empty TokenDance ID values (client_id "",
-	// redirect_uri "", allowed_redirect_uris []), which makes the OIDC
-	// authorize success path unreachable in tests. Inject a deterministic
-	// test redirect URI so authorize/callback flows are exercisable.
-	if cfg.TokenDanceID.RedirectURI == "" {
-		cfg.TokenDanceID.RedirectURI = "http://127.0.0.1:54321/callback"
+	// Handler wiring uses a loopback Account-shaped public discovery surface.
+	// This keeps integration tests hermetic while exercising the production
+	// discovery-before-authorize path.
+	cfg.AccountOIDC = config.AccountOIDCConfig{
+		IssuerURL:    accountOIDC.URL,
+		ClientID:     "agenthub-integration",
+		ClientSecret: "integration-account-client-secret-32-chars",
+		RedirectURI:  "http://127.0.0.1:53682/callback",
 	}
-	if len(cfg.TokenDanceID.AllowedRedirectURIs) == 0 {
-		cfg.TokenDanceID.AllowedRedirectURIs = []string{"http://127.0.0.1:54321/callback"}
-	}
-
-	oidcService := oidc.NewService(db, cfg.TokenDanceID, cfg.JWT, cacheClient)
+	oidcService := oidc.NewService(db, cfg.AccountOIDC, cfg.JWT, cacheClient)
 	oidcHandler := handler.NewOIDCHandler(oidcService)
 	profileService := agentprofile.NewService(db)
 	agentProfileHandler := handler.NewAgentProfileHandler(profileService)
@@ -191,7 +218,7 @@ func TestMain(m *testing.M) {
 
 	r := gin.New()
 	r.Use(gin.Recovery())
-	if err := router.SetupRoutes(r, cfg, middleware.NewAuthMiddleware(cfg, middleware.AuthDependencies{}, nil), cfg.JWT.Secret, cacheClient, authHandler, wsHandler, deviceHandler, contactHandler, sessionHandler, messageHandler, agentHandler, customAgentHandler, attachmentHandler, notificationHandler, healthHandler, publicHandler, oidcHandler, agentProfileHandler, skillHandler, mcpHandler, marketHandler, pbHandler, targetHandler, auditHandler, relayHandler, agentTeamHandler, nil, nil); err != nil {
+	if err := router.SetupRoutes(r, cfg, middleware.NewAuthMiddleware(cfg, middleware.AuthDependencies{}), cfg.JWT.Secret, cacheClient, authHandler, wsHandler, deviceHandler, contactHandler, sessionHandler, messageHandler, agentHandler, customAgentHandler, attachmentHandler, notificationHandler, healthHandler, publicHandler, oidcHandler, agentProfileHandler, skillHandler, mcpHandler, marketHandler, pbHandler, targetHandler, auditHandler, relayHandler, agentTeamHandler, nil, nil); err != nil {
 		panic(fmt.Sprintf("SetupRoutes failed: %v", err))
 	}
 
@@ -205,7 +232,9 @@ func TestMain(m *testing.M) {
 		panic(fmt.Sprintf("failed to clear test rate limits: %v", err))
 	}
 
-	os.Exit(m.Run())
+	code := m.Run()
+	accountOIDC.Close()
+	os.Exit(code)
 }
 
 // CleanDB truncates all business tables between tests for isolation.
@@ -471,12 +500,43 @@ func seedRefreshToken(t *testing.T, userID, deviceType, deviceID string) string 
 	if err != nil {
 		t.Fatalf("generate refresh token: %v", err)
 	}
+	const identityIssuer = "https://integration.example"
+	identity := &model.UserIdentity{
+		UserID:   userID,
+		Provider: model.IdentityProviderAccount,
+		Issuer:   identityIssuer,
+		Subject:  userID,
+		Status:   model.IdentityStatusActive,
+		LinkedAt: time.Now().UTC(),
+	}
+	result := db.Clauses(clause.OnConflict{
+		Columns:   []clause.Column{{Name: "issuer"}, {Name: "subject"}},
+		DoNothing: true,
+	}).Create(identity)
+	if result.Error != nil {
+		t.Fatalf("seed active identity for user %s: %v", userID, result.Error)
+	}
+	if result.RowsAffected == 0 {
+		identity = &model.UserIdentity{}
+	}
+	if identity.ID == "" {
+		if err := db.Where("issuer = ? AND subject = ?", identityIssuer, userID).First(identity).Error; err != nil {
+			t.Fatalf("load active identity for user %s: %v", userID, err)
+		}
+	}
+	if identity.Status != model.IdentityStatusActive {
+		t.Fatalf("seeded identity for user %s is %q", userID, identity.Status)
+	}
+	if identity.UserID != userID {
+		t.Fatalf("seeded identity for user %s belongs to %s", userID, identity.UserID)
+	}
 	rt := &model.RefreshToken{
-		UserID:     userID,
-		DeviceType: deviceType,
-		DeviceID:   deviceID,
-		TokenHash:  jwtutil.HashRefreshToken(raw),
-		ExpiresAt:  time.Now().Add(testJWT.RefreshTTL),
+		UserID:         userID,
+		DeviceType:     deviceType,
+		DeviceID:       deviceID,
+		UserIdentityID: &identity.ID,
+		TokenHash:      jwtutil.HashRefreshToken(raw),
+		ExpiresAt:      time.Now().Add(testJWT.RefreshTTL),
 	}
 	if err := repository.UpsertRefreshToken(db, rt); err != nil {
 		t.Fatalf("seed refresh token for user %s device %s: %v", userID, deviceID, err)

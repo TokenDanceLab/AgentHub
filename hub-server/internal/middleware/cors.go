@@ -54,12 +54,32 @@ func defaultCORSOrigins(env string) string {
 }
 
 func validateCORSOriginsForEnvironment(env string, origins []string) error {
-	if !isProductionEnvironment(env) {
-		return nil
-	}
-	for _, origin := range origins {
-		if isLoopbackOrigin(origin) {
-			return fmt.Errorf("production CORS origin must not be loopback or localhost: %s", origin)
+	production := isProductionEnvironment(env)
+	seen := make(map[string]struct{}, len(origins))
+	for _, raw := range origins {
+		origin := strings.TrimSpace(raw)
+		if origin == "" || origin == "*" {
+			return fmt.Errorf("CORS origin must be an exact HTTP(S) origin, not wildcard or empty")
+		}
+		parsed, err := url.Parse(origin)
+		if err != nil || parsed.Host == "" || parsed.User != nil ||
+			(parsed.Scheme != "http" && parsed.Scheme != "https") ||
+			parsed.Path != "" ||
+			parsed.RawQuery != "" || parsed.Fragment != "" {
+			return fmt.Errorf("CORS origin must be an exact HTTP(S) origin without credentials, path, query or fragment: %s", origin)
+		}
+		normalized := parsed.Scheme + "://" + parsed.Host
+		if _, exists := seen[normalized]; exists {
+			return fmt.Errorf("CORS origin is duplicated: %s", origin)
+		}
+		seen[normalized] = struct{}{}
+		if production {
+			if parsed.Scheme != "https" {
+				return fmt.Errorf("production CORS origin must use https: %s", origin)
+			}
+			if isLoopbackOrigin(origin) || isPrivateOriginHost(parsed.Hostname()) {
+				return fmt.Errorf("production CORS origin must be public and must not be loopback or private: %s", origin)
+			}
 		}
 	}
 	return nil
@@ -85,6 +105,25 @@ func isLoopbackOrigin(origin string) bool {
 	}
 	ip := net.ParseIP(host)
 	return ip != nil && ip.IsLoopback()
+}
+
+func isPrivateOriginHost(host string) bool {
+	host = strings.TrimSuffix(strings.ToLower(strings.TrimSpace(host)), ".")
+	// Tauri's packaged webview uses this reserved custom-protocol origin. It
+	// does not resolve to a network service, so it is the one allowed
+	// *.localhost origin in production.
+	if host == "tauri.localhost" {
+		return false
+	}
+	if host == "localhost" || strings.HasSuffix(host, ".localhost") {
+		return true
+	}
+	ip := net.ParseIP(host)
+	if ip == nil {
+		return false
+	}
+	return !ip.IsGlobalUnicast() || ip.IsPrivate() || ip.IsLoopback() ||
+		ip.IsLinkLocalUnicast() || ip.IsUnspecified() || ip.IsMulticast()
 }
 
 func splitAndTrim(s string) []string {

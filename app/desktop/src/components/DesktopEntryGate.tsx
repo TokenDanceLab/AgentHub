@@ -4,7 +4,7 @@ import { DesignNavIcon } from '@agenthub/workbench';
 import { useAuth } from '@/hooks/useAuth';
 import { OidcError } from '@/api/hubAuth';
 import agentHubLogo from '@/assets/agenthub-product-icon-rounded.svg';
-import tokenDanceLogo from '@/assets/tokendance-product-mark-transparent.svg';
+import accountLogo from '@/assets/tokendance-product-mark-transparent.svg';
 import styles from './DesktopEntryGate.module.css';
 
 interface DesktopEntryGateProps {
@@ -17,12 +17,12 @@ interface DesktopEntryGateProps {
 
 export function DesktopEntryGate({ onLoginSuccess, onContinueDemo, onConnectEdge, onToggleTheme, edgeOnline }: DesktopEntryGateProps) {
   const { t } = useTranslation();
-  const { loginWithTokenDance, tryAutoLogin, user } = useAuth();
+  const { loginWithAccount, tryAutoLogin, user } = useAuth();
   const [loginPending, setLoginPending] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
 
   // On mount, try auto-login — this handles the OIDC callback URL case
-  // where the browser returns to localhost:5173/auth/tokendance/callback?code=xxx&state=yyy
+  // where the browser returns to /auth/account/callback?code=xxx&state=yyy&iss=...
   // NOTE: tryAutoLogin is wrapped in useCallback with a stable [auth] singleton (useAuth.ts).
   // If the singleton pattern is changed, this effect may re-fire spuriously.
   useEffect(() => {
@@ -40,12 +40,12 @@ export function DesktopEntryGate({ onLoginSuccess, onContinueDemo, onConnectEdge
 
   if (user) return null;
 
-  async function handleTokenDanceLogin() {
+  async function handleAccountLogin() {
     setLoginError(null);
     setLoginPending(true);
     try {
-      await loginWithTokenDance();
-      // In Vite dev mode, loginWithTokenDance() does window.location.assign()
+      await loginWithAccount();
+      // In Vite dev mode, loginWithAccount() does window.location.assign()
       // which unloads the page. The callback page reload will trigger the
       // tryAutoLogin → user check → onLoginSuccess path above.
       // In Tauri mode, we reach this point after the callback is processed.
@@ -55,7 +55,7 @@ export function DesktopEntryGate({ onLoginSuccess, onContinueDemo, onConnectEdge
         setLoginError(t(`auth.error.oidc.${err.code}` as const, { detail: err.detail ?? '', defaultValue: 'Login failed' }));
       } else {
         const message = err instanceof Error ? err.message : '';
-        setLoginError(message || t('auth.error.tokenDanceUnavailable'));
+        setLoginError(message || t('auth.error.accountUnavailable'));
       }
     }
   }
@@ -77,7 +77,7 @@ export function DesktopEntryGate({ onLoginSuccess, onContinueDemo, onConnectEdge
         <div className={styles.actions}>
           <button
             className={styles.primaryButton}
-            onClick={handleTokenDanceLogin}
+            onClick={handleAccountLogin}
             disabled={loginPending}
             type="button"
           >
@@ -85,13 +85,13 @@ export function DesktopEntryGate({ onLoginSuccess, onContinueDemo, onConnectEdge
               alt=""
               aria-hidden="true"
               className={styles.identityLogo}
-              data-testid="tokendance-id-logo"
-              src={tokenDanceLogo}
+              data-testid="account-logo"
+              src={accountLogo}
             />
             <span>
               {loginPending
-                ? t('desktopEntry.redirecting', { defaultValue: '正在跳转 TokenDance ID…' })
-                : t('desktopEntry.continueWithTokenDance', { defaultValue: '使用 TokenDance ID 继续' })}
+                ? t('desktopEntry.redirecting', { defaultValue: '正在跳转 TokenDance Account…' })
+                : t('desktopEntry.continueWithAccount', { defaultValue: '使用 TokenDance Account 继续' })}
             </span>
           </button>
           <button
@@ -120,7 +120,7 @@ export function DesktopEntryGate({ onLoginSuccess, onContinueDemo, onConnectEdge
         </div>
         {loginPending ? (
           <p className={styles.status} role="status">
-            {t('desktopEntry.waitingForLogin', { defaultValue: '正在等待 TokenDance ID 登录…' })}
+            {t('desktopEntry.waitingForLogin', { defaultValue: '正在等待 TokenDance Account 登录…' })}
           </p>
         ) : null}
         {loginError ? (

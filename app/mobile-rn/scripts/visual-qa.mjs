@@ -128,7 +128,7 @@ const scenes = [
     locale: 'zh-CN',
     viewport: { width: 390, height: 844 },
     path: '/',
-    expectedTexts: ['身份与会话', 'TokenDance ID', 'AgentHub', 'Agent Profiles', '切换工作区', 'Demo User'],
+    expectedTexts: ['身份与会话', 'TokenDance Account', 'AgentHub', 'Agent Profiles', '切换工作区', 'Demo User'],
     expectTabsHidden: true,
     actions: [
       { role: 'button', namePattern: 'Open account drawer|打开账号抽屉' },
@@ -139,7 +139,7 @@ const scenes = [
     locale: 'en-US',
     viewport: { width: 390, height: 844 },
     path: '/',
-    expectedTexts: ['Identity and session', 'TokenDance ID', 'AgentHub', 'Agent Profiles', 'Switch workspace', 'OLED selected'],
+    expectedTexts: ['Identity and session', 'TokenDance Account', 'AgentHub', 'Agent Profiles', 'Switch workspace', 'OLED selected'],
     expectTabsHidden: true,
     expectedDarkSurfaceMaxLuminance: 20,
     actions: [
@@ -200,7 +200,7 @@ const scenes = [
       'AgentHub Mobile 工作台视觉校准',
       'Review approval',
       '设计系统进入移动端视觉审查。',
-      'TokenDance ID identity',
+      'TokenDance Account identity',
       'Sync status',
     ],
     forbiddenTexts: ['Back to messages'],

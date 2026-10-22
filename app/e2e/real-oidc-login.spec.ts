@@ -1,4 +1,4 @@
-import { test, expect, type Browser, type BrowserContext, type Page } from '@playwright/test';
+import { test, expect, type BrowserContext, type Page } from '@playwright/test';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -7,10 +7,10 @@ import { fileURLToPath } from 'node:url';
  * AgentHub real OIDC browser E2E — 真浏览器 × 真本地栈。
  *
  * 与 chat-real.spec.ts（dev-secret 自签 JWT 旁路 + API 级断言）互补：
- * 本 spec 走真实的 TokenDance ID OIDC Authorization Code + PKCE 浏览器
+ * 本 spec 走真实的 TokenDance Account OIDC Authorization Code + PKCE 浏览器
  * 登录动线（禁用任何自签 JWT/旁路），并断言聊天消息真实落 hub。
  *
- * 前置（本机全栈：TokenDance ID :3000 / hub :8080 / edge :3210 / web :5174）：
+ * 前置（operator Account + hub :8080 / edge :3210 / web :5174）：
  *   bash scripts/e2e/provision-real-e2e-stack.sh
  *   （供给测试账号并落凭据到 tests/artifacts/real-e2e-account.env，gitignored）
  *
@@ -18,13 +18,13 @@ import { fileURLToPath } from 'node:url';
  *   cd app/web && pnpm exec playwright test --config playwright.real.config.ts \
  *     --project=chromium real-oidc-login.spec.ts
  *
- * 证据等级：observed-local（real_tested=true，本地单机真栈）。
+ * 证据等级：approved-real（真实外部 Account issuer；real_tested=true）。
  * CI 状态：非 PR 检查；由 dispatch-only 的 real-e2e-stack lane
  * （checks.yml → scripts/e2e/run-real-e2e-lane.sh）运行。
  */
 
 interface RealE2ECredentials {
-  idBaseUrl: string;
+  accountIssuer: string;
   hubBaseUrl: string;
   webBaseUrl: string;
   userEmail: string;
@@ -42,10 +42,8 @@ const SPEC_DIR = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(SPEC_DIR, '..', '..');
 const ACCOUNT_ENV_PATH = path.join(REPO_ROOT, 'tests', 'artifacts', 'real-e2e-account.env');
 const WORKBENCH_PATH = '/workbench/';
-const CALLBACK_PATH = '/workbench/auth/tokendance/callback';
+const CALLBACK_PATH = '/workbench/auth/account/callback';
 const HUB_TOKEN_STORAGE_KEY = 'agenthub_hub_token';
-const PRIMARY_DISPLAY_NAME = 'AgentHub E2E User';
-const PARTNER_DISPLAY_NAME = 'AgentHub E2E Partner';
 
 function envValue(key: string): string {
   return process.env[key]?.trim() ?? '';
@@ -66,7 +64,7 @@ function loadCredentials(): RealE2ECredentials | null {
   const file = readAccountEnvFile();
   const pick = (envKey: string, fileKey: string): string => envValue(envKey) || file[fileKey] || '';
   const credentials: RealE2ECredentials = {
-    idBaseUrl: pick('AGENTHUB_E2E_ID_BASE_URL', 'AGENTHUB_E2E_ID_BASE_URL') || 'http://127.0.0.1:3000',
+    accountIssuer: pick('AGENTHUB_E2E_ACCOUNT_ISSUER', 'AGENTHUB_E2E_ACCOUNT_ISSUER'),
     hubBaseUrl: pick('AGENTHUB_E2E_HUB_BASE_URL', 'AGENTHUB_E2E_HUB_BASE_URL') || 'http://127.0.0.1:8080',
     webBaseUrl: pick('AGENTHUB_E2E_WEB_BASE_URL', 'AGENTHUB_E2E_WEB_BASE_URL') || 'http://127.0.0.1:5174',
     userEmail: pick('AGENTHUB_E2E_USER_EMAIL', 'AGENTHUB_E2E_USER_EMAIL'),
@@ -74,6 +72,7 @@ function loadCredentials(): RealE2ECredentials | null {
     partnerEmail: pick('AGENTHUB_E2E_PARTNER_EMAIL', 'AGENTHUB_E2E_PARTNER_EMAIL'),
     partnerPassword: pick('AGENTHUB_E2E_PARTNER_PASSWORD', 'AGENTHUB_E2E_PARTNER_PASSWORD'),
   };
+  if (!credentials.accountIssuer) return null;
   if (!credentials.userEmail || !credentials.userPassword) return null;
   if (!credentials.partnerEmail || !credentials.partnerPassword) return null;
   return credentials;
@@ -92,29 +91,25 @@ async function urlReachable(url: string): Promise<boolean> {
 }
 
 async function stackIsUp(credentials: RealE2ECredentials): Promise<boolean> {
-  const idOk = await urlReachable(`${credentials.idBaseUrl}/.well-known/openid-configuration`);
+  const accountOk = await urlReachable(`${credentials.accountIssuer}/.well-known/openid-configuration`);
   const hubOk = await urlReachable(`${credentials.hubBaseUrl}/health`);
   const webOk = await urlReachable(`${credentials.webBaseUrl}${WORKBENCH_PATH}`);
-  return idOk && hubOk && webOk;
+  return accountOk && hubOk && webOk;
 }
 
 const credentials = loadCredentials();
 
 /**
- * 本机离线环境无法加载 Cloudflare Turnstile CDN 脚本；abort 触发前端组件的
- * 错误分支从而允许提交。本 lane 使用的本地 ID 实例未配置 Turnstile challenge，
- * 因此该处理只影响测试环境。
- */
-async function blockTurnstileCdn(context: BrowserContext): Promise<void> {
-  await context.route('**/challenges.cloudflare.com/**', (route) => route.abort());
-}
-
-/**
- * 真实 OIDC 浏览器登录：工作台触发 → TokenDance ID 登录页 → 提交凭据 →
+ * 真实 OIDC 浏览器登录：工作台触发 → TokenDance Account 登录页 → 提交凭据 →
  * consent 授权页 → 回调回 web → hub 交换出会话 token。
  * 返回登录后 sessionStorage 中 hub 颁发的 access token。
  */
-async function performRealOidcLogin(page: Page, email: string, password: string, idBaseUrl: string): Promise<string> {
+async function performRealOidcLogin(
+  page: Page,
+  email: string,
+  password: string,
+  accountIssuer: string,
+): Promise<string> {
   await page.goto(WORKBENCH_PATH, { waitUntil: 'domcontentloaded' });
 
   // 未认证时工作台无直接登录按钮；在 composer 提交触发 ensureAuth 打开登录浮层。
@@ -123,33 +118,42 @@ async function performRealOidcLogin(page: Page, email: string, password: string,
   await composer.fill('real-e2e: open sign-in');
   await composer.press('Enter');
 
-  const loginButton = page.getByRole('button', { name: /Continue with TokenDance|使用 TokenDance ID 登录/i }).first();
+  const loginButton = page.getByRole('button', {
+    name: /Continue with TokenDance Account|使用 TokenDance Account 登录/i,
+  }).first();
   await expect(loginButton).toBeVisible({ timeout: 10_000 });
   await loginButton.click();
 
-  // 真实重定向到 TokenDance ID（OIDC authorize → 302 到 /login）。
+  // 真实重定向到 external Account（/oauth/authorize → login/consent）。
   // 用 toHaveURL 轮询而不是 waitForURL：后者绑定导航生命周期事件，
   // 在 vite 快速响应下会错过已提交的导航（实测 flake）。
-  const idHost = new URL(idBaseUrl).host.replace(/\./g, '\\.');
-  await expect(page).toHaveURL(new RegExp(`${idHost}/login`), { timeout: 20_000 });
+  const accountOrigin = new URL(accountIssuer).origin;
+  await expect.poll(() => {
+    try {
+      return new URL(page.url()).origin;
+    } catch {
+      return '';
+    }
+  }, { timeout: 20_000 }).toBe(accountOrigin);
 
-  // TokenDance ID 真实登录表单。
+  // TokenDance Account 的两步登录表单；test identity 不得依赖 MFA/passkey。
   await expect(page.locator('#login-email')).toBeVisible({ timeout: 15_000 });
   await page.locator('#login-email').fill(email);
-  await page.locator('#login-password').fill(password);
-  const submitLogin = page.locator('button.login-submit');
+  const next = page.getByRole('button', { name: /^(Next|下一步)$/i });
+  await expect(next).toBeEnabled({ timeout: 10_000 });
+  await next.click();
+  await page.locator('#login-secret').fill(password);
+  const submitLogin = page.getByRole('button', { name: /^(Sign in|登录)$/i });
   await expect(submitLogin).toBeEnabled({ timeout: 20_000 });
   await submitLogin.click();
 
-  // consent 授权页（服务端渲染；client 未信任且 prompt=consent）。
-  const consentForm = page.locator('form[action="/oidc/authorize/confirm"]');
-  await expect(consentForm).toBeVisible({ timeout: 20_000 });
-  const authorizationRequestId = await consentForm.locator('input[name="authorization_request_id"]').inputValue();
-  expect(authorizationRequestId.length).toBeGreaterThan(0);
-  const approveButton = consentForm.locator('button[type="submit"]');
-  await expect(approveButton).toBeVisible();
+  // Account consent is React UI, not a provider form submission.
+  await expect(page.getByRole('heading', { name: /Allow access|允许访问/ })).toBeVisible({
+    timeout: 20_000,
+  });
+  const approveButton = page.getByRole('button', { name: /^(Allow access|允许访问)$/i });
 
-  // 批准授权 → 302 回 web 回调（带 code + state）。
+  // 批准授权 → redirect 回 Web（带 code + state + RFC 9207 iss）。
   // 用 framenavigated 事件捕获回调 URL：SPA 换完 token 后会立刻
   // replaceState 清掉回调路由，轮询/生命周期等待都可能错过。
   let observedCallbackUrl: string | null = null;
@@ -168,6 +172,7 @@ async function performRealOidcLogin(page: Page, email: string, password: string,
   const callbackUrl = new URL(String(observedCallbackUrl));
   expect(callbackUrl.searchParams.get('code')).toBeTruthy();
   expect(callbackUrl.searchParams.get('state')).toBeTruthy();
+  expect(callbackUrl.searchParams.get('iss')).toBe(accountIssuer);
 
   // web SPA 用 PKCE verifier 与 hub 交换真实会话（无旁路）。
   await expect
@@ -178,7 +183,7 @@ async function performRealOidcLogin(page: Page, email: string, password: string,
     .not.toBeNull();
 
   // 回调路由被清理，回到工作台。
-  await expect(page).not.toHaveURL(/auth\/tokendance\/callback/, { timeout: 15_000 });
+  await expect(page).not.toHaveURL(/auth\/account\/callback/, { timeout: 15_000 });
   const token = await page.evaluate((key) => sessionStorage.getItem(key), HUB_TOKEN_STORAGE_KEY);
   expect(token).toBeTruthy();
   return String(token);
@@ -218,7 +223,7 @@ test.describe('真实 OIDC 浏览器登录与聊天动线', () => {
   test.beforeEach(async () => {
     test.skip(!credentials, 'missing test credentials: run bash scripts/e2e/provision-real-e2e-stack.sh first');
     if (credentials && !(await stackIsUp(credentials))) {
-      test.skip(true, 'local real stack not up: start TokenDance ID :3000 / hub :8080 / web :5174 first');
+      test.skip(true, 'real stack not up: configure external Account and start hub :8080 / web :5174 first');
     }
   });
 
@@ -226,19 +231,25 @@ test.describe('真实 OIDC 浏览器登录与聊天动线', () => {
     test.setTimeout(120_000);
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- beforeAll skip 已保证非空
     const creds = credentials!;
-    await blockTurnstileCdn(page.context());
 
-    const token = await performRealOidcLogin(page, creds.userEmail, creds.userPassword, creds.idBaseUrl);
+    const token = await performRealOidcLogin(
+      page,
+      creds.userEmail,
+      creds.userPassword,
+      creds.accountIssuer,
+    );
 
     // hub 以真实 OIDC 映射出的用户身份应答。
     const me = await hubMe(page.request, creds.hubBaseUrl, token);
-    expect(me.nickname).toBe(PRIMARY_DISPLAY_NAME);
+    expect(String(me.nickname ?? '').trim()).not.toBe('');
     expect(String(me.id ?? '')).toMatch(/^[0-9a-f-]{36}$/);
 
     // 已认证工作台：导航存在、登录浮层消失。
     await expect(page.getByRole('button', { name: 'Chat', exact: true })).toBeVisible({ timeout: 15_000 });
     await expect(
-      page.getByRole('button', { name: /Continue with TokenDance|使用 TokenDance ID 登录/i }),
+      page.getByRole('button', {
+        name: /Continue with TokenDance Account|使用 TokenDance Account 登录/i,
+      }),
     ).toHaveCount(0);
   });
 
@@ -246,28 +257,31 @@ test.describe('真实 OIDC 浏览器登录与聊天动线', () => {
     test.setTimeout(240_000);
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- beforeAll skip 已保证非空
     const creds = credentials!;
-    await blockTurnstileCdn(page.context());
 
     // ── 主账号真实登录 ──
-    const primaryToken = await performRealOidcLogin(page, creds.userEmail, creds.userPassword, creds.idBaseUrl);
+    const primaryToken = await performRealOidcLogin(
+      page,
+      creds.userEmail,
+      creds.userPassword,
+      creds.accountIssuer,
+    );
     const primaryMe = await hubMe(page.request, creds.hubBaseUrl, primaryToken);
     const primaryId = String(primaryMe.id);
 
     // ── 陪聊账号真实登录（独立上下文）──
     const partnerContext: BrowserContext = await browser.newContext({ locale: 'en-US' });
     try {
-      await blockTurnstileCdn(partnerContext);
       const partnerPage = await partnerContext.newPage();
       const partnerToken = await performRealOidcLogin(
         partnerPage,
         creds.partnerEmail,
         creds.partnerPassword,
-        creds.idBaseUrl,
+        creds.accountIssuer,
       );
       const partnerMe = await hubMe(partnerPage.request, creds.hubBaseUrl, partnerToken);
       const partnerId = String(partnerMe.id);
       expect(partnerId).not.toBe(primaryId);
-      expect(partnerMe.nickname).toBe(PARTNER_DISPLAY_NAME);
+      expect(String(partnerMe.nickname ?? '').trim()).not.toBe('');
 
       // ── 建立好友关系（私聊会话要求双方为好友）──
       const contactsBefore = await hubJson(page.request, 'get', `${creds.hubBaseUrl}/client/contacts`, primaryToken);

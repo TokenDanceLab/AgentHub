@@ -14,16 +14,16 @@ import (
 // Domain sections and env helpers live in companion files.
 
 type Config struct {
-	Server       ServerConfig       `mapstructure:"server"`
-	DB           DBConfig           `mapstructure:"db"`
-	Redis        RedisConfig        `mapstructure:"redis"`
-	JWT          JWTConfig          `mapstructure:"jwt"`
-	Upload       UploadConfig       `mapstructure:"upload"`
-	S3           S3Config           `mapstructure:"s3"`
-	TokenDanceID TokenDanceIDConfig `mapstructure:"tokendance_id"`
-	AgentTeam    AgentTeamConfig    `mapstructure:"agent_team"`
-	Egress       EgressConfig       `mapstructure:"egress"`
-	Edge         EdgeDispatchConfig `mapstructure:"edge"`
+	Server      ServerConfig       `mapstructure:"server"`
+	DB          DBConfig           `mapstructure:"db"`
+	Redis       RedisConfig        `mapstructure:"redis"`
+	JWT         JWTConfig          `mapstructure:"jwt"`
+	Upload      UploadConfig       `mapstructure:"upload"`
+	S3          S3Config           `mapstructure:"s3"`
+	AccountOIDC AccountOIDCConfig  `mapstructure:"account_oidc"`
+	AgentTeam   AgentTeamConfig    `mapstructure:"agent_team"`
+	Egress      EgressConfig       `mapstructure:"egress"`
+	Edge        EdgeDispatchConfig `mapstructure:"edge"`
 }
 
 // EdgeDispatchConfig is the Hub→trusted-Edge dispatch client config (#1549).
@@ -85,10 +85,10 @@ func Load(configPath string) (*Config, error) {
 	v.SetDefault("edge.auth_token", "")
 	v.SetDefault("edge.device_id", "")
 	v.SetDefault("edge.timeout", 10*time.Second)
-	// #1564: TokenDance ID outbound client policy defaults (10s timeout,
-	// 64 KiB fail-closed response cap) keep the historical behavior.
-	v.SetDefault("tokendance_id.http_timeout", 10*time.Second)
-	v.SetDefault("tokendance_id.max_response_body_bytes", int64(64*1024))
+	// Account OIDC outbound client policy defaults (10s timeout, 64 KiB
+	// fail-closed response cap).
+	v.SetDefault("account_oidc.http_timeout", 10*time.Second)
+	v.SetDefault("account_oidc.max_response_body_bytes", int64(64*1024))
 	setAgentTeamDefaults(v)
 
 	// A missing config file is valid for env-only deployments (including the
@@ -111,14 +111,6 @@ func Load(configPath string) (*Config, error) {
 		return nil, err
 	}
 
-	// Auto-derive JWKS URI from issuer URL when not explicitly set.
-	if cfg.TokenDanceID.JWKSURI == "" && cfg.TokenDanceID.IssuerURL != "" {
-		cfg.TokenDanceID.JWKSURI = cfg.TokenDanceID.IssuerURL + "/oidc/jwks"
-	}
-	// Auto-derive token endpoint from issuer URL when not explicitly set.
-	if cfg.TokenDanceID.TokenURL == "" && cfg.TokenDanceID.IssuerURL != "" {
-		cfg.TokenDanceID.TokenURL = cfg.TokenDanceID.IssuerURL + "/oidc/token"
-	}
 	cfg.AgentTeam = cfg.AgentTeam.withDefaults()
 
 	return &cfg, nil
@@ -143,7 +135,7 @@ func (c *Config) Validate() error {
 	if err := c.validateJWT(); err != nil {
 		return err
 	}
-	if err := c.validateTokenDanceID(); err != nil {
+	if err := c.validateAccountOIDC(); err != nil {
 		return err
 	}
 

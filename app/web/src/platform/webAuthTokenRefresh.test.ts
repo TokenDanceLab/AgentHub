@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { AppError } from '@shared/errors';
 
 const refreshMock = vi.hoisted(() => vi.fn());
 
@@ -38,7 +39,7 @@ describe('refreshWebHubAccessTokenOnce (#1816)', () => {
     await tokenStorage.saveStoredHubAccessToken('stale-access');
     await tokenStorage.saveStoredHubRefreshToken('dead-refresh');
     useHubStore.getState().setAuthenticated(true, 'user-1', 'alice');
-    refreshMock.mockRejectedValueOnce(new Error('refresh token revoked'));
+    refreshMock.mockRejectedValueOnce(new AppError({ error: { code: 'auth_refresh_invalid', message: 'refresh token revoked' } }, 401));
 
     const token = await refreshWebHubAccessTokenOnce();
 
@@ -52,6 +53,22 @@ describe('refreshWebHubAccessTokenOnce (#1816)', () => {
     expect(useHubStore.getState().authenticated).toBe(false);
     expect(useHubStore.getState().userId).toBeNull();
     expect(useHubStore.getState().showAuthModal).toBe(true);
+  });
+
+  it('preserves the session when refresh fails transiently', async () => {
+    const { useHubStore, refreshWebHubAccessTokenOnce, tokenStorage } = await loadModules();
+    await tokenStorage.saveStoredHubAccessToken('stale-access');
+    await tokenStorage.saveStoredHubRefreshToken('valid-refresh');
+    useHubStore.getState().setAuthenticated(true, 'user-1', 'alice');
+    refreshMock.mockRejectedValueOnce(new AppError({ error: { code: 'unavailable', message: 'hub down' } }, 503));
+
+    const token = await refreshWebHubAccessTokenOnce();
+
+    expect(token).toBeNull();
+    expect(await tokenStorage.loadStoredHubRefreshToken()).toBe('valid-refresh');
+    expect(await tokenStorage.loadStoredHubAccessToken()).toBe('stale-access');
+    expect(useHubStore.getState().authenticated).toBe(true);
+    expect(useHubStore.getState().showAuthModal).toBe(false);
   });
 
   it('keeps the session and persists new tokens when the refresh exchange succeeds', async () => {

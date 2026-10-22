@@ -32,12 +32,14 @@ vi.mock('@tauri-apps/plugin-shell', () => ({
 // ── Helpers ───────────────────────────────────────
 
 const PENDING_KEY = 'agenthub_oidc_pkce_pending';
+const ACCOUNT_ISSUER = 'https://account.example';
 
 const pending: BrowserOIDCPending = {
   state: 'server-state',
   codeVerifier: 'verifier-1',
   deviceId: 'device-1',
-  redirectUri: 'http://127.0.0.1:49152/callback',
+  redirectUri: 'http://127.0.0.1:53682/callback',
+  issuer: ACCOUNT_ISSUER,
   createdAt: 1_700_000_000_000,
 };
 
@@ -90,22 +92,28 @@ describe('desktopPorts (Tauri mode)', () => {
   });
 
   it('starts the local callback server and resolves the callback on oidc-callback', async () => {
-    invokeMock.mockResolvedValueOnce(49152);
+    invokeMock.mockResolvedValueOnce(53682);
     const captured = captureListeners();
 
     const ports = createDesktopHubAuthPorts();
     const { redirectUri, callback } = await ports.callbackChannel.start();
 
     expect(invokeMock).toHaveBeenCalledWith('start_oidc_callback_server');
-    expect(redirectUri).toBe('http://127.0.0.1:49152/callback');
+    expect(redirectUri).toBe('http://127.0.0.1:53682/callback');
 
     const resultPromise = callback.catch((err: unknown) => err);
-    captured['oidc-callback']!({ payload: { code: 'code-1', state: 'server-state' } });
-    await expect(resultPromise).resolves.toEqual({ code: 'code-1', state: 'server-state' });
+    captured['oidc-callback']!({
+      payload: { code: 'code-1', state: 'server-state', iss: ACCOUNT_ISSUER },
+    });
+    await expect(resultPromise).resolves.toEqual({
+      code: 'code-1',
+      state: 'server-state',
+      iss: ACCOUNT_ISSUER,
+    });
   });
 
   it('rejects the callback with an OidcError on oidc-callback-error', async () => {
-    invokeMock.mockResolvedValueOnce(49152);
+    invokeMock.mockResolvedValueOnce(53682);
     const captured = captureListeners();
 
     const ports = createDesktopHubAuthPorts();
@@ -126,7 +134,7 @@ describe('desktopPorts (Tauri mode)', () => {
   it('times out the callback after 5 minutes', async () => {
     vi.useFakeTimers();
     try {
-      invokeMock.mockResolvedValueOnce(49152);
+      invokeMock.mockResolvedValueOnce(53682);
       captureListeners();
 
       const ports = createDesktopHubAuthPorts();
@@ -162,7 +170,7 @@ describe('desktopPorts (Tauri mode)', () => {
 
   it('completes the full Tauri OIDC login flow via the shared state machine', async () => {
     invokeMock.mockImplementation(async (command: string) => {
-      if (command === 'start_oidc_callback_server') return 49152;
+      if (command === 'start_oidc_callback_server') return 53682;
       if (command === 'read_hub_access_token' || command === 'read_hub_refresh_token') return null;
       return undefined;
     });
@@ -177,13 +185,14 @@ describe('desktopPorts (Tauri mode)', () => {
         expect(body).toMatchObject({
           code_challenge_method: 'S256',
           device_type: 'desktop',
-          redirect_uri: 'http://127.0.0.1:49152/callback',
+          redirect_uri: 'http://127.0.0.1:53682/callback',
         });
         expect(body.device_id).toEqual(expect.any(String));
         return new Response(
           JSON.stringify({
             state: 'server-state',
             authorization_url: 'https://id.example/authorize?state=server-state',
+            issuer: ACCOUNT_ISSUER,
           }),
           { status: 200, headers: { 'Content-Type': 'application/json' } },
         );
@@ -194,8 +203,9 @@ describe('desktopPorts (Tauri mode)', () => {
         expect(body).toMatchObject({
           code: 'code-1',
           state: 'server-state',
+          iss: ACCOUNT_ISSUER,
           device_type: 'desktop',
-          redirect_uri: 'http://127.0.0.1:49152/callback',
+          redirect_uri: 'http://127.0.0.1:53682/callback',
         });
         expect(body.code_verifier).toMatch(/^[A-Za-z0-9_-]{43}$/);
         return new Response(
@@ -233,16 +243,18 @@ describe('desktopPorts (Tauri mode)', () => {
     const { createHubAuth } = await import('../hubAuth');
     const auth = createHubAuth();
 
-    const loginPromise = auth.loginWithTokenDance();
+    const loginPromise = auth.loginWithAccount();
     await vi.waitFor(() => expect(captured['oidc-callback']).toBeDefined());
-    captured['oidc-callback']!({ payload: { code: 'code-1', state: 'server-state' } });
+    captured['oidc-callback']!({
+      payload: { code: 'code-1', state: 'server-state', iss: ACCOUNT_ISSUER },
+    });
     await expect(loginPromise).resolves.toBeUndefined();
 
     expect(auth.getState()).toMatchObject({
       token: 'access-tauri',
       refreshToken: 'refresh-tauri',
       isAuthenticated: true,
-      tokenSource: 'tokendance',
+      tokenSource: 'account',
       user: { username: 'tauri-user' },
     });
     // Tauri mode persists tokens via the OS credential store, never

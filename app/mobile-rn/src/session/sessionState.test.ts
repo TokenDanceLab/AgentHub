@@ -26,7 +26,7 @@ function createMemoryAdapter(initial?: Record<string, string>) {
 }
 
 describe('Hub session reducer', () => {
-  it('stores only Hub-issued session state after TokenDance ID exchange', () => {
+  it('stores only Hub-issued session state after TokenDance Account exchange', () => {
     const next = reduceHubSession(
       { status: 'missing' },
       {
@@ -46,7 +46,7 @@ describe('Hub session reducer', () => {
       expiresAt: '2026-06-08T10:30:00.000Z',
     });
     expect(Object.keys(next)).not.toContain('providerAccessToken');
-    expect(Object.keys(next)).not.toContain('tokenDanceIdToken');
+    expect(Object.keys(next)).not.toContain('accountIdentityToken');
   });
 
   it('marks stale sessions expired without dropping refresh context', () => {
@@ -150,7 +150,7 @@ describe('Hub session expiry and identity boundary', () => {
     ).toBe(false);
   });
 
-  it('selects the Hub and TokenDance ID boundary without provider tokens', () => {
+  it('selects the Hub and TokenDance Account boundary without provider tokens', () => {
     expect(
       getHubSessionBoundary({
         status: 'active',
@@ -160,10 +160,10 @@ describe('Hub session expiry and identity boundary', () => {
       }),
     ).toEqual({
       hubSessionStatus: 'active',
-      tokenDanceIdSubject: 'tokendance-alice',
+      accountSubject: 'tokendance-alice',
       hasHubAccessToken: true,
       hasHubRefreshToken: true,
-      storesTokenDanceIdToken: false,
+      storesProviderToken: false,
       storesThirdPartyProviderToken: false,
     });
   });

@@ -1,7 +1,7 @@
 # Deployment
 
 > 子文档 | 主索引：[architecture.md](../architecture.md)
-> 最后更新：2026-10-18
+> 最后更新：2026-10-23
 
 本文件记录仓库内可维护的部署结构和证据边界；实际运行环境由部署方提供。
 
@@ -40,16 +40,18 @@ docker compose up -d
 | Web Vite | 5174 |
 | Mobile RN Expo Web | 5177 |
 | Local Edge | 3210 |
-| TokenDance ID（外部服务） | 3000 |
 
 默认 compose 绑定开发本机；远程调试必须显式配置网络和防火墙，不能把默认开发密码或 admin 端口暴露出去。
+
+TokenDance Account 是外部 OIDC provider。Hub 只通过配置的公开 issuer 发现 authorization、token、UserInfo 和 JWKS endpoint，不在本地启动、也不读取 Account 内部管理服务或数据库。
 
 ## 部署证据等级
 
 | Claim | 最低证据 |
 |---|---|
 | Compose 配置形状正确 | `docker compose config` 或 CI compose check |
-| OIDC 配置形状正确 | OIDC/session tests + L3 真实 OIDC 流（`scripts/e2e/run-real-e2e-lane.sh`）；WSL 全栈用 `scripts/e2e/wsl-full-stack-e2e.sh` 搭建，维护者远程 lane 用 `scripts/dev/devserver.sh` |
+| Account OIDC 配置形状正确 | OIDC/session unit、fixture 和 config tests；只能证明解析、拒绝和接线 |
+| 真实 Account 登录 | 真实 Account issuer + 浏览器 Authorization Code + PKCE + UserInfo + Hub session；fixture/stubbed Hub 不算 L3 |
 | Hub/Edge API 行为正确 | 相关 Go handler/service tests + OpenAPI parse |
 | Web/Desktop UI 流程正确 | Playwright UI + Visual QA，按证据等级标注 |
 | Desktop packaged 行为正确 | Tauri package/sidecar/icon/installer evidence |
@@ -76,7 +78,7 @@ python ./scripts/verify/verify-backend-perf-leak-gates.py --Benchtime 100ms
 
 ## 生产边界
 
-发布前需要：镜像 digest、部署命令、rollback 方案和备份状态；secret 通过 secret store 注入；`/health`、CORS、OIDC callback、WebSocket upgrade 和 admin exposure smoke；声明 Desktop packaged/release 时附 packaged-release gate。
+发布前需要：镜像 digest、部署命令、rollback 方案和备份状态；secret 通过 secret store 注入；Account OIDC 配置完整；`/health`、CORS、OIDC callback、WebSocket upgrade 和 admin exposure smoke；声明 Desktop packaged/release 时附 packaged-release gate。
 
 ## 安全配置
 
@@ -89,23 +91,28 @@ python ./scripts/verify/verify-backend-perf-leak-gates.py --Benchtime 100ms
 
 Redis 故障时对外行为：认证路径始终 503 `rate_limit_unavailable`，且 `AUTH_FAIL_CLOSED=true` 时 jti 检查拒绝 → 401；非认证路径按开关返回放行或 503；正常限流命中返回 429 `rate_limited` + `Retry-After`（全局限流固定 60，路径级为 key 剩余 TTL），WS 连接限流返回 429 `ws_rate_limited`。`code` 与 HTTP 状态完整对照见 [../../api/conventions.md](../../api/conventions.md) §Errors；开关常量见 `hub-server/internal/config/constants.go`。
 
-## OIDC 回调契约
+## Account OIDC 契约
 
-TokenDance ID（TDID）OIDC 回调有三条浏览器/原生回跳地址，外加一条机器侧入口。三条回调集合必须与 TDID 侧 `oauth_clients.redirect_uris` 同步。
+Hub 是 TokenDance Account 的 confidential OIDC client，只消费 issuer discovery 文档声明的公开 endpoint。Hub 不配置或调用 Account 管理 API、内部服务地址或数据库；authorization、token、UserInfo 和 JWKS endpoint 必须与配置 issuer 同源。
+
+浏览器/客户端的 Account 回跳地址必须与 Account client 注册值精确一致：
 
 | 回调 URI | 用途 |
 |---|---|
-| `https://<hub-host>/api/auth/callback` | 首页 SPA 回调页 |
-| `https://<hub-host>/workbench/auth/tokendance/callback` | 工作台 `app/web`（`BASE_URL=/workbench/`） |
-| `http://127.0.0.1/callback` | 桌面 Tauri loopback（RFC 8252 端口宽松匹配） |
+| `http://127.0.0.1:53682/callback` | Desktop Tauri 固定 loopback callback |
+| `http://localhost:5174/workbench/auth/account/callback` | Web 本地开发（默认 `/workbench/` base） |
+| `http://127.0.0.1:5174/workbench/auth/account/callback` | Web 本地开发（默认 base，IPv4） |
+| `http://localhost:5174/auth/account/callback` | Web 本地开发（`VITE_BASE_PATH=/`） |
+| `http://127.0.0.1:5174/auth/account/callback` | Web 本地开发（根 base，IPv4） |
+| `https://<hub-host>/workbench/auth/account/callback` | 生产 Web |
 
-Hub 侧 code 交换端点固定为 `POST /client/auth/oidc/callback`，桌面/Web/CLI 共用，不是浏览器回跳地址。机器侧 code 交换与 JWKS 拉取使用部署方配置的 OIDC token 入口；域名/解析由部署方维护。对应变量 `AGENTHUB_TOKENDANCE_ID_TOKEN_URL`、`AGENTHUB_TOKENDANCE_ID_JWKS_URI`。
+Hub 的机器侧入口是 `POST /client/auth/oidc/authorize` 和 `POST /client/auth/oidc/callback`。浏览器回跳地址不是 Hub callback；旧的 GET callback 不属于当前契约。
 
-回调通过 `AGENTHUB_TOKENDANCE_ID_REDIRECT_URI`（fallback，隐式加入候选）和 `AGENTHUB_TOKENDANCE_ID_ALLOWED_REDIRECT_URIS`（逗号分隔的额外候选）配置。OIDC client 注册与 secret 由 TokenDance ID 管理，禁止写入仓库。
+`AGENTHUB_ACCOUNT_OIDC_REDIRECT_URI` 提供主 callback，`AGENTHUB_ACCOUNT_OIDC_ALLOWED_REDIRECT_URIS` 只列额外精确候选。token 和 JWKS endpoint 由 discovery 解析，不提供旧 provider 的 token URL、JWKS URI 或 issuer 启动步骤。
 
 ## 必填变量表
 
-启动顺序：`redis` healthcheck 通过 → `hub-server` 启动 → `docker-entrypoint.sh` 校验 `AGENTHUB_DB_PASSWORD` 与 `AGENTHUB_JWT_SECRET` 非空 → `InitDB` → `RunMigrations`（自动执行 `hub-server/migrations/*.up.sql`）→ `InitRedis` → `app.Run`。
+启动顺序：`redis` healthcheck 通过 → `hub-server` 启动 → `docker-entrypoint.sh` 校验 `AGENTHUB_DB_PASSWORD` 与 `AGENTHUB_JWT_SECRET` 非空 → `config.Load`/`config.Validate` → `InitDB` → `RunMigrations`（自动执行 `hub-server/migrations/*.up.sql`）→ `InitRedis` → `app.Run`。`AGENTHUB_ENV=production` 时缺少完整 Account OIDC client 配置会在迁移前直接失败。
 
 | 变量 | 必填 | 校验点 | 说明 |
 |---|---|---|---|
@@ -113,10 +120,11 @@ Hub 侧 code 交换端点固定为 `POST /client/auth/oidc/callback`，桌面/We
 | `PG_HOST`（→ `AGENTHUB_DB_HOST`） | 是（默认 `127.0.0.1`） | `config.Validate` | **只写主机，不带端口**；端口走 `PG_PORT`。 |
 | `PG_PORT`（→ `AGENTHUB_DB_PORT`） | 是（默认 `5433`） | `config.Validate`（1–65535） | 独立于 host。 |
 | `AGENTHUB_JWT_SECRET` | 是 | entrypoint + `config.Validate`（≥32 字符且不在弱密钥 blocklist） | `change-me-production*` / `dev-secret-change-in-production*` 前缀被拒绝。 |
-| `AGENTHUB_TOKENDANCE_ID_CLIENT_ID` | 配置 OIDC 即必填 | `config.Validate` | 留空=未启用 OIDC。 |
-| `AGENTHUB_TOKENDANCE_ID_CLIENT_SECRET` | 配置 OIDC 即必填 | 同上 | 由 TDID 管理，不入仓库。 |
-| `AGENTHUB_TOKENDANCE_ID_REDIRECT_URI` | 配置 OIDC 即必填 | 同上 | 无代码默认；`deployments/production/.env.example` 留空，生产 compose 默认 `https://hub.example.com/api/auth/callback`。该值会隐式加入候选集合。 |
-| `AGENTHUB_TOKENDANCE_ID_ALLOWED_REDIRECT_URIS` | 否（默认三条） | — | 额外的回调候选；改集合时必须与 TDID `oauth_clients.redirect_uris` 同步。 |
+| `AGENTHUB_ACCOUNT_OIDC_ISSUER_URL` | production 是；非 production 可由整组 OIDC 留空关闭 | `config.Validate` | Account 公开 issuer；必须是无凭据、query、fragment 的绝对 URL，非 loopback 使用 HTTPS。 |
+| `AGENTHUB_ACCOUNT_OIDC_CLIENT_ID` | production 是 | 同上 | confidential AgentHub OIDC client ID。 |
+| `AGENTHUB_ACCOUNT_OIDC_CLIENT_SECRET` | production 是 | 同上 | 仅在 Hub 服务端 token exchange 使用；至少 32 字符且拒绝占位值。 |
+| `AGENTHUB_ACCOUNT_OIDC_REDIRECT_URI` | production 是 | 同上 | 主 callback；必须与 Account client 注册值精确一致。 |
+| `AGENTHUB_ACCOUNT_OIDC_ALLOWED_REDIRECT_URIS` | 否 | handler + config validation | 逗号分隔的额外精确 callback；只加真实客户端需要的地址。 |
 | `AGENTHUB_AUTH_FAIL_CLOSED` | 生产必填（显式设置）；dev compose 默认 `true` | `validateProdGuard` 拒绝未设置的生产启动；`AuthFailClosed()` 决定 Redis 故障时的 jti 检查行为 | 见 §安全配置。 |
 | `AGENTHUB_RATE_LIMIT_FAIL_OPEN` | 否（生产建议 `false`） | `RateLimitFailOpen()` | 见 §安全配置。 |
 
@@ -128,11 +136,11 @@ Hub 侧 code 交换端点固定为 `POST /client/auth/oidc/callback`，桌面/We
 
 | 变量 | 服务 | 默认 | 语义 |
 |---|---|---|---|
-| `AGENTHUB_PPROF_USER` / `PASS`、`AGENTHUB_CORS_ORIGINS`、`AGENTHUB_ADMIN_USERS` | hub | 空 | debug 门禁（未配=404）、CORS 白名单覆盖、管理端点用户白名单 |
+| `AGENTHUB_PPROF_USER` / `PASS`、`AGENTHUB_CORS_ORIGINS`、`AGENTHUB_ADMIN_USERS` | hub | 空 | debug 门禁（未配=404）、CORS 白名单覆盖、管理端点用户白名单。CORS 只接受精确 HTTP(S) origin，禁止 `*`、凭据、路径、query 和 fragment；production 只接受公网 HTTPS，保留 `https://tauri.localhost` 给 Tauri 自定义协议 |
 | `AGENTHUB_AGENT_TEAM_*`（9 字段） | hub | 见 `config_agent_team.go` | delegation depth、subagents、route repeats、budget、compete、human review |
 | `AGENTHUB_EGRESS_*` | hub | 见 `config.yaml` | allow CIDRs/hostnames/plain HTTP/timeout（见 08-outbound-http.md）。Edge 没有独立 allowlist：出站目标是部署方配置的 Hub URL 与用户配置的模型 baseURL，统一受 edgehttp/SDK 的 timeout、redirect、TLS 合同约束 |
 | `AGENTHUB_UPLOAD_*` / `AGENTHUB_S3_*`（+裸 `S3_*` legacy） | hub | 见 config | 上传目录/大小/MIME；对象存储后端 |
-| `AGENTHUB_TOKENDANCE_ID_HTTP_TIMEOUT` / `_MAX_RESPONSE_BODY_BYTES` | hub | 见 config | OIDC 客户端超时与响应体上限 |
+| `AGENTHUB_ACCOUNT_OIDC_HTTP_TIMEOUT` / `_MAX_RESPONSE_BODY_BYTES` | hub | `10s` / `64 KiB` | Account discovery、token、UserInfo、JWKS 的统一超时与 fail-closed 响应体上限 |
 | `AGENTHUB_MAX_CLOUD_EDGE_DEVICES` | hub | `50` | 每用户 `cloud_edge` 设备上限；超限新 `device_id` 返回 403 `device_limit_exceeded`；`<=0` 关闭上限 |
 | `AGENTHUB_EVIDENCE_GATE_ENABLED`、`AGENTHUB_FAULT_ESCALATION_ENABLED`、`AGENTHUB_ESCALATION_TIMEOUT` | edge | `true` / 见 config | Edge 证据门禁与故障升级 |
 | `AGENTHUB_EVENT_WORKERS`、`AGENTHUB_DELIVERY_JOURNAL_DB` | edge | `4` / 空（关闭） | 事件总线 worker 数、durable journal 开关 |
@@ -156,6 +164,6 @@ GitHub Release 的 `agenthub-hub-*` 二进制把 migrations embed 在二进制�
 
 - [01-hub-server.md](01-hub-server.md) — Hub Server 架构
 - [02-edge-server.md](02-edge-server.md) — Edge Server 架构
-- [06-auth-identity.md](06-auth-identity.md) — TokenDance ID 和 Hub session
+- [06-auth-identity.md](06-auth-identity.md) — Account OIDC、身份绑定和 Hub session
 - [../../AGENTS.md](../../AGENTS.md) — 执行 gate 和项目规则
 - `scripts/verify/verify-real-e2e-contract.py` — 真实 E2E 证据等级（内嵌规范）

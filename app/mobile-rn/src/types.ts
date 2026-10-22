@@ -79,7 +79,7 @@ export interface MobileBrowserPreview {
 export type MobileInspectorSheetMode = 'review' | 'approveConfirm' | 'rejectConfirm' | 'approvalError';
 
 export interface MobileAccountState {
-  tokenDanceId: 'signed_in' | 'signed_out' | 'recovering';
+  accountIdentity: 'signed_in' | 'signed_out' | 'recovering';
   hubSession: 'active' | 'missing' | 'expired';
   notification: 'granted' | 'prompt' | 'blocked';
   hubSync: 'active' | 'recovering' | 'offline';

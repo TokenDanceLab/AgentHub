@@ -30,13 +30,13 @@ func TestExchangeCode_RedirectNotFollowed(t *testing.T) {
 	}))
 	defer redirector.Close()
 
-	svc := NewService(nil, config.TokenDanceIDConfig{
+	svc := NewService(nil, config.AccountOIDCConfig{
 		IssuerURL:    redirector.URL,
 		ClientID:     "agenthub-client",
 		ClientSecret: "super-secret-client-secret",
 	}, config.JWTConfig{}, nil)
 
-	_, err := svc.exchangeCode(context.Background(), "auth-code-1", "verifier-1", "http://127.0.0.1/callback")
+	_, err := svc.exchangeCode(context.Background(), redirector.URL, "auth-code-1", "verifier-1", "http://127.0.0.1/callback")
 	require.Error(t, err)
 	if redirectTargetHits != 0 {
 		t.Fatalf("token exchange must not follow redirects; target dialed %d times", redirectTargetHits)
@@ -55,14 +55,14 @@ func TestExchangeCode_BodyLimitFailClosed(t *testing.T) {
 	}))
 	defer server.Close()
 
-	svc := NewService(nil, config.TokenDanceIDConfig{
+	svc := NewService(nil, config.AccountOIDCConfig{
 		IssuerURL:            server.URL,
 		ClientID:             "agenthub-client",
 		ClientSecret:         "super-secret-client-secret",
 		MaxResponseBodyBytes: 1024,
 	}, config.JWTConfig{}, nil)
 
-	_, err := svc.exchangeCode(context.Background(), "auth-code-1", "verifier-1", "http://127.0.0.1/callback")
+	_, err := svc.exchangeCode(context.Background(), server.URL, "auth-code-1", "verifier-1", "http://127.0.0.1/callback")
 	require.Error(t, err)
 	if !strings.Contains(err.Error(), "too large") {
 		t.Fatalf("error should mention the body cap, got: %v", err)
@@ -86,14 +86,14 @@ func TestExchangeCode_SharedClientReusedAcrossCalls(t *testing.T) {
 	}))
 	defer server.Close()
 
-	svc := NewService(nil, config.TokenDanceIDConfig{
+	svc := NewService(nil, config.AccountOIDCConfig{
 		IssuerURL:    server.URL,
 		ClientID:     "agenthub-client",
 		ClientSecret: "super-secret-client-secret",
 	}, config.JWTConfig{}, nil)
 
 	for i := 0; i < 3; i++ {
-		_, err := svc.exchangeCode(context.Background(), "auth-code-1", "verifier-1", "http://127.0.0.1/callback")
+		_, err := svc.exchangeCode(context.Background(), server.URL, "auth-code-1", "verifier-1", "http://127.0.0.1/callback")
 		require.Error(t, err)
 	}
 	if tokenHits != 3 {

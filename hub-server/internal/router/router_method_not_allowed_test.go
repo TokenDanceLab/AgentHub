@@ -39,7 +39,7 @@ func newMethodRoutingEngine(t *testing.T) *gin.Engine {
 	if err := SetupRoutes(
 		r,
 		&config.Config{},
-		middleware.NewAuthMiddleware(&config.Config{}, middleware.AuthDependencies{}, nil),
+		middleware.NewAuthMiddleware(&config.Config{}, middleware.AuthDependencies{}),
 		"",
 		cache.NewClient(rdb),
 		nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil,

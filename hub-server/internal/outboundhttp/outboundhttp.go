@@ -9,12 +9,12 @@
 // address comes from administrator configuration, not from request data.
 // Concretely, all five production call sites are admin-configured endpoints:
 //
-//   - TokenDance ID OIDC token endpoint (service/oidc, token exchange —
+//   - TokenDance Account OIDC token endpoint (service/oidc, token exchange —
 //     the POST body carries client_secret, so redirect refusal is the
 //     credential-replay defense)
-//   - TokenDance ID JWKS endpoint (service/oidc + jwtutil TokenDanceVerifier)
+//   - TokenDance Account JWKS endpoint (service/oidc + jwtutil.AccountOIDCVerifier)
 //   - Hub→Edge dispatch URL, AGENTHUB_EDGE_URL (app/wiring, dispatchsvc)
-//   - TokenDance ID verifier HTTP client (app.App.tdVerifier)
+//   - TokenDance Account verifier HTTP client (app.App.accountOIDCVerifier)
 //
 // For user-controllable target addresses (execution-target ping URLs) the
 // correct dial path is internal/egress, which adds fail-closed address

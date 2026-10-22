@@ -13,7 +13,7 @@ let mockUser: { id: string; username: string; nickname: string; avatar_url: stri
 
 vi.mock('@/hooks/useAuth', () => ({
   useAuth: () => ({
-    loginWithTokenDance: mockLoginWithTokenDance,
+    loginWithAccount: mockLoginWithTokenDance,
     user: mockUser,
     token: null,
     refreshToken: null,
@@ -31,21 +31,21 @@ describe('LoginForm', () => {
     mockUser = null;
   });
 
-  it('renders the TokenDance ID primary login only', () => {
+  it('renders the TokenDance Account primary login only', () => {
     render(<LoginForm onSuccess={onSuccess} />);
-    expect(screen.getByRole('button', { name: 'auth.tokenDanceLogin' })).toBeInTheDocument();
-    expect(screen.getByText('auth.tokenDancePrimary')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'auth.accountLogin' })).toBeInTheDocument();
+    expect(screen.getByText('auth.accountPrimary')).toBeInTheDocument();
   });
 
   it('shows a pending notice after opening the TokenDance login shell', async () => {
     mockLoginWithTokenDance.mockResolvedValueOnce(undefined);
     render(<LoginForm onSuccess={onSuccess} />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'auth.tokenDanceLogin' }));
+    fireEvent.click(screen.getByRole('button', { name: 'auth.accountLogin' }));
 
     await waitFor(() => {
       expect(mockLoginWithTokenDance).toHaveBeenCalledTimes(1);
-      expect(screen.getByRole('status')).toHaveTextContent('auth.tokenDanceCallbackPending');
+      expect(screen.getByRole('status')).toHaveTextContent('auth.accountCallbackPending');
     });
   });
 
@@ -59,7 +59,7 @@ describe('LoginForm', () => {
     );
     render(<LoginForm onSuccess={onSuccess} />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'auth.tokenDanceLogin' }));
+    fireEvent.click(screen.getByRole('button', { name: 'auth.accountLogin' }));
 
     await waitFor(() => {
       const alert = screen.getByRole('alert');
@@ -73,7 +73,7 @@ describe('LoginForm', () => {
     mockLoginWithTokenDance.mockRejectedValueOnce(new Error('Hub login unavailable'));
     render(<LoginForm onSuccess={onSuccess} />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'auth.tokenDanceLogin' }));
+    fireEvent.click(screen.getByRole('button', { name: 'auth.accountLogin' }));
 
     await waitFor(() => {
       const alert = screen.getByRole('alert');
@@ -82,7 +82,7 @@ describe('LoginForm', () => {
     });
 
     mockLoginWithTokenDance.mockRejectedValueOnce({});
-    fireEvent.click(screen.getByRole('button', { name: 'auth.tokenDanceLogin' }));
+    fireEvent.click(screen.getByRole('button', { name: 'auth.accountLogin' }));
     await waitFor(() => {
       expect(screen.getByRole('alert')).toHaveTextContent('auth.error.oidc.default');
     });
@@ -117,7 +117,7 @@ describe('AuthPage', () => {
   it('renders the login form and advanced settings toggle', () => {
     renderAuthPage();
     expect(screen.getByRole('heading', { name: 'auth.title' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'auth.tokenDanceLogin' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'auth.accountLogin' })).toBeInTheDocument();
     expect(screen.getByText('auth.advancedSettings')).toBeInTheDocument();
   });
 

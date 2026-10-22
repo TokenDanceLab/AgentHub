@@ -13,7 +13,7 @@ interface LoginFormProps {
 
 export default function LoginForm({ onSuccess }: LoginFormProps) {
   const { t } = useTranslation();
-  const { loginWithTokenDance, user } = useAuth();
+  const { loginWithAccount, user } = useAuth();
   const [identityLoading, setIdentityLoading] = useState(false);
   const [identityNotice, setIdentityNotice] = useState<string | null>(null);
   const [serverError, setServerError] = useState<string | null>(null);
@@ -22,13 +22,13 @@ export default function LoginForm({ onSuccess }: LoginFormProps) {
     if (user) onSuccess(user);
   }, [onSuccess, user]);
 
-  const handleTokenDanceLogin = useCallback(async () => {
+  const handleAccountLogin = useCallback(async () => {
     setServerError(null);
     setIdentityNotice(null);
     setIdentityLoading(true);
     try {
-      await loginWithTokenDance();
-      setIdentityNotice(t('auth.tokenDanceCallbackPending'));
+      await loginWithAccount();
+      setIdentityNotice(t('auth.accountCallbackPending'));
     } catch (err: unknown) {
       // #2154: never render err.message. The OIDC failures are produced
       // in English at the transport layer ("Failed to start OIDC login: fetch
@@ -47,7 +47,7 @@ export default function LoginForm({ onSuccess }: LoginFormProps) {
     } finally {
       setIdentityLoading(false);
     }
-  }, [loginWithTokenDance, t]);
+  }, [loginWithAccount, t]);
 
   if (user) return null;
 
@@ -60,12 +60,12 @@ export default function LoginForm({ onSuccess }: LoginFormProps) {
         </div>
       )}
 
-      <p className={styles.identityHint}>{t('auth.tokenDancePrimary')}</p>
+      <p className={styles.identityHint}>{t('auth.accountPrimary')}</p>
 
       <button
         type="button"
         className={styles.identityButton}
-        onClick={handleTokenDanceLogin}
+        onClick={handleAccountLogin}
         disabled={identityLoading}
       >
         {identityLoading ? (
@@ -76,7 +76,7 @@ export default function LoginForm({ onSuccess }: LoginFormProps) {
             <KeyRound size={15} aria-hidden="true" />
           </>
         )}
-        <span>{t('auth.tokenDanceLogin')}</span>
+        <span>{t('auth.accountLogin')}</span>
       </button>
 
       {identityNotice && (

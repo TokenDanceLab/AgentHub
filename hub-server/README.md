@@ -1,8 +1,8 @@
 # AgentHub Hub Server
 
-最后更新：2026-10-19
+最后更新：2026-10-23
 
-Hub Server 是 AgentHub 的云端控制面：TokenDance ID OIDC → Hub session、Hub-local 授权、IM、多端同步、设备路由、Edge 中继、Profile catalog 和审计。它不直接启动 Agent CLI；实际执行由 Edge Server 完成。完整 Boundaries 表见 [docs/architecture/01-hub-server.md](../docs/architecture/01-hub-server.md)（SSOT）。
+Hub Server 是 AgentHub 的云端控制面：TokenDance Account 公共 OIDC → Hub session、Hub-local 授权、IM、多端同步、设备路由、Edge 中继、Profile catalog 和审计。它不直接启动 Agent CLI；实际执行由 Edge Server 完成。完整 Boundaries 表见 [docs/architecture/01-hub-server.md](../docs/architecture/01-hub-server.md)（SSOT）。
 
 ## 运行
 
@@ -43,8 +43,10 @@ go test ./... -short -count=1   # 需要干净结果时
 
 ## Auth Boundary
 
-Hub session 是 AgentHub 产品授权边界。TokenDance ID bearer middleware 只是一条兼容身份校验路径，不能替代 Hub refresh token、device proof、WebSocket session 或 Hub-local authorization。
+Hub 只消费 Account 公开 OIDC endpoint，不持有或调用 Account 管理 API、内部服务或数据库。`(issuer, subject)` 是外部身份键；历史 `tokendance_sub` 只是退役审计数据，不能自动认领 Account user。
 
-`/client/ws` 只接受 Hub-issued HS256 access token。新增登录、session、device、permission 或 Edge callback 行为时，同步 `api/openapi.yaml`、`api/events.md`、`docs/architecture/06-auth-identity.md` 和相关测试。
+Account access/ID token 只由 Hub OIDC service 在服务端使用，不能作为 Hub REST/WS bearer。Hub REST 和 `/client/ws` 只接受 Hub-issued HS256 session token；WebSocket 还拒绝非产品 purpose 和 edge device token。
+
+生产环境缺少完整 Account OIDC 配置时 `config.Validate` fail closed。新增登录、session、device、permission 或 Edge callback 行为时，同步 `api/openapi.yaml`、`api/events.md`、`docs/architecture/06-auth-identity.md` 和相关测试。
 
 access jti 黑名单的 fail-open/fail-closed 行为矩阵（Redis 可达性 × `AGENTHUB_AUTH_FAIL_CLOSED`，补偿控制）由 `internal/middleware/auth_fail_closed_redis_test.go` 按生产接线（`*cache.Client` + 进程内 miniredis，无真实网络）守护。

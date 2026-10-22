@@ -42,26 +42,22 @@ type AuthDependencies struct {
 type AuthMiddleware struct {
 	cfg  *config.Config
 	deps AuthDependencies
-	// tdVerifier validates TokenDance ID-issued RS256 JWTs against the
-	// configured JWKS endpoint; constructed once (never per-request).
-	tdVerifier *jwtutil.TokenDanceVerifier
 	// adminUsers is the AGENTHUB_ADMIN_USERS snapshot taken at construction
 	// (#1551); RequireAdmin consults the instance, not a package global.
 	adminUsers []string
 }
 
 // NewAuthMiddleware constructs an AuthMiddleware with its security
-// dependencies. tdVerifier may be nil when TokenDance ID is not configured
-// (the dual-mode validator simply skips the RS256 path).
-func NewAuthMiddleware(cfg *config.Config, deps AuthDependencies, tdVerifier *jwtutil.TokenDanceVerifier) *AuthMiddleware {
-	return &AuthMiddleware{cfg: cfg, deps: deps, tdVerifier: tdVerifier, adminUsers: parseAdminUsers()}
+// dependencies.
+func NewAuthMiddleware(cfg *config.Config, deps AuthDependencies) *AuthMiddleware {
+	return &AuthMiddleware{cfg: cfg, deps: deps, adminUsers: parseAdminUsers()}
 }
 
 // AuthMiddleware returns a Gin middleware that validates JWT bearer tokens and
 // classifies the auth source.
-// It supports dual-mode identity parsing:
-// 1. TokenDance ID RS256 JWT (if configured) — identity compatibility only
-// 2. Local HS256 JWT — Hub-issued product session
+// Only Hub-issued HS256 product sessions are accepted. Account ID/access
+// tokens are provider credentials used by the OIDC service and must never be
+// accepted as Hub REST or WebSocket bearer tokens.
 //
 // User identity (user_id, device_type, device_id) is injected into the Gin context.
 // Product APIs must add RequireHubSession after this middleware.
@@ -135,9 +131,8 @@ func (m *AuthMiddleware) WSHandler() gin.HandlerFunc {
 			return
 		}
 
-		// WebSocket sessions must be Hub-issued sessions. TokenDance ID bearer
-		// tokens prove identity only and must not bypass the Hub session/device
-		// handshake by authenticating at the upgrade middleware layer.
+		// WebSocket sessions must be Hub-issued sessions. Account tokens must
+		// never bypass the Hub session/device handshake.
 		claims, err := jwtutil.ParseToken(tokenStr, m.cfg.JWT.Secret)
 		if err != nil {
 			// Audit the failed upgrade and count it in WSAuthFailures.
@@ -219,24 +214,7 @@ func tokenFromWSSubprotocols(values []string) string {
 // validateToken is a shared helper that validates a JWT token string and sets
 // Gin context values. Used by AuthMiddleware.
 func (m *AuthMiddleware) validateToken(c *gin.Context, tokenStr string) {
-	// Try TokenDance ID RS256 JWT first (if TokenDance ID is configured).
-	// tdVerifier must be non-nil as well: callers may construct the
-	// middleware with a nil verifier (NewAuthMiddleware documents it), and
-	// dereferencing nil here panics inside the timeout goroutine (recovered
-	// as a 500/403). The nil verifier means "RS256 path unavailable" —
-	// fall through to local HS256 instead.
-	if m.tdVerifier != nil && m.cfg.TokenDanceID.IssuerURL != "" && m.cfg.TokenDanceID.ClientID != "" {
-		if claims, err := m.tdVerifier.ParseJWT(c.Request.Context(), tokenStr, m.cfg.TokenDanceID.IssuerURL, m.cfg.TokenDanceID.ClientID); err == nil {
-			c.Set("user_id", claims.Subject)
-			c.Set("device_type", "tokendance_bearer")
-			c.Set("device_id", "")
-			c.Set("auth_source", "tokendance_id")
-			c.Next()
-			return
-		}
-	}
-
-	// Fallback to local HS256 JWT.
+	// Product APIs accept only the Hub-issued HS256 session.
 	claims, err := jwtutil.ParseToken(tokenStr, m.cfg.JWT.Secret)
 	if err != nil {
 		m.auditPermission(c, "", "auth_validate", false, map[string]interface{}{
@@ -271,9 +249,9 @@ func setHubLocalClaims(c *gin.Context, claims *jwtutil.Claims) {
 
 // enforceHubSession applies the post-parse Hub product-session policy shared by
 // RequireHubSession and AuthMiddleware.WSHandler(). It rejects:
-//   - non-hub_local auth_source (e.g. TokenDance identity bearer)
+//   - non-hub_local auth_source
 //   - non-empty purpose (edge-api / run-start / capability class)
-//   - edge / tokendance_bearer device_type (defense in depth)
+//   - edge device_type (defense in depth)
 //
 // On rejection it audits, fails closed with 403, and aborts the request.
 // Returns true when the session is allowed to proceed.
@@ -288,7 +266,7 @@ func (m *AuthMiddleware) enforceHubSession(c *gin.Context) bool {
 		reason = "auth_source"
 	case purpose != "":
 		reason = "purpose"
-	case deviceType == "edge" || deviceType == "tokendance_bearer":
+	case deviceType == "edge":
 		reason = "device_type"
 	}
 	if reason == "" {
@@ -378,7 +356,7 @@ func (m *AuthMiddleware) acceptAccessClaims(c *gin.Context, claims *jwtutil.Clai
 }
 
 // RequireHubSession is a middleware that requires a Hub-issued local session.
-// TokenDance ID bearer tokens prove identity only; they must not authorize Hub
+// TokenDance Account provider tokens prove identity only; they must not authorize Hub
 // product APIs, device routing, Web task dispatch, or user-local resources.
 // WebSocket upgrades share the same post-parse gate via AuthMiddleware.WSHandler().
 func (m *AuthMiddleware) RequireHubSession() gin.HandlerFunc {

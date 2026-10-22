@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createMobileAuthCorePorts } from './expoAuthPorts';
+
+const ACCOUNT_ISSUER = 'https://account.example';
 import type { HubSessionStorageAdapter } from '@/session/sessionState';
 
 function createMemoryAdapter(): {
@@ -111,7 +113,7 @@ describe('createMobileAuthCorePorts', () => {
 
   it('queues an incoming callback when no login is in flight and consumes it once', async () => {
     const { ports } = createPorts();
-    const callback = { code: 'code-cold', state: 'state-cold' };
+    const callback = { code: 'code-cold', state: 'state-cold', iss: ACCOUNT_ISSUER };
 
     ports.handleIncomingOidcCallback(callback);
 
@@ -124,9 +126,13 @@ describe('createMobileAuthCorePorts', () => {
     const started = ports.ports.callbackChannel.start();
     const callbackPromise = started.then((control) => control.callback);
 
-    ports.handleIncomingOidcCallback({ code: 'code-1', state: 'state-1' });
+    ports.handleIncomingOidcCallback({ code: 'code-1', state: 'state-1', iss: ACCOUNT_ISSUER });
 
-    await expect(callbackPromise).resolves.toEqual({ code: 'code-1', state: 'state-1' });
+    await expect(callbackPromise).resolves.toEqual({
+      code: 'code-1',
+      state: 'state-1',
+      iss: ACCOUNT_ISSUER,
+    });
   });
 
   it('rejects the in-flight login on state mismatch', async () => {
@@ -136,13 +142,14 @@ describe('createMobileAuthCorePorts', () => {
       codeVerifier: 'verifier',
       deviceId: 'device-1',
       redirectUri: 'agenthub://auth/callback',
+      issuer: ACCOUNT_ISSUER,
       createdAt: 1_000_000,
     });
 
     const started = ports.ports.callbackChannel.start();
     const callbackPromise = started.then((control) => control.callback);
 
-    ports.handleIncomingOidcCallback({ code: 'code-1', state: 'other-state' });
+    ports.handleIncomingOidcCallback({ code: 'code-1', state: 'other-state', iss: ACCOUNT_ISSUER });
 
     await expect(callbackPromise).rejects.toThrow(/state mismatch/i);
   });
@@ -154,6 +161,7 @@ describe('createMobileAuthCorePorts', () => {
       codeVerifier: 'verifier',
       deviceId: 'device-1',
       redirectUri: 'agenthub://auth/callback',
+      issuer: ACCOUNT_ISSUER,
       createdAt: 1_000_000,
     });
 
@@ -161,8 +169,31 @@ describe('createMobileAuthCorePorts', () => {
     const callbackPromise = started.then((control) => control.callback);
 
     advanceTime(11 * 60 * 1000);
-    ports.handleIncomingOidcCallback({ code: 'code-1', state: 'server-state' });
+    ports.handleIncomingOidcCallback({ code: 'code-1', state: 'server-state', iss: ACCOUNT_ISSUER });
 
     await expect(callbackPromise).rejects.toThrow(/expired/i);
+  });
+
+  it('rejects the in-flight login on issuer mismatch', async () => {
+    const { ports } = createPorts();
+    ports.ports.pendingStorage.save({
+      state: 'server-state',
+      codeVerifier: 'verifier',
+      deviceId: 'device-1',
+      redirectUri: 'agenthub://auth/callback',
+      issuer: ACCOUNT_ISSUER,
+      createdAt: Date.now(),
+    });
+
+    const started = ports.ports.callbackChannel.start();
+    const callbackPromise = started.then((control) => control.callback);
+
+    ports.handleIncomingOidcCallback({
+      code: 'code-1',
+      state: 'server-state',
+      iss: 'https://legacy-id.invalid',
+    });
+
+    await expect(callbackPromise).rejects.toThrow(/issuer mismatch/i);
   });
 });

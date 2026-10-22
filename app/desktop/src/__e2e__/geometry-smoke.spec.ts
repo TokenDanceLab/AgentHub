@@ -55,7 +55,7 @@ test.describe('Desktop geometry smoke (#1284)', () => {
     // covered by blockLiveBackends' list and would reach the network, so they
     // are forbidden here; hub hosts are already 503'd downstream.
     assertFontGuardHermetic(fontGuard, {
-      forbiddenBoundaries: new Set(['tokendance-id', 'gateway']),
+      forbiddenBoundaries: new Set(['account-oidc', 'gateway']),
     });
   });
 });
@@ -101,7 +101,8 @@ async function blockLiveBackends(page: Page): Promise<void> {
       url.includes('localhost:3210') ||
       url.includes('127.0.0.1:3210') ||
       url.includes('hub.vectorcontrol.tech') ||
-      url.includes('api.hub.vectorcontrol.tech')
+      url.includes('api.hub.vectorcontrol.tech') ||
+      url.includes('hub-app.tokendancelab.com')
     ) {
       return route.fulfill({
         status: 503,

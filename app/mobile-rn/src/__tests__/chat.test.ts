@@ -214,7 +214,7 @@ describe('formatChatDisplayName', () => {
 
   it('returns TokenDance for matching name', () => {
     expect(formatChatDisplayName('TokenDance')).toBe('TokenDance');
-    expect(formatChatDisplayName('TokenDance ID')).toBe('TokenDance');
+    expect(formatChatDisplayName('TokenDance Account')).toBe('TokenDance');
   });
 
   it('returns AgentHub as default', () => {

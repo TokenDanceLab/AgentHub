@@ -63,14 +63,39 @@ func jwtCfg() config.JWTConfig {
 
 // SQL substrings used for matching (QueryMatcherFunc with strings.Contains)
 const (
-	sqlUserByID       = `FROM "users" WHERE id =`
-	sqlRTByUserDevice = `FROM "refresh_tokens" WHERE user_id`
-	sqlRTByHash       = `FROM "refresh_tokens" WHERE token_hash`
-	sqlInsertRT       = `INSERT INTO "refresh_tokens"`
-	sqlRevokeByDevice = `UPDATE "refresh_tokens" SET "revoked"=$1 WHERE user_id`    // device-wide revoke (Logout / rotation step 2)
-	sqlClaimRT        = `UPDATE "refresh_tokens" SET "revoked"=$1 WHERE token_hash` // rotation step 1 atomic claim (#2154)
-	sqlUpdateUser     = `UPDATE "users" SET`
+	sqlUserByID         = `FROM "users" WHERE id =`
+	sqlRTByUserDevice   = `FROM "refresh_tokens" WHERE user_id`
+	sqlRTByHash         = `FROM "refresh_tokens" WHERE token_hash`
+	sqlIdentityByID     = `FROM "user_identities" WHERE id =`
+	sqlInsertRT         = `INSERT INTO "refresh_tokens"`
+	sqlRevokeByDevice   = `UPDATE "refresh_tokens" SET "revoked"=$1 WHERE user_id`    // device-wide revoke (Logout / rotation step 2)
+	sqlClaimRT          = `UPDATE "refresh_tokens" SET "revoked"=$1 WHERE token_hash` // rotation step 1 atomic claim (#2154)
+	sqlUpdateUser       = `UPDATE "users" SET`
+	testRefreshIdentity = "identity-1"
 )
+
+func refreshTokenRows(
+	id, userID, deviceType, deviceID, tokenHash string,
+	revoked bool,
+	expiresAt time.Time,
+) *sqlmock.Rows {
+	return sqlmock.NewRows([]string{
+		"id", "user_id", "device_type", "device_id", "user_identity_id",
+		"token_hash", "revoked", "expires_at",
+	}).AddRow(id, userID, deviceType, deviceID, testRefreshIdentity, tokenHash, revoked, expiresAt)
+}
+
+func expectActiveRefreshIdentity(mock sqlmock.Sqlmock) {
+	mock.ExpectQuery(sqlIdentityByID).
+		WithArgs(testRefreshIdentity, 1).
+		WillReturnRows(sqlmock.NewRows([]string{
+			"id", "user_id", "provider", "issuer", "subject", "status",
+			"linked_at", "created_at", "updated_at",
+		}).AddRow(
+			testRefreshIdentity, "user-uuid", "account", "https://account.example",
+			"subject", "active", time.Now(), time.Now(), time.Now(),
+		))
+}
 
 // ==================== RefreshToken ====================
 
@@ -94,8 +119,7 @@ func TestRefreshToken_Revoked(t *testing.T) {
 
 	mock.ExpectQuery(sqlRTByHash).
 		WithArgs(sqlmock.AnyArg(), 1).
-		WillReturnRows(sqlmock.NewRows([]string{"id", "user_id", "device_type", "device_id", "token_hash", "revoked", "expires_at"}).
-			AddRow("rt-1", "user-uuid", "desktop", "dev-1", "hash", true, time.Now().Add(24*time.Hour)))
+		WillReturnRows(refreshTokenRows("rt-1", "user-uuid", "desktop", "dev-1", "hash", true, time.Now().Add(24*time.Hour)))
 
 	svc := NewService(db, jwtCfg(), cache.NoOpCache{})
 	_, err := svc.RefreshToken(context.Background(), "any-refresh-token")
@@ -111,10 +135,10 @@ func TestRefreshToken_Success(t *testing.T) {
 	expiry := time.Now().Add(24 * time.Hour)
 	mock.ExpectQuery(sqlRTByHash).
 		WithArgs(sqlmock.AnyArg(), 1).
-		WillReturnRows(sqlmock.NewRows([]string{"id", "user_id", "device_type", "device_id", "token_hash", "revoked", "expires_at"}).
-			AddRow("rt-1", "user-uuid", "desktop", "dev-1", "hash", false, expiry))
+		WillReturnRows(refreshTokenRows("rt-1", "user-uuid", "desktop", "dev-1", "hash", false, expiry))
 
-	// Rotation step 1: atomic claim on the presented row (#2154).
+	mock.ExpectBegin()
+	expectActiveRefreshIdentity(mock)
 	mock.ExpectExec(sqlClaimRT).
 		WithArgs(true, sqlmock.AnyArg(), false).
 		WillReturnResult(sqlmock.NewResult(0, 1))
@@ -129,8 +153,8 @@ func TestRefreshToken_Success(t *testing.T) {
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectQuery(sqlRTByUserDevice).
 		WithArgs("user-uuid", "desktop", "dev-1", 1).
-		WillReturnRows(sqlmock.NewRows([]string{"id", "user_id", "device_type", "device_id", "token_hash", "revoked", "expires_at"}).
-			AddRow("rt-new", "user-uuid", "desktop", "dev-1", "newhash", false, expiry))
+		WillReturnRows(refreshTokenRows("rt-new", "user-uuid", "desktop", "dev-1", "newhash", false, expiry))
+	mock.ExpectCommit()
 
 	svc := NewService(db, jwtCfg(), cache.NoOpCache{})
 	resp, err := svc.RefreshToken(context.Background(), "valid-refresh-token")
@@ -143,6 +167,49 @@ func TestRefreshToken_Success(t *testing.T) {
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
+func TestRefreshToken_DatabaseFailureIsNotMappedToInvalidToken(t *testing.T) {
+	db, mock, sqlDB := newMockDB(t)
+	defer sqlDB.Close()
+
+	mock.ExpectQuery(sqlRTByHash).
+		WithArgs(sqlmock.AnyArg(), 1).
+		WillReturnError(fmt.Errorf("database unavailable"))
+
+	svc := NewService(db, jwtCfg(), cache.NoOpCache{})
+	_, err := svc.RefreshToken(context.Background(), "valid-refresh-token")
+	require.Error(t, err)
+	assert.NotErrorIs(t, err, errcode.AuthRefreshInvalid)
+	assert.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestRefreshToken_RotationRollsBackOnReplacementWriteFailure(t *testing.T) {
+	db, mock, sqlDB := newMockDB(t)
+	defer sqlDB.Close()
+
+	expiry := time.Now().Add(24 * time.Hour)
+	mock.ExpectQuery(sqlRTByHash).
+		WithArgs(sqlmock.AnyArg(), 1).
+		WillReturnRows(refreshTokenRows("rt-1", "user-uuid", "desktop", "dev-1", "hash", false, expiry))
+
+	mock.ExpectBegin()
+	expectActiveRefreshIdentity(mock)
+	mock.ExpectExec(sqlClaimRT).
+		WithArgs(true, sqlmock.AnyArg(), false).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectExec(sqlRevokeByDevice).
+		WithArgs(true, "user-uuid", "dev-1").
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectExec(sqlInsertRT).
+		WillReturnError(fmt.Errorf("insert failed"))
+	mock.ExpectRollback()
+
+	svc := NewService(db, jwtCfg(), cache.NoOpCache{})
+	_, err := svc.RefreshToken(context.Background(), "valid-refresh-token")
+	require.Error(t, err)
+	assert.NotErrorIs(t, err, errcode.AuthRefreshInvalid)
+	assert.NoError(t, mock.ExpectationsWereMet())
+}
+
 // #134: Refresh token rotation with redis cache.
 func TestRefreshToken_RotatesWithCache(t *testing.T) {
 	db, mock, sqlDB := newMockDB(t)
@@ -151,9 +218,10 @@ func TestRefreshToken_RotatesWithCache(t *testing.T) {
 	expiry := time.Now().Add(24 * time.Hour)
 	mock.ExpectQuery(sqlRTByHash).
 		WithArgs(sqlmock.AnyArg(), 1).
-		WillReturnRows(sqlmock.NewRows([]string{"id", "user_id", "device_type", "device_id", "token_hash", "revoked", "expires_at"}).
-			AddRow("rt-1", "user-uuid", "web", "dev-web", "oldhash", false, expiry))
+		WillReturnRows(refreshTokenRows("rt-1", "user-uuid", "web", "dev-web", "oldhash", false, expiry))
 
+	mock.ExpectBegin()
+	expectActiveRefreshIdentity(mock)
 	mock.ExpectExec(sqlClaimRT).
 		WithArgs(true, sqlmock.AnyArg(), false).
 		WillReturnResult(sqlmock.NewResult(0, 1))
@@ -167,8 +235,8 @@ func TestRefreshToken_RotatesWithCache(t *testing.T) {
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectQuery(sqlRTByUserDevice).
 		WithArgs("user-uuid", "web", "dev-web", 1).
-		WillReturnRows(sqlmock.NewRows([]string{"id", "user_id", "device_type", "device_id", "token_hash", "revoked", "expires_at"}).
-			AddRow("rt-new", "user-uuid", "web", "dev-web", "newhash", false, expiry))
+		WillReturnRows(refreshTokenRows("rt-new", "user-uuid", "web", "dev-web", "newhash", false, expiry))
+	mock.ExpectCommit()
 
 	svc := NewService(db, jwtCfg(), testCacheClient(t))
 	resp, err := svc.RefreshToken(context.Background(), "some-refresh-token")
@@ -188,8 +256,7 @@ func TestRefreshToken_RejectsBlacklistedTokenHash(t *testing.T) {
 	expiry := time.Now().Add(24 * time.Hour)
 	mock.ExpectQuery(sqlRTByHash).
 		WithArgs(sqlmock.AnyArg(), 1).
-		WillReturnRows(sqlmock.NewRows([]string{"id", "user_id", "device_type", "device_id", "token_hash", "revoked", "expires_at"}).
-			AddRow("rt-1", "user-uuid", "desktop", "dev-1", "hash-abc", false, expiry))
+		WillReturnRows(refreshTokenRows("rt-1", "user-uuid", "desktop", "dev-1", "hash-abc", false, expiry))
 
 	cacheClient := testCacheClient(t)
 	// Pre-set the token hash in the blacklist (simulating a prior rotation
@@ -211,8 +278,7 @@ func TestRefreshToken_RejectsBlacklistedUserDevice(t *testing.T) {
 	expiry := time.Now().Add(24 * time.Hour)
 	mock.ExpectQuery(sqlRTByHash).
 		WithArgs(sqlmock.AnyArg(), 1).
-		WillReturnRows(sqlmock.NewRows([]string{"id", "user_id", "device_type", "device_id", "token_hash", "revoked", "expires_at"}).
-			AddRow("rt-1", "user-uuid", "desktop", "dev-1", "hash-xyz", false, expiry))
+		WillReturnRows(refreshTokenRows("rt-1", "user-uuid", "desktop", "dev-1", "hash-xyz", false, expiry))
 
 	cacheClient := testCacheClient(t)
 	// Pre-set the user:device blacklist key (simulating a logout that
@@ -234,8 +300,7 @@ func TestRefreshToken_RejectsBlacklistedUserDeviceType(t *testing.T) {
 	expiry := time.Now().Add(24 * time.Hour)
 	mock.ExpectQuery(sqlRTByHash).
 		WithArgs(sqlmock.AnyArg(), 1).
-		WillReturnRows(sqlmock.NewRows([]string{"id", "user_id", "device_type", "device_id", "token_hash", "revoked", "expires_at"}).
-			AddRow("rt-1", "user-uuid", "desktop", "dev-1", "hash-uvw", false, expiry))
+		WillReturnRows(refreshTokenRows("rt-1", "user-uuid", "desktop", "dev-1", "hash-uvw", false, expiry))
 
 	cacheClient := testCacheClient(t)
 	// Pre-set the scoped blacklist key.
@@ -426,13 +491,15 @@ func TestRefreshToken_ConcurrentRotationLosesClaim(t *testing.T) {
 	expiry := time.Now().Add(24 * time.Hour)
 	mock.ExpectQuery(sqlRTByHash).
 		WithArgs(sqlmock.AnyArg(), 1).
-		WillReturnRows(sqlmock.NewRows([]string{"id", "user_id", "device_type", "device_id", "token_hash", "revoked", "expires_at"}).
-			AddRow("rt-1", "user-uuid", "desktop", "dev-1", "hash", false, expiry))
+		WillReturnRows(refreshTokenRows("rt-1", "user-uuid", "desktop", "dev-1", "hash", false, expiry))
 
 	// Claim loses the race: RowsAffected = 0.
+	mock.ExpectBegin()
+	expectActiveRefreshIdentity(mock)
 	mock.ExpectExec(sqlClaimRT).
 		WithArgs(true, sqlmock.AnyArg(), false).
 		WillReturnResult(sqlmock.NewResult(0, 0))
+	mock.ExpectRollback()
 
 	before := testutil.ToFloat64(metrics.RefreshTokenReuseTotal)
 

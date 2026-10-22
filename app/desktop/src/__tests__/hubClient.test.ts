@@ -543,7 +543,7 @@ describe('hubAuth', () => {
 
     it('returns true and fetches the user from a stored access token', async () => {
       await saveStoredHubAccessToken('valid_access');
-      localStorage.setItem('agenthub_token_source', 'tokendance');
+      localStorage.setItem('agenthub_token_source', 'account');
       const auth = newAuth();
       mockFetch(200, mockUser);
 
@@ -553,7 +553,7 @@ describe('hubAuth', () => {
       expect(auth.getState()).toMatchObject({
         token: 'valid_access',
         isAuthenticated: true,
-        tokenSource: 'tokendance',
+        tokenSource: 'account',
       });
       expect(auth.getState().user?.id).toBe('user_1');
       expect(localStorage.getItem('agenthub_hub_token')).toBeNull();
@@ -581,7 +581,7 @@ describe('hubAuth', () => {
     it('returns false and clears state when refresh fails', async () => {
       await saveStoredHubAccessToken('expired_access');
       await saveStoredHubRefreshToken('bad_refresh');
-      localStorage.setItem('agenthub_token_source', 'tokendance');
+      localStorage.setItem('agenthub_token_source', 'account');
       const auth = newAuth();
       mockFetchSequence([
         { status: 401, data: { error: { code: 'token_expired', message: 'Token expired' } } },
@@ -601,6 +601,26 @@ describe('hubAuth', () => {
       expect(await loadStoredHubAccessToken()).toBeNull();
       expect(await loadStoredHubRefreshToken()).toBeNull();
       expect(localStorage.getItem('agenthub_token_source')).toBeNull();
+    });
+
+    it('preserves keyring state when refresh fails transiently', async () => {
+      await saveStoredHubAccessToken('expired_access');
+      await saveStoredHubRefreshToken('valid_refresh');
+      localStorage.setItem('agenthub_token_source', 'account');
+      const auth = newAuth();
+      mockFetchSequence([
+        { status: 401, data: { error: { code: 'token_expired', message: 'Token expired' } } },
+        { status: 503, data: { error: { code: 'unavailable', message: 'Hub unavailable' } } },
+      ]);
+
+      const result = await auth.tryAutoLogin();
+
+      expect(result).toBe(false);
+      expect(auth.getState().isAuthenticated).toBe(false);
+      expect(auth.getState().tokenSource).toBe('account');
+      expect(await loadStoredHubAccessToken()).toBe('expired_access');
+      expect(await loadStoredHubRefreshToken()).toBe('valid_refresh');
+      expect(localStorage.getItem('agenthub_token_source')).toBe('account');
     });
   });
 

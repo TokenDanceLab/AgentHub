@@ -35,6 +35,19 @@ func setupSQLite(t *testing.T) *gorm.DB {
 		)`,
 		`CREATE UNIQUE INDEX idx_users_tokendance_sub ON users(tokendance_sub)
 			WHERE tokendance_sub IS NOT NULL AND tokendance_sub != ''`,
+		`CREATE TABLE user_identities (
+			id TEXT PRIMARY KEY,
+			user_id TEXT NOT NULL,
+			provider TEXT NOT NULL,
+			issuer TEXT NOT NULL,
+			subject TEXT NOT NULL,
+			status TEXT NOT NULL DEFAULT 'active',
+			linked_at DATETIME NOT NULL,
+			created_at DATETIME,
+			updated_at DATETIME
+		)`,
+		`CREATE UNIQUE INDEX idx_user_identities_issuer_subject ON user_identities(issuer, subject)`,
+		`CREATE INDEX idx_user_identities_user_id ON user_identities(user_id)`,
 		`CREATE TABLE devices (
 			id TEXT PRIMARY KEY,
 			user_id TEXT NOT NULL,
@@ -189,6 +202,7 @@ func setupSQLite(t *testing.T) *gorm.DB {
 			user_id TEXT NOT NULL,
 			device_type TEXT NOT NULL DEFAULT '',
 			device_id TEXT NOT NULL DEFAULT '',
+			user_identity_id TEXT,
 			token_hash TEXT NOT NULL UNIQUE,
 			expires_at DATETIME NOT NULL,
 			revoked INTEGER NOT NULL DEFAULT 0,

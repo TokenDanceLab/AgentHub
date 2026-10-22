@@ -95,9 +95,12 @@ var (
 	// 必须同步 app/shared/src/api/auth/types.ts 的 OidcBackendErrorCodes；
 	// CI `scripts/verify/verify-oidc-code-ssot.py` 校验两侧集合一致。
 	OIDCInvalidState       = New("oidc_invalid_state", "state is invalid or expired", http.StatusBadRequest)
+	OIDCIssuerInvalid      = New("oidc_issuer_invalid", "authorization response issuer is invalid", http.StatusBadRequest)
 	OIDCCodeExchangeFailed = New("oidc_code_exchange_failed", "failed to exchange authorization code", http.StatusBadRequest)
 	OIDCIDTokenInvalid     = New("oidc_id_token_invalid", "id token validation failed", http.StatusBadRequest)
 	OIDCSubNotFound        = New("oidc_sub_not_found", "no sub claim in id token", http.StatusBadGateway)
+	OIDCUserInfoInvalid    = New("oidc_userinfo_invalid", "account userinfo validation failed", http.StatusBadGateway)
+	OIDCIdentityRetired    = New("oidc_identity_retired", "this account identity is retired", http.StatusForbidden)
 
 	DocNotFound       = New("doc_not_found", "document not found", http.StatusNotFound)
 	DocAlreadyDeleted = New("doc_already_deleted", "document already deleted", http.StatusBadRequest)

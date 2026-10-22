@@ -1,10 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createHubAuthCore } from '@agenthub/shared/api/auth';
+import { AppError } from '@agenthub/shared/errors';
 import { createMobileAuthSession } from './mobileAuthSession';
 import { createMobileAuthCorePorts } from './expoAuthPorts';
 import type { HubSessionStorageAdapter } from '@/session/sessionState';
 
 const HUB_SESSION_KEY = 'agenthub.mobile.hubSession.v1';
+const ACCOUNT_ISSUER = 'https://account.example';
 // Token field names are assembled from fragments so the privacy scanner does
 // not flag the literal secret-bearing identifiers in the fixture source.
 const ACCESS_TOKEN_FIELD = ['access', '_token'].join('');
@@ -66,6 +68,7 @@ function createFakeClient(): {
       return {
         state: 'server-state-123',
         authorization_url: 'https://id.example/oauth/authorize?state=server-state-123',
+        issuer: ACCOUNT_ISSUER,
       };
     },
     async oidcCallback(body: unknown) {
@@ -109,7 +112,7 @@ function createHarness(overrides: { randomDeviceId?: () => string } = {}) {
   const auth = createHubAuthCore(corePorts.ports, {
     createClient: () => client as never,
   });
-  const authSession = createMobileAuthSession(auth);
+  const authSession = createMobileAuthSession(auth, { allowRealLogin: true });
   return {
     authSession,
     corePorts,
@@ -145,7 +148,11 @@ describe('createMobileAuthSession over the shared auth core', () => {
       redirect_uri: 'agenthub://auth/callback',
     });
 
-    corePorts.handleIncomingOidcCallback({ code: 'auth-code-1', state: 'server-state-123' });
+    corePorts.handleIncomingOidcCallback({
+      code: 'auth-code-1',
+      state: 'server-state-123',
+      iss: ACCOUNT_ISSUER,
+    });
     const snapshot = await loginPromise;
 
     expect(snapshot.status).toBe('active');
@@ -156,6 +163,7 @@ describe('createMobileAuthSession over the shared auth core', () => {
     expect(harness.callbackCalls[0]).toMatchObject({
       code: 'auth-code-1',
       state: 'server-state-123',
+      iss: ACCOUNT_ISSUER,
       device_type: 'mobile',
     });
   });
@@ -167,7 +175,11 @@ describe('createMobileAuthSession over the shared auth core', () => {
 
     const loginPromise = authSession.login();
     await waitForLoginStarted(harness);
-    corePorts.handleIncomingOidcCallback({ code: 'auth-code-1', state: 'server-state-123' });
+    corePorts.handleIncomingOidcCallback({
+      code: 'auth-code-1',
+      state: 'server-state-123',
+      iss: ACCOUNT_ISSUER,
+    });
     await loginPromise;
 
     expect(snapshots).toContain('active');
@@ -180,7 +192,11 @@ describe('createMobileAuthSession over the shared auth core', () => {
     const loginPromise = authSession.login();
     await waitForLoginStarted(harness);
 
-    corePorts.handleIncomingOidcCallback({ code: 'auth-code-1', state: 'wrong-state' });
+    corePorts.handleIncomingOidcCallback({
+      code: 'auth-code-1',
+      state: 'wrong-state',
+      iss: ACCOUNT_ISSUER,
+    });
 
     await expect(loginPromise).rejects.toThrow(/state mismatch/i);
     expect((await authSession.getSession()).status).toBe('missing');
@@ -193,12 +209,17 @@ describe('createMobileAuthSession over the shared auth core', () => {
       codeVerifier: 'verifier',
       deviceId: 'device-id-fixed',
       redirectUri: 'agenthub://auth/callback',
+      issuer: ACCOUNT_ISSUER,
       createdAt: Date.now() - 11 * 60 * 1000,
     });
 
     // Cold start: the deep-link callback arrives before restore(); restore()
     // consumes the queued callback and hits the core expiry path.
-    corePorts.handleIncomingOidcCallback({ code: 'auth-code-1', state: 'server-state-123' });
+    corePorts.handleIncomingOidcCallback({
+      code: 'auth-code-1',
+      state: 'server-state-123',
+      iss: ACCOUNT_ISSUER,
+    });
 
     await expect(authSession.restore()).rejects.toThrow(/expired/i);
   });
@@ -255,10 +276,10 @@ describe('createMobileAuthSession over the shared auth core', () => {
       userSub: 'user-1',
     });
     harness.meImpl = async () => {
-      throw new Error('401');
+      throw new AppError({ error: { code: 'unauthorized', message: '401' } }, 401);
     };
     harness.refreshImpl = async () => {
-      throw new Error('refresh denied');
+      throw new AppError({ error: { code: 'auth_refresh_invalid', message: 'refresh denied' } }, 401);
     };
 
     const snapshot = await authSession.restore();
@@ -269,18 +290,49 @@ describe('createMobileAuthSession over the shared auth core', () => {
     expect(stored.refreshToken).toBeUndefined();
   });
 
+  it('keeps the stored session when restore fails transiently', async () => {
+    const { authSession, harness, store } = createHarness();
+    store[HUB_SESSION_KEY] = JSON.stringify({
+      status: 'active',
+      accessToken: 'access-stale',
+      refreshToken: 'refresh-valid',
+      userSub: 'user-1',
+    });
+    harness.meImpl = async () => {
+      throw new AppError({ error: { code: 'unavailable', message: 'down' } }, 503);
+    };
+    harness.refreshImpl = async () => {
+      throw new AppError({ error: { code: 'unavailable', message: 'down' } }, 503);
+    };
+
+    const snapshot = await authSession.restore();
+
+    expect(snapshot.status).toBe('missing');
+    const stored = JSON.parse(store[HUB_SESSION_KEY]!) as Record<string, unknown>;
+    expect(stored.accessToken).toBe('access-stale');
+    expect(stored.refreshToken).toBe('refresh-valid');
+  });
+
   it('persists and reuses the device id across logins', async () => {
     const { authSession, corePorts, harness } = createHarness();
 
     const firstLogin = authSession.login();
     await waitForLoginStarted(harness);
-    corePorts.handleIncomingOidcCallback({ code: 'code-1', state: 'server-state-123' });
+    corePorts.handleIncomingOidcCallback({
+      code: 'code-1',
+      state: 'server-state-123',
+      iss: ACCOUNT_ISSUER,
+    });
     await firstLogin;
 
     await authSession.logout();
     const secondLogin = authSession.login();
     await waitForLoginStarted(harness, 2);
-    corePorts.handleIncomingOidcCallback({ code: 'code-2', state: 'server-state-123' });
+    corePorts.handleIncomingOidcCallback({
+      code: 'code-2',
+      state: 'server-state-123',
+      iss: ACCOUNT_ISSUER,
+    });
     await secondLogin;
 
     const firstAuthorize = harness.authorizeCalls[0] as { device_id: string };
@@ -314,7 +366,11 @@ describe('logout', () => {
     const { authSession, corePorts, harness } = createHarness();
     const loginPromise = authSession.login();
     await waitForLoginStarted(harness);
-    corePorts.handleIncomingOidcCallback({ code: 'code-1', state: 'server-state-123' });
+    corePorts.handleIncomingOidcCallback({
+      code: 'code-1',
+      state: 'server-state-123',
+      iss: ACCOUNT_ISSUER,
+    });
     await loginPromise;
 
     expect(await authSession.getAccessToken()).toBe('access-token-1');

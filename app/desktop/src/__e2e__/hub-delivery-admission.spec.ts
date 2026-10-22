@@ -86,7 +86,7 @@ async function installDispatchFixture(page: Page, baseURL: string, theme: 'light
 
   await page.addInitScript(({ device, color }) => {
     sessionStorage.setItem('agenthub_hub_token', 'fixture-not-a-real-access-token');
-    localStorage.setItem('agenthub_token_source', 'tokendance');
+    localStorage.setItem('agenthub_token_source', 'account');
     localStorage.setItem('agenthub_device_id', device);
     localStorage.setItem('agenthub_onboarding_seen', 'true');
     localStorage.setItem('agenthub-v4-theme', color);

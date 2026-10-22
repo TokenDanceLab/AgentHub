@@ -189,7 +189,7 @@ async function installSplitHubStub(page: Page): Promise<BackendRequestLog> {
       return;
     }
 
-    if (boundary === 'local-edge' || boundary === 'tokendance-id' || boundary === 'gateway') {
+    if (boundary === 'local-edge' || boundary === 'account-oidc' || boundary === 'gateway') {
       requests.push({ method: request.method(), url: request.url() });
       await route.fulfill({
         status: 503,

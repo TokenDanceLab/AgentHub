@@ -39,6 +39,8 @@ const configDir = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(configDir, '..', '..');
 const artifactsDir = path.join(repoRoot, 'tests', 'artifacts');
 const stamp = runTimestamp();
+const configuredWebBaseUrl = process.env.AGENTHUB_E2E_WEB_BASE_URL?.trim().replace(/\/+$/, '');
+const webBaseUrl = configuredWebBaseUrl || 'http://127.0.0.1:5174';
 
 export default defineConfig({
   testDir: '../e2e',
@@ -57,7 +59,7 @@ export default defineConfig({
   // 时间戳会漂移；报告/HTML 已带时间戳，这里固定目录即可（每次运行覆盖）。
   outputDir: path.join(artifactsDir, 'test-results'),
   use: {
-    baseURL: 'http://127.0.0.1:5174',
+    baseURL: webBaseUrl,
     // Pin a real BCP-47 locale: some hosts expose navigator.language like
     // "en-US@posix", which crashes Intl (RangeError) inside the transcript
     // time formatter and hides chat messages.
@@ -75,9 +77,13 @@ export default defineConfig({
       use: { ...devices['Desktop Firefox'] },
     },
   ],
-  webServer: {
-    command: 'pnpm dev --host 127.0.0.1 --port 5174',
-    url: 'http://127.0.0.1:5174',
-    reuseExistingServer: !process.env.CI,
-  },
+  ...(configuredWebBaseUrl
+    ? {}
+    : {
+        webServer: {
+          command: 'pnpm dev --host 127.0.0.1 --port 5174',
+          url: 'http://127.0.0.1:5174',
+          reuseExistingServer: !process.env.CI,
+        },
+      }),
 });

@@ -51,7 +51,7 @@ describe('Mobile workflow fixtures', () => {
     ) as Record<MobileFixtureScenario, typeof mobileFixture>;
 
     expect(fixtures.empty.account).toMatchObject({
-      tokenDanceId: 'signed_in',
+      accountIdentity: 'signed_in',
       hubSession: 'active',
       notification: 'prompt',
       hubSync: 'active',

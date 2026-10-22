@@ -3,6 +3,7 @@ import { fetchExecutionTargets } from './executionTargetQueries';
 import { getAuthorization } from '@/__tests__/requestInitTestUtils';
 
 const DEVICE_ID = '00000000-0000-0000-0000-00000000a101';
+const ACCOUNT_ISSUER = 'https://account.example';
 
 async function loadAuthModule() {
   vi.resetModules();
@@ -55,14 +56,15 @@ describe('web Hub auth token auto-login', () => {
       configurable: true,
       value: {},
     });
-    window.history.pushState({}, '', '/auth/tokendance/callback?code=oidc-code&state=state-1');
+    window.history.pushState({}, '', `/auth/account/callback?code=oidc-code&state=state-1&iss=${encodeURIComponent(ACCOUNT_ISSUER)}`);
     sessionStorage.setItem(
       'agenthub_oidc_pkce_pending',
       JSON.stringify({
         state: 'state-1',
         codeVerifier: 'verifier-1',
         deviceId: DEVICE_ID,
-        redirectUri: `${window.location.origin}/auth/tokendance/callback`,
+        redirectUri: `${window.location.origin}/auth/account/callback`,
+        issuer: ACCOUNT_ISSUER,
         createdAt: Date.now(),
       })
     );
@@ -75,6 +77,7 @@ describe('web Hub auth token auto-login', () => {
         expect(body).toMatchObject({
           code: 'oidc-code',
           state: 'state-1',
+          iss: ACCOUNT_ISSUER,
           code_verifier: 'verifier-1',
           device_type: 'web',
           device_id: DEVICE_ID,
@@ -112,7 +115,7 @@ describe('web Hub auth token auto-login', () => {
     window.history.pushState(
       {},
       '',
-      '/auth/tokendance/callback?code=web-code&state=state-web-fixture'
+      `/auth/account/callback?code=web-code&state=state-web-fixture&iss=${encodeURIComponent(ACCOUNT_ISSUER)}`
     );
     sessionStorage.setItem(
       'agenthub_oidc_pkce_pending',
@@ -120,7 +123,8 @@ describe('web Hub auth token auto-login', () => {
         state: 'state-web-fixture',
         codeVerifier: 'web-verifier-fixture',
         deviceId: DEVICE_ID,
-        redirectUri: `${window.location.origin}/auth/tokendance/callback`,
+        redirectUri: `${window.location.origin}/auth/account/callback`,
+        issuer: ACCOUNT_ISSUER,
         createdAt: Date.now(),
       })
     );
@@ -135,10 +139,11 @@ describe('web Hub auth token auto-login', () => {
         expect(body).toMatchObject({
           code: 'web-code',
           state: 'state-web-fixture',
+          iss: ACCOUNT_ISSUER,
           code_verifier: 'web-verifier-fixture',
           device_type: 'web',
           device_id: DEVICE_ID,
-          redirect_uri: `${window.location.origin}/auth/tokendance/callback`,
+          redirect_uri: `${window.location.origin}/auth/account/callback`,
         });
         return new Response(
           JSON.stringify({
@@ -193,11 +198,11 @@ describe('web Hub auth token auto-login', () => {
       isAuthenticated: true,
       token: 'web-fixture-access-token',
       refreshToken: 'web-fixture-refresh-token',
-      tokenSource: 'tokendance',
+      tokenSource: 'account',
     });
     expect(sessionStorage.getItem('agenthub_hub_token')).toBe('web-fixture-access-token');
     expect(sessionStorage.getItem('agenthub_hub_refresh_token')).toBe('web-fixture-refresh-token');
-    expect(sessionStorage.getItem('agenthub_token_source')).toBe('tokendance');
+    expect(sessionStorage.getItem('agenthub_token_source')).toBe('account');
     expect(localStorage.getItem('agenthub_hub_token')).toBeNull();
     expect(localStorage.getItem('agenthub_hub_refresh_token')).toBeNull();
     expect(localStorage.getItem('agenthub_token_source')).toBeNull();
@@ -307,7 +312,7 @@ describe('web Hub auth token auto-login', () => {
     const { createHubAuth } = await loadAuthModule();
     const auth = createHubAuth();
 
-    window.history.pushState({}, '', '/auth/tokendance/callback?code=c&state=s');
+    window.history.pushState({}, '', `/auth/account/callback?code=c&state=s&iss=${encodeURIComponent(ACCOUNT_ISSUER)}`);
     sessionStorage.setItem('agenthub_oidc_pkce_pending', '{bad-json');
     await expect(auth.tryAutoLogin()).resolves.toBe(false);
 
@@ -317,11 +322,12 @@ describe('web Hub auth token auto-login', () => {
         state: 'expected',
         codeVerifier: 'v',
         deviceId: DEVICE_ID,
-        redirectUri: `${window.location.origin}/auth/tokendance/callback`,
+        redirectUri: `${window.location.origin}/auth/account/callback`,
+        issuer: ACCOUNT_ISSUER,
         createdAt: Date.now(),
       })
     );
-    window.history.pushState({}, '', '/auth/tokendance/callback?code=c&state=other');
+    window.history.pushState({}, '', `/auth/account/callback?code=c&state=other&iss=${encodeURIComponent(ACCOUNT_ISSUER)}`);
     await expect(auth.tryAutoLogin()).rejects.toThrow(/state mismatch/i);
 
     sessionStorage.setItem(
@@ -330,11 +336,12 @@ describe('web Hub auth token auto-login', () => {
         state: 'old',
         codeVerifier: 'v',
         deviceId: DEVICE_ID,
-        redirectUri: `${window.location.origin}/auth/tokendance/callback`,
+        redirectUri: `${window.location.origin}/auth/account/callback`,
+        issuer: ACCOUNT_ISSUER,
         createdAt: Date.now() - 11 * 60 * 1000,
       })
     );
-    window.history.pushState({}, '', '/auth/tokendance/callback?code=c&state=old');
+    window.history.pushState({}, '', `/auth/account/callback?code=c&state=old&iss=${encodeURIComponent(ACCOUNT_ISSUER)}`);
     await expect(auth.tryAutoLogin()).rejects.toThrow(/expired/i);
   });
 
@@ -361,13 +368,14 @@ describe('web Hub auth token auto-login', () => {
           code_challenge_method: 'S256',
           device_type: 'web',
           device_id: DEVICE_ID,
-          redirect_uri: 'http://localhost:5173/auth/tokendance/callback',
+          redirect_uri: 'http://localhost:5173/auth/account/callback',
         });
         expect(body.code_challenge).toMatch(/^[A-Za-z0-9_-]{43}$/);
         return new Response(
           JSON.stringify({
             state: 'server-state-1',
             authorization_url: 'https://id.example.com/authorize?state=server-state-1',
+            issuer: ACCOUNT_ISSUER,
           }),
           { status: 200, headers: { 'Content-Type': 'application/json' } }
         );
@@ -383,7 +391,7 @@ describe('web Hub auth token auto-login', () => {
 
       // Browser-redirect mode: the page unloads during the redirect, so the
       // returned promise never settles — assert the pre-redirect side effects.
-      void auth.loginWithTokenDance();
+      void auth.loginWithAccount();
 
       await vi.waitFor(() => {
         expect(assignSpy).toHaveBeenCalledWith(
@@ -394,7 +402,8 @@ describe('web Hub auth token auto-login', () => {
       expect(pending).toMatchObject({
         state: 'server-state-1',
         deviceId: DEVICE_ID,
-        redirectUri: 'http://localhost:5173/auth/tokendance/callback',
+        redirectUri: 'http://localhost:5173/auth/account/callback',
+        issuer: ACCOUNT_ISSUER,
       });
       expect(pending.codeVerifier).toMatch(/^[A-Za-z0-9_-]{43}$/);
       expect(pending.createdAt).toBeGreaterThan(0);

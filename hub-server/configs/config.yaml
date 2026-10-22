@@ -56,13 +56,14 @@ agent_team:
   assignment_timeout: 30m
   max_team_run_budget_tokens: 200000
   max_team_run_budget_usage_pct: 95
-tokendance_id:
-  issuer_url: "https://id.example.com"
-  jwks_uri: ""
+account_oidc:
+  issuer_url: ""
   client_id: ""
   client_secret: ""
   redirect_uri: ""
   allowed_redirect_uris: []
+  http_timeout: 10s
+  max_response_body_bytes: 65536
 
 # Outbound HTTP egress policy (#1540). Default-deny: an empty allowlist
 # refuses every dial to loopback/private/link-local/metadata networks, so

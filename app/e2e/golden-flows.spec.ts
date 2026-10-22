@@ -20,10 +20,9 @@ import { test, expect, request as pwRequest, type APIRequestContext, type Page }
  *  GF4 Edge 回调落地后 transcript 无需手动刷新（缓存失效回归门）。
  */
 
-const ID = process.env.AGENTHUB_E2E_ID_BASE_URL || 'http://127.0.0.1:3000';
 const HUB = process.env.AGENTHUB_E2E_HUB_BASE_URL || 'http://127.0.0.1:8080';
 const WEB = process.env.AGENTHUB_E2E_WEB_BASE_URL || 'http://127.0.0.1:5174';
-const WEB_CALLBACK = `${WEB}/workbench/auth/tokendance/callback`;
+const WEB_CALLBACK = `${WEB}/workbench/auth/account/callback`;
 const SPEC_DIR = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(SPEC_DIR, '..', '..');
 const ACCOUNT_ENV = process.env.AGENTHUB_E2E_ACCOUNT_ENV
@@ -40,70 +39,13 @@ function readAccountEnv(): Record<string, string> {
 }
 
 const creds = readAccountEnv();
-
-function pkce(): { verifier: string; challenge: string } {
-  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~';
-  let verifier = '';
-  const bytes = crypto.randomBytes(64);
-  for (let i = 0; i < 64; i += 1) verifier += alphabet[bytes[i]! % alphabet.length];
-  const challenge = crypto.createHash('sha256').update(verifier).digest('base64url');
-  return { verifier, challenge };
-}
+const ACCOUNT_ISSUER = process.env.AGENTHUB_E2E_ACCOUNT_ISSUER
+  || creds.AGENTHUB_E2E_ACCOUNT_ISSUER
+  || '';
+const USER_EMAIL = process.env.AGENTHUB_E2E_USER_EMAIL || creds.AGENTHUB_E2E_USER_EMAIL || '';
+const USER_PASSWORD = process.env.AGENTHUB_E2E_USER_PASSWORD || creds.AGENTHUB_E2E_USER_PASSWORD || '';
 
 interface HubSession { token: string; userId: string }
-
-/** 真实 Authorization Code + PKCE：ID 登录 → hub authorize → consent → hub callback。 */
-async function realHubSession(api: APIRequestContext, email: string, password: string, deviceType: 'web' | 'desktop'): Promise<HubSession> {
-  // ID 对 /api/auth/login 按 IP 限流（实测窗口内第 3 次起 429）：按 Retry-After
-  // 退避重试，而不是把限流当成登录失败。
-  let loginStatus = 0;
-  for (let attempt = 0; attempt < 6; attempt += 1) {
-    const login = await api.post(`${ID}/api/auth/login`, { data: { email, password }, maxRedirects: 0 });
-    loginStatus = login.status();
-    if (loginStatus === 200) break;
-    if (loginStatus !== 429) break;
-    const retryAfter = Number(login.headers()['retry-after'] ?? '0') || 10 * (attempt + 1);
-    await new Promise((resolve) => { setTimeout(resolve, retryAfter * 1000); });
-  }
-  expect(loginStatus, `ID login for ${deviceType}`).toBe(200);
-
-  const { verifier, challenge } = pkce();
-  const deviceId = crypto.randomUUID();
-  const authorize = await api.post(`${HUB}/client/auth/oidc/authorize`, {
-    data: { code_challenge: challenge, code_challenge_method: 'S256', device_type: deviceType, device_id: deviceId, redirect_uri: WEB_CALLBACK },
-  });
-  expect(authorize.status()).toBe(200);
-  const az = (await authorize.json()).data as { state: string; authorization_url: string };
-
-  let code: string | null = null;
-  const first = await api.get(az.authorization_url, { maxRedirects: 0 });
-  if ([302, 303, 307].includes(first.status())) {
-    code = new URL(first.headers().location ?? '', ID).searchParams.get('code');
-  } else {
-    expect(first.status()).toBe(200);
-    const html = await first.text();
-    const form = html.match(/<form[^>]+action="\/oidc\/authorize\/confirm"[^>]*>([\s\S]*?)<\/form>/);
-    const formBody = form?.[1];
-    expect(formBody, 'consent form present').toBeTruthy();
-    const fields: Record<string, string> = {};
-    for (const m of (formBody ?? '').matchAll(/<input[^>]+name="([^"]+)"[^>]+value="([^"]*)"/g)) fields[m[1] ?? ''] = m[2] ?? '';
-    const confirm = await api.post(`${ID}/oidc/authorize/confirm`, {
-      data: new URLSearchParams(fields).toString(),
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      maxRedirects: 0,
-    });
-    expect([302, 303, 307].includes(confirm.status()), `consent confirm status ${confirm.status()}`).toBe(true);
-    code = new URL(confirm.headers().location ?? '', ID).searchParams.get('code');
-  }
-  expect(code, 'authorization code obtained').not.toBeNull();
-
-  const callback = await api.post(`${HUB}/client/auth/oidc/callback`, {
-    data: { code, state: az.state, code_verifier: verifier, device_type: deviceType, device_id: deviceId, redirect_uri: WEB_CALLBACK },
-  });
-  expect(callback.status(), 'hub oidc callback').toBe(200);
-  const body = (await callback.json()).data as { access_token: string; user: { id: string } };
-  return { token: body.access_token, userId: body.user.id };
-}
 
 async function hubJson(api: APIRequestContext, method: 'get' | 'post', path: string, token: string, data?: unknown) {
   const res = await api[method === 'get' ? 'get' : 'post'](`${HUB}${path}`, {
@@ -157,31 +99,48 @@ async function provisionConversation(api: APIRequestContext, web: HubSession, de
   return { sessionId, taskId, agentReplyText, sessionName };
 }
 
-/** 真浏览器 OIDC 登录（与 real-oidc-login.spec.ts 同一路径）。 */
-async function loginInBrowser(page: Page): Promise<void> {
+/** 真浏览器 Account OIDC 登录（与 real-oidc-login.spec.ts 同一路径）。 */
+async function loginInBrowser(page: Page, email: string, password: string): Promise<HubSession> {
   await page.goto(`${WEB}/workbench/`, { waitUntil: 'domcontentloaded' });
   const composer = page.locator('textarea[data-composer-input]').first();
   await composer.click();
   await composer.fill('golden-flow: open sign-in');
   await composer.press('Enter');
-  await page.getByRole('button', { name: /Continue with TokenDance|使用 TokenDance ID 登录/i }).first().click();
-  const idHost = new URL(ID).host.replace(/\./g, '\\.');
-  await expect(page).toHaveURL(new RegExp(`${idHost}/login`), { timeout: 25_000 });
-  await page.locator('#login-email').fill(creds.AGENTHUB_E2E_USER_EMAIL ?? '');
-  await page.locator('#login-password').fill(creds.AGENTHUB_E2E_USER_PASSWORD ?? '');
-  // ID 按 IP 限流 /api/auth/login：并行 spec 会消耗配额，提交后可能停在登录页。
-  // 表单值保留，所以限流窗口过后重提交即可自愈（不把限流当登录失败）。
-  const consent = page.locator('form[action="/oidc/authorize/confirm"]');
-  for (let attempt = 0; attempt < 4; attempt += 1) {
-    await page.locator('button.login-submit').click();
-    const appeared = await consent.waitFor({ timeout: 12_000 }).then(() => true).catch(() => false);
-    if (appeared) break;
-    if (attempt === 3) await consent.waitFor({ timeout: 25_000 });
-    await page.waitForTimeout(15_000);
-  }
-  await consent.locator('button[type="submit"]').click();
+  await page.getByRole('button', {
+    name: /Continue with TokenDance Account|使用 TokenDance Account 登录/i,
+  }).first().click();
+  const accountOrigin = new URL(ACCOUNT_ISSUER).origin;
+  await expect.poll(() => {
+    try {
+      return new URL(page.url()).origin;
+    } catch {
+      return '';
+    }
+  }, { timeout: 25_000 }).toBe(accountOrigin);
+  await page.locator('#login-email').fill(email);
+  await page.getByRole('button', { name: /^(Next|下一步)$/i }).click();
+  await page.locator('#login-secret').fill(password);
+  await page.getByRole('button', { name: /^(Sign in|登录)$/i }).click();
+  await page.getByRole('button', { name: /^(Allow access|允许访问)$/i }).click({ noWaitAfter: true });
   await page.waitForURL('**/workbench/**', { timeout: 30_000 });
   await page.waitForFunction(() => sessionStorage.getItem('agenthub_hub_token') !== null, null, { timeout: 30_000 });
+  const token = String(await page.evaluate(() => sessionStorage.getItem('agenthub_hub_token')));
+  const me = await page.request.get(`${HUB}/client/auth/me`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  expect(me.status()).toBe(200);
+  const body = await me.json() as { data?: { id?: string } };
+  const userId = String(body.data?.id ?? '');
+  expect(userId).toBeTruthy();
+  return { token, userId };
+}
+
+async function seedSessionInPage(page: Page, session: HubSession): Promise<void> {
+  await page.addInitScript(({ token }) => {
+    sessionStorage.setItem('agenthub_token_source', 'account');
+    sessionStorage.setItem('agenthub_hub_token', token);
+  }, { token: session.token });
+  await page.goto(`${WEB}/workbench/`, { waitUntil: 'domcontentloaded' });
 }
 
 async function openSessionByName(page: Page, name: string): Promise<void> {
@@ -212,50 +171,62 @@ async function clickRegenerate(page: Page, block: import('@playwright/test').Loc
 }
 
 test.describe('AgentHub Golden Flows（真实栈）', () => {
-  // 串行：四条流共享同一个 IP 的 ID 登录配额，并行只会互相限流。
+  // 串行：四条流共享同一组真实 Hub 会话与 Account 登录结果。
   test.describe.configure({ mode: 'serial' });
   test.setTimeout(240_000);
 
-  // ID 对 /api/auth/login 按 IP 限流（实测连续第 3 次起 429）：整个 describe 只登录
-  // 一次，web/desktop 两种 device_type 的 hub 会话共用同一个 ID cookie jar 派生。
   let sharedApi: APIRequestContext;
   let webSession: HubSession;
   let desktopSession: HubSession;
 
-  test.beforeAll(async () => {
+  test.beforeAll(async ({ browser }) => {
+    if (!ACCOUNT_ISSUER || !USER_EMAIL || !USER_PASSWORD) {
+      test.skip(true, 'external Account and disposable test credentials are required');
+      return;
+    }
     sharedApi = await pwRequest.newContext();
-    webSession = await realHubSession(sharedApi, creds.AGENTHUB_E2E_USER_EMAIL ?? '', creds.AGENTHUB_E2E_USER_PASSWORD ?? '', 'web');
-    desktopSession = await realHubSession(sharedApi, creds.AGENTHUB_E2E_USER_EMAIL ?? '', creds.AGENTHUB_E2E_USER_PASSWORD ?? '', 'desktop');
+    const webContext = await browser.newContext({ locale: 'en-US' });
+    try {
+      const webPage = await webContext.newPage();
+      webSession = await loginInBrowser(webPage, USER_EMAIL, USER_PASSWORD);
+    } finally {
+      await webContext.close();
+    }
+    const desktopContext = await browser.newContext({ locale: 'en-US' });
+    try {
+      const desktopPage = await desktopContext.newPage();
+      desktopSession = await loginInBrowser(desktopPage, USER_EMAIL, USER_PASSWORD);
+    } finally {
+      await desktopContext.close();
+    }
   });
 
   test.afterAll(async () => {
     await sharedApi?.dispose();
   });
 
-  test('GF1 真登录后主界面拿到真实 Hub 数据（会话与消息非 demo）', async ({ request, browser }) => {
+  test('GF1 真登录后主界面拿到真实 Hub 数据（会话与消息非 demo）', async ({ browser }) => {
     const prov = await provisionConversation(sharedApi, webSession, desktopSession, 'GF1');
 
     const context = await browser.newContext({ viewport: { width: 1440, height: 810 }, locale: 'en-US' });
-    await context.route('**/challenges.cloudflare.com/**', (r) => r.abort());
     const page = await context.newPage();
-    await loginInBrowser(page);
+    await seedSessionInPage(page, webSession);
     await openSessionByName(page, prov.sessionName);
     // 真数据断言：用户消息与 agent 回复都来自 Hub（文本逐字匹配 provisioning 内容）。
     await expect(page.getByText(prov.agentReplyText).first()).toBeVisible({ timeout: 20_000 });
     await context.close();
   });
 
-  test('GF2 「重新生成」发真 task id 且成功（#2274 回归门）', async ({ request, browser }) => {
+  test('GF2 「重新生成」发真 task id 且成功（#2274 回归门）', async ({ browser }) => {
     const prov = await provisionConversation(sharedApi, webSession, desktopSession, 'GF2');
 
     const context = await browser.newContext({ viewport: { width: 1440, height: 810 }, locale: 'en-US' });
-    await context.route('**/challenges.cloudflare.com/**', (r) => r.abort());
     const page = await context.newPage();
     const regenerateCalls: Array<{ url: string; status: number }> = [];
     page.on('response', (res) => {
       if (res.url().includes('/regenerate')) regenerateCalls.push({ url: res.url(), status: res.status() });
     });
-    await loginInBrowser(page);
+    await seedSessionInPage(page, webSession);
     await openSessionByName(page, prov.sessionName);
     const block = page.locator('[data-block-id^="hub-message-"]', { hasText: prov.agentReplyText }).first();
     await expect(block).toBeVisible({ timeout: 20_000 });
@@ -273,7 +244,6 @@ test.describe('AgentHub Golden Flows（真实栈）', () => {
 
   test('GF3 未登录 demo 不提供会失败的「重新生成」（诚实门回归）', async ({ browser }) => {
     const context = await browser.newContext({ viewport: { width: 1440, height: 810 }, locale: 'en-US' });
-    await context.route('**/challenges.cloudflare.com/**', (r) => r.abort());
     const page = await context.newPage();
     const regenerateCalls: string[] = [];
     page.on('request', (req) => {
@@ -293,13 +263,12 @@ test.describe('AgentHub Golden Flows（真实栈）', () => {
     await context.close();
   });
 
-  test('GF4 Edge 回调落地后 transcript 无需手动刷新（invalidation 回归门）', async ({ request, browser }) => {
+  test('GF4 Edge 回调落地后 transcript 无需手动刷新（invalidation 回归门）', async ({ browser }) => {
     const prov = await provisionConversation(sharedApi, webSession, desktopSession, 'GF4');
 
     const context = await browser.newContext({ viewport: { width: 1440, height: 810 }, locale: 'en-US' });
-    await context.route('**/challenges.cloudflare.com/**', (r) => r.abort());
     const page = await context.newPage();
-    await loginInBrowser(page);
+    await seedSessionInPage(page, webSession);
     await openSessionByName(page, prov.sessionName);
     await expect(page.getByText(prov.agentReplyText).first()).toBeVisible({ timeout: 20_000 });
 

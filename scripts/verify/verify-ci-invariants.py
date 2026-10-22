@@ -62,7 +62,17 @@ POLICY = {
                 ),
             },
         },
-        "dispatch_only_jobs": {"real-e2e-stack": ("vars.OIDC_SOURCE_REPO", "vars.OIDC_IMAGE")},
+        "dispatch_only_jobs": {
+            "real-e2e-stack": (
+                "vars.AGENTHUB_E2E_ACCOUNT_ISSUER",
+                "vars.AGENTHUB_E2E_ACCOUNT_CLIENT_ID",
+                "secrets.AGENTHUB_E2E_ACCOUNT_CLIENT_SECRET",
+                "secrets.AGENTHUB_E2E_USER_EMAIL",
+                "secrets.AGENTHUB_E2E_USER_PASSWORD",
+                "secrets.AGENTHUB_E2E_PARTNER_EMAIL",
+                "secrets.AGENTHUB_E2E_PARTNER_PASSWORD",
+            )
+        },
     },
     "release.yml": {
         "required_jobs": ("release-gate",),
@@ -176,7 +186,8 @@ def check_workflow(name, workflow, requirements, errors):
         if isinstance(job, dict) and str(job.get("environment", "")) != environment:
             errors.append(f"{name}: job '{job_name}' must run in the protected '{environment}' environment")
 
-    for job_name, required_refs in requirements.get("dispatch_only_jobs", {}).items():
+    dispatch_only_jobs = requirements.get("dispatch_only_jobs", {})
+    for job_name, required_refs in dispatch_only_jobs.items():
         job = jobs.get(job_name)
         if not isinstance(job, dict):
             continue
@@ -189,12 +200,32 @@ def check_workflow(name, workflow, requirements, errors):
         for ref in required_refs:
             if ref not in job_text:
                 errors.append(f"{name}: job '{job_name}' must read {ref}")
-        if re.search(r"inputs\.(id_image|id_base_url|id_source_repo)", job_text):
-            errors.append(f"{name}: job '{job_name}' must not accept OIDC source/image dispatch inputs")
-        if job_name == "real-e2e-stack":
-            issuer = str((job.get("env") or {}).get("AGENTHUB_TOKENDANCE_ID_ISSUER_URL", ""))
-            if not re.fullmatch(r"http://(127\.0\.0\.1|localhost|\[::1\]):\d+/?", issuer):
-                errors.append(f"{name}: real-e2e-stack must use a loopback TokenDance ID issuer")
+        forbidden_provider_refs = (
+            r"inputs\.(?:id_env|id_image|id_base_url|id_source_repo)",
+            r"\b(?:OIDC_SOURCE_REPO|OIDC_IMAGE|OIDC_CLONE_TOKEN)\b",
+            r"\bAGENTHUB_TOKENDANCE_ID_[A-Z0-9_]+\b",
+            r"\b(?:tokendance-id|tokendance-account)\b",
+            r"/var/lib/oidc-provider",
+        )
+        for pattern in forbidden_provider_refs:
+            if re.search(pattern, job_text):
+                errors.append(
+                    f"{name}: job '{job_name}' must use an external Account client, "
+                    f"not internal provider wiring ({pattern})"
+                )
+
+    # A default PR/push gate may exercise Hub Account-OIDC code against the
+    # repo-local fixture, but it must never receive operator Account secrets or
+    # depend on an internal Account/provider checkout.
+    dispatch_names = set(dispatch_only_jobs)
+    for job_name, job in jobs.items():
+        if not isinstance(job, dict) or job_name in dispatch_names:
+            continue
+        job_text = json.dumps(job)
+        if re.search(r"\bsecrets\.AGENTHUB_E2E_(?:ACCOUNT_|USER_|PARTNER_)", job_text):
+            errors.append(f"{name}: default job '{job_name}' must not receive operator Account E2E secrets")
+        if re.search(r"\b(?:tokendance-id|tokendance-account)\b", job_text):
+            errors.append(f"{name}: default job '{job_name}' must not depend on an internal Account/provider checkout")
 
 
 def check_script_references(name, workflow, repo_root, errors):
@@ -260,6 +291,60 @@ def run_self_test():
             raise AssertionError(f"{label}: expected {expected!r}, got {message!r}")
         if not expected and errors:
             raise AssertionError(f"{label}: expected no errors, got {message!r}")
+
+    account_requirements = {
+        "required_jobs": ("validate", "real-e2e-stack"),
+        "must_always_report": (),
+        "verifier_jobs": {},
+        "job_scripts": {},
+        "required_steps": {},
+        "protected_environments": {},
+        "dispatch_only_jobs": {
+            "real-e2e-stack": (
+                "vars.AGENTHUB_E2E_ACCOUNT_ISSUER",
+                "secrets.AGENTHUB_E2E_ACCOUNT_CLIENT_SECRET",
+            )
+        },
+    }
+
+    def account_workflow(*, condition="github.event_name == 'workflow_dispatch'",
+                          refs=("vars.AGENTHUB_E2E_ACCOUNT_ISSUER",
+                                "secrets.AGENTHUB_E2E_ACCOUNT_CLIENT_SECRET"),
+                          extra=""):
+        return {
+            "jobs": {
+                "validate": {"steps": [{"name": "validate", "run": "python gate.py"}]},
+                "real-e2e-stack": {
+                    "if": condition,
+                    "env": {"ISSUER": refs[0]},
+                    "steps": [{"name": "lane", "run": f"echo {refs[1]} {extra}".strip()}],
+                },
+            }
+        }
+
+    account_cases = {
+        "account-valid": (account_workflow(), None),
+        "account-pr-runnable": (
+            account_workflow(condition="github.event_name == 'pull_request'"),
+            "must stay workflow_dispatch-only",
+        ),
+        "account-internal-source": (
+            account_workflow(extra="vars.OIDC_SOURCE_REPO"), "not internal provider wiring"
+        ),
+        "account-missing-secret": (
+            account_workflow(refs=("vars.AGENTHUB_E2E_ACCOUNT_ISSUER", "vars.ACCOUNT_PUBLIC")),
+            "must read secrets.AGENTHUB_E2E_ACCOUNT_CLIENT_SECRET",
+        ),
+    }
+    for label, (fixture, expected) in account_cases.items():
+        errors = []
+        check_workflow("fixture.yml", fixture, account_requirements, errors)
+        message = "; ".join(errors)
+        if expected and expected not in message:
+            raise AssertionError(f"{label}: expected {expected!r}, got {message!r}")
+        if not expected and errors:
+            raise AssertionError(f"{label}: expected no errors, got {message!r}")
+
     print("CI invariant self-test ok")
 
 

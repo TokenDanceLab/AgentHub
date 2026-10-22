@@ -1,6 +1,6 @@
 # Agent protocols and SDK strategy
 
-最后更新：2026-10-18（合并 SDK 策略与 Agent Protocol 兼容性）
+最后更新：2026-10-23（Account OIDC 身份边界）
 
 本文是 AgentHub 对外部 Agent SDK 和 Agent Protocol 兼容层的轻量策略摘要。
 
@@ -27,7 +27,7 @@ AgentHubAgentSpec / Agent Profile / TeamRun
 
 ## 2. Agent Protocol 兼容性
 
-AgentHub 不是 Agent Protocol 的 drop-in implementation。两者概念层相近，但 AgentHub 使用 Hub/Edge 双层 API、TokenDance ID OIDC + Hub session、本地/远程 Execution Target、IM 会话和 TeamRun 编排。
+AgentHub 不是 Agent Protocol 的 drop-in implementation。两者概念层相近，但 AgentHub 使用 Hub/Edge 双层 API、TokenDance Account 公共 OIDC + Hub session、本地/远程 Execution Target、IM 会话和 TeamRun 编排。
 
 如果要做 Agent Protocol 兼容网关，应在网关层完成 API key / Agent Protocol schema 到 AgentHub Hub session / Edge token / AgentHub schema 的转换；不要把 Agent Protocol 直接变成 AgentHub 内部产品模型。
 
@@ -37,9 +37,9 @@ AgentHub 不是 Agent Protocol 的 drop-in implementation。两者概念层相�
 | Threads | `/v1/threads` | `/client/sessions`, `/web/projects/:id/threads` | Hub session 还包含 IM 私聊/群聊语义 |
 | Store | none | `/web/documents`, `/client/settings` | AgentHub Store 是文档/设置，不是低延迟 runtime KV |
 | Wait/stream | `/v1/events` WebSocket | Hub WebSocket / event endpoints | AgentHub 偏 typed event stream，不是 HTTP wait |
-| Auth | Edge local token / Edge bearer | TokenDance ID OIDC → Hub-issued session | Agent Protocol API key 不可直接复用 |
+| Auth | Edge local token / Edge bearer | Account 公共 OIDC → Hub-issued HS256 session | Agent Protocol API key、Account token 和 Hub session 不可互相替代 |
 
-行为差异：cancel run 使用 action endpoint，不是 `DELETE`；Hub session/thread 含 IM membership、pin/archive/mute、群聊信息和审计；Web 不直连 Local Edge；Hub session、Edge token 和 TokenDance API key 语义不同，不能混用。
+行为差异：cancel run 使用 action endpoint，不是 `DELETE`；Hub session/thread 含 IM membership、pin/archive/mute、群聊信息和审计；Web 不直连 Local Edge；Hub session、Edge token、Account token 和 provider API key 语义不同，不能混用。Hub REST/WS 只接受 Hub HS256，Account token 只由 Hub OIDC service 在服务端消费。
 
 **Implementation rule**：任何兼容层必须作为 adapter/gateway 明确标注，不能改写 AgentHub 内部 API SSOT：REST SSOT `api/openapi.yaml`，WebSocket SSOT `api/events.md`，架构入口 `docs/architecture.md`，安全/授权约定见 `docs/architecture/06-auth-identity.md`，漏洞报告见 `SECURITY.md`。
 
@@ -48,5 +48,5 @@ AgentHub 不是 Agent Protocol 的 drop-in implementation。两者概念层相�
 - 是否保持 Agent Runtime / Agent Profile / Agent Configuration / Execution Target 术语分离？
 - SDK 对象是否被限制在 Edge adapter 以下？
 - Tool/MCP/approval/memory/evidence 是否仍由 AgentHub policy 和合同拥有？
-- 测试是否默认 fixture-only，除非有明确 approved-real？
+- 测试是否默认 fixture-only，除非有明确 approved-real？真实 Account L3 必须使用真实 issuer、浏览器授权码流和 UserInfo，fixture/stubbed Hub 不能冒充。
 - 文档和 PR 是否没有宣称真实模型/API、真实 MCP 或 production 能力？

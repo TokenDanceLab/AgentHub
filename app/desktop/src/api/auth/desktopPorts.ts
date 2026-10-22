@@ -5,8 +5,8 @@
  * - tokens live in the OS credential store via Tauri invoke (memory +
  *   sessionStorage fallback in Vite dev mode); token source hint stays in
  *   localStorage
- * - Tauri mode: the Rust backend starts a local HTTP callback server on a
- *   random loopback port and emits `oidc-callback` / `oidc-callback-error`
+ * - Tauri mode: the Rust backend starts a local HTTP callback server on the
+ *   fixed registered loopback port and emits `oidc-callback` / `oidc-callback-error`
  *   events; the PKCE verifier stays memory-only (never sessionStorage)
  * - Vite dev mode: browser redirect like Web, pending state in sessionStorage
  * - authorization URL opens in the system browser (Tauri) or current window
@@ -30,9 +30,10 @@ import type {
 } from '@shared/api/auth';
 import { OidcError } from '@shared/api/auth';
 
-const TOKEN_SOURCE_KEY = 'agenthub_token_source'; // "tokendance" | "hub"
+const TOKEN_SOURCE_KEY = 'agenthub_token_source'; // "account" | "hub"
 const OIDC_PENDING_KEY = 'agenthub_oidc_pkce_pending';
-const OIDC_CALLBACK_PATH = '/auth/tokendance/callback';
+const OIDC_CALLBACK_PATH = '/auth/account/callback';
+const OIDC_LOOPBACK_PORT = 53682;
 
 type TauriWindow = Window & { __TAURI_INTERNALS__?: unknown };
 
@@ -51,8 +52,9 @@ function readBrowserCallback(): OidcCallbackResult | null {
   if (url.pathname !== OIDC_CALLBACK_PATH) return null;
   const code = url.searchParams.get('code')?.trim();
   const state = url.searchParams.get('state')?.trim();
-  if (!code || !state) return null;
-  return { code, state };
+  const iss = url.searchParams.get('iss')?.trim();
+  if (!code || !state || !iss) return null;
+  return { code, state, iss };
 }
 
 function leaveCallbackRoute(): void {
@@ -62,9 +64,14 @@ function leaveCallbackRoute(): void {
 
 function readTokenSource(): HubTokenSource {
   try {
-    return (typeof localStorage !== 'undefined'
+    const source = typeof localStorage !== 'undefined'
       ? localStorage.getItem(TOKEN_SOURCE_KEY)
-      : null) as HubTokenSource;
+      : null;
+    if (source === 'account' || source === 'hub') return source;
+    if (source) {
+      localStorage.removeItem(TOKEN_SOURCE_KEY);
+    }
+    return null;
   } catch {
     return null;
   }
@@ -111,12 +118,12 @@ function startCallbackServer(): Promise<{ port: number; result: Promise<OidcCall
         let unlisten: () => void = () => {};
         let unlistenError: () => void = () => {};
 
-        listen<{ code: string; state: string }>('oidc-callback', (event) => {
+        listen<{ code: string; state: string; iss: string }>('oidc-callback', (event) => {
           if (settled) return;
           settled = true;
           clearTimeout(timeout);
           unlistenError();
-          resolve({ code: event.payload.code, state: event.payload.state });
+          resolve({ code: event.payload.code, state: event.payload.state, iss: event.payload.iss });
         }).then((u) => {
           if (settled) {
             u();
@@ -188,7 +195,11 @@ export function createDesktopHubAuthPorts(): HubAuthPorts {
         try {
           const raw = sessionStorage.getItem(OIDC_PENDING_KEY);
           if (!raw) return null;
-          return JSON.parse(raw) as BrowserOIDCPending;
+          const pending = JSON.parse(raw) as BrowserOIDCPending;
+          if (!pending.state || !pending.codeVerifier || !pending.deviceId || !pending.redirectUri || !pending.issuer) {
+            return null;
+          }
+          return pending;
         } catch {
           return null;
         }
@@ -209,7 +220,13 @@ export function createDesktopHubAuthPorts(): HubAuthPorts {
           };
         }
         const { port, result } = await startCallbackServer();
-        const redirectUri = port > 0 ? `http://127.0.0.1:${port}/callback` : '';
+        if (port !== OIDC_LOOPBACK_PORT) {
+          throw new OidcError(
+            'startFailed',
+            `Account callback server returned port ${port}; expected registered port ${OIDC_LOOPBACK_PORT}.`,
+          );
+        }
+        const redirectUri = `http://127.0.0.1:${port}/callback`;
         return { redirectUri, callback: result };
       },
       readBrowserCallback,

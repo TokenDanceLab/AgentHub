@@ -4,7 +4,8 @@ import { blockExternalFonts, isExternalFontUrl } from '../../../e2e/fontBlocker'
 const LIVE_BACKEND_HOSTS = new Set([
   'hub.vectorcontrol.tech',
   'api.hub.vectorcontrol.tech',
-  'id.tokendancelab.com',
+  'hub-app.tokendancelab.com',
+  'account.tokendancelab.com',
   'api.vectorcontrol.tech',
   'localhost:8080',
   '127.0.0.1:8080',

@@ -8,9 +8,10 @@
 
 统一入口：`scripts/dev/devserver.sh <sync|start|stop|status|test|integration>`。
 
-远程服务器承载 L3 真实测试（全栈：TokenDanceID + hub + edge + web vite），
-本脚本从本地发起同步、启动、健康检查与测试报告回传。分层定义见
-根 `AGENTS.md` 的“测试分层（L0-L4）”。
+远程服务器承载 L3 真实测试（外部 TokenDance Account + hub + edge + web
+vite），本脚本从本地发起同步、启动、健康检查与测试报告回传。Account
+issuer/client 由 operator 在服务器本地配置并已注册；仓库不启动或克隆内部
+Account provider。分层定义见根 `AGENTS.md` 的“测试分层（L0-L4）”。
 
 ### 前置配置
 
@@ -21,10 +22,15 @@
 3. 服务器仓库路径必须通过 `AGENTHUB_DEVSERVER_ROOT` 显式传入。
 
 4. 服务器本地 `.env` 必须包含启动所需全部键（`AGENTHUB_DB_*`、
-   `AGENTHUB_TOKENDANCE_ID_*`、`AGENTHUB_JWT_SECRET`）；缺键时 `start`
-   会 fail-closed 并指出缺哪个键，值永不出服务器。
+   `AGENTHUB_ACCOUNT_OIDC_*`、`AGENTHUB_JWT_SECRET`）；缺键时 `start`
+   会 fail-closed 并指出缺哪个键，值永不出服务器。`start` 只探测已配置的
+   Account discovery，不启动本地 Account。
 
-5. 若服务器出站受限，`devserver.sh` 会读取 `/etc/environment` 或 `DEVSERVER_GOPROXY`。
+5. Account 侧须为该 client 精确登记 desktop loopback
+   `http://127.0.0.1:53682/callback`，以及实际 Web dev origin/path（默认
+   `/workbench/auth/account/callback`）。
+
+6. 若服务器出站受限，`devserver.sh` 会读取 `/etc/environment` 或 `DEVSERVER_GOPROXY`。
 
 ### 证据纪律
 

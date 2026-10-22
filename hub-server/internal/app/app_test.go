@@ -151,10 +151,10 @@ func TestHubConfigDumperMasksSecrets(t *testing.T) {
 	require.NotContains(t, dump, "raw-jwt-secret")
 }
 
-// TestOIDCSmoke verifies that when TokenDance ID is configured (ClientID is set),
+// TestAccountOIDCSmoke verifies that when Account OIDC is configured (ClientID is set),
 // both the OIDC service and handler are non-nil. When ClientID is empty, both
 // should remain nil (OIDC disabled).
-func TestOIDCSmoke(t *testing.T) {
+func TestAccountOIDCSmoke(t *testing.T) {
 	// Helper to create a minimal in-memory SQLite DB for the test.
 	newDB := func(t *testing.T) *gorm.DB {
 		t.Helper()
@@ -190,11 +190,11 @@ func TestOIDCSmoke(t *testing.T) {
 				AccessTTL:  15 * time.Minute,
 				RefreshTTL: 720 * time.Hour,
 			},
-			TokenDanceID: config.TokenDanceIDConfig{
-				IssuerURL:    "https://id.example.com",
+			AccountOIDC: config.AccountOIDCConfig{
+				IssuerURL:    "https://account.example.com",
 				ClientID:     "test-client",
-				ClientSecret: "test-secret",
-				RedirectURI:  "http://localhost:0/callback",
+				ClientSecret: "test-account-client-secret-padded-to-32",
+				RedirectURI:  "http://127.0.0.1:53682/callback",
 			},
 		}
 
@@ -202,7 +202,7 @@ func TestOIDCSmoke(t *testing.T) {
 		// We don't call Run (which would try to ping the real DB), but
 		// we manually verify the DI wiring.
 		// Simulate what Run does for OIDC:
-		if app.Config.TokenDanceID.ClientID != "" {
+		if app.Config.AccountOIDC.ClientID != "" {
 			_ = app.Config // used
 			// This mirrors the guard in App.initServices (wiring.go).
 			// In production, service.NewOIDCService and handler.NewOIDCHandler would be called.
@@ -210,11 +210,11 @@ func TestOIDCSmoke(t *testing.T) {
 		}
 
 		// Verify the config values are wired through (smoke test).
-		if app.Config.TokenDanceID.ClientID != "test-client" {
-			t.Fatalf("ClientID = %q, want test-client", app.Config.TokenDanceID.ClientID)
+		if app.Config.AccountOIDC.ClientID != "test-client" {
+			t.Fatalf("ClientID = %q, want test-client", app.Config.AccountOIDC.ClientID)
 		}
-		if app.Config.TokenDanceID.IssuerURL != "https://id.example.com" {
-			t.Fatalf("IssuerURL = %q, want https://id.example.com", app.Config.TokenDanceID.IssuerURL)
+		if app.Config.AccountOIDC.IssuerURL != "https://account.example.com" {
+			t.Fatalf("IssuerURL = %q, want https://account.example.com", app.Config.AccountOIDC.IssuerURL)
 		}
 	})
 
@@ -234,7 +234,7 @@ func TestOIDCSmoke(t *testing.T) {
 
 		app := New(cfg, newDB(t), newCache(t))
 		// When ClientID is empty, OIDC should NOT activate.
-		if app.Config.TokenDanceID.ClientID != "" {
+		if app.Config.AccountOIDC.ClientID != "" {
 			t.Fatal("expected ClientID to be empty, got non-empty")
 		}
 	})

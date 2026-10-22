@@ -19,6 +19,7 @@
 
 import {
   createHubAuthCore,
+  OidcError,
   type HubAuth,
   type HubAuthState,
 } from '@agenthub/shared/api/auth';
@@ -39,7 +40,7 @@ export const MOBILE_AUTH_CALLBACK_URI = 'agenthub://auth/callback';
  */
 export interface MobileAuthSession {
   /**
-   * Full TokenDance ID login: PKCE start (Hub authorize) → system browser →
+   * Full TokenDance Account login: PKCE start (Hub authorize) → system browser →
    * deep-link callback → code exchange → persisted session. The promise
    * settles on completion or an OidcError (state mismatch / expiry /
    * exchange failure).
@@ -67,11 +68,12 @@ export interface CreateExpoMobileAuthSessionResult {
    * Push an OIDC authorization response parsed by the deep-link bridge into
    * the core callback channel (validate + resolve the in-flight login).
    */
-  handleIncomingOidcCallback: (callback: { code: string; state: string }) => void;
+  handleIncomingOidcCallback: (callback: { code: string; state: string; iss: string }) => void;
 }
 
 export async function createExpoMobileAuthSession(
   baseUrl: string,
+  options: { allowRealLogin?: boolean } = {},
 ): Promise<CreateExpoMobileAuthSessionResult> {
   const storageAdapter = await createExpoSecureStoreAdapter();
   const hubSessionStorage = createHubSessionStorage(storageAdapter);
@@ -90,7 +92,9 @@ export async function createExpoMobileAuthSession(
       createExpoAuthBackedHubClient(baseUrl, opts?.getToken, opts?.onRefreshToken, opts?.fetch),
   });
 
-  const authSession = createMobileAuthSession(auth);
+  const authSession = createMobileAuthSession(auth, {
+    allowRealLogin: options.allowRealLogin === true,
+  });
   const client = createMobileHubClient({ baseUrl, sessionStorage: hubSessionStorage });
 
   return {
@@ -106,7 +110,10 @@ export async function createExpoMobileAuthSession(
  * - active: state machine has a validated token;
  * - missing: no usable session (signed out, refresh failed, or never signed in).
  */
-export function createMobileAuthSession(auth: HubAuth): MobileAuthSession {
+export function createMobileAuthSession(
+  auth: HubAuth,
+  options: { allowRealLogin?: boolean } = {},
+): MobileAuthSession {
   const listeners = new Set<(snapshot: HubSessionSnapshot) => void>();
   let currentSnapshot = toSessionSnapshot(auth.getState());
 
@@ -122,7 +129,13 @@ export function createMobileAuthSession(auth: HubAuth): MobileAuthSession {
 
   return {
     async login() {
-      await auth.loginWithTokenDance();
+      if (!options.allowRealLogin) {
+        throw new OidcError(
+          'mobileFixtureOnly',
+          'Mobile Account login remains fixture-only until a packaged approved-real lane exists.',
+        );
+      }
+      await auth.loginWithAccount();
       publish(auth.getState());
       return currentSnapshot;
     },
