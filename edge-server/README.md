@@ -4,7 +4,7 @@
 
 Edge Server 是靠近 workspace 和 Agent Runtime 的执行控制节点，可运行在 Desktop 内、本机后台、远程机器或 headless Cloud Edge。
 
-Runtime: Go 1.26.
+Runtime: Go 1.27.3.
 
 ## Boundary
 

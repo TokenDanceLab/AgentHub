@@ -8,7 +8,7 @@
 
 | 工具 | 用途 |
 |---|---|
-| Go 1.26+ | Hub Server / Edge Server |
+| Go 1.27.3 | Hub Server / Edge Server |
 | Node.js 24+ + corepack | pnpm workspace 和前端构建 |
 | PostgreSQL 16+ | Hub 数据库 |
 | Redis 7+ | Hub cache/session |

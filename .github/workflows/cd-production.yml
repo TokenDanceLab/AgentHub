@@ -19,7 +19,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  GO_VERSION: "1.26.9"
+  GO_VERSION: "1.27.3"
   REGISTRY: ghcr.io
   # Image name is the single product image; do not add a second alias.
   IMAGE_NAME: tokendancelab/agenthub-hub-server
@@ -73,6 +73,8 @@ jobs:
         with:
           context: .
           file: hub-server/deployments/Dockerfile
+          build-args: |
+            VERSION=${{ steps.ref.outputs.ref }}
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}

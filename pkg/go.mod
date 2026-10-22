@@ -1,6 +1,6 @@
 module github.com/agenthub/pkg
 
-go 1.26.9
+go 1.27.3
 
 require github.com/gin-gonic/gin v1.12.0
 

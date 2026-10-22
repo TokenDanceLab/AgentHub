@@ -2,6 +2,18 @@
 
 已发布版本的 longform release notes（破坏性变更、升级注意、release gate 结论及其他重大变更）在这里；commit 级明细由 git-cliff 生成到 [GitHub Releases](https://github.com/TokenDanceLab/AgentHub/releases)。
 
+## v0.7.1 (2026-10-22)
+
+### 安全更新
+
+- Go toolchain、Hub/Edge 模块与 Docker builder 升至 `1.27.3`，覆盖 `GO-2026-6809` / `CVE-2026-111943` 等 `1.26.10` 之前修复的 stdlib 风险；`govulncheck` 对 Hub/Edge 均为 0 个可达漏洞。
+- Hub Server 发布镜像现在把发布 tag 注入二进制 `Version`，不再把可发布镜像报告为 `version=dev`。
+
+### 升级注意
+
+- 这是安全基线补丁发布；HTTP/WS 协议、数据库迁移和部署变量无破坏性变更。
+- 发布 tag 前须由维护者记录本次安全风险评审（`RELEASE_RISK_REVIEWED=v0.7.1`），否则 release gate 按设计冻结。
+
 ## v0.7.0 (2026-10-20)
 
 ### 破坏性变更
