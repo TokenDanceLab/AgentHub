@@ -1,9 +1,8 @@
 name: CD Production
 
 on:
-  workflow_run:
-    workflows: ["Release"]
-    types: [completed]
+  push:
+    tags: ["v*"]
   workflow_dispatch:
     inputs:
       version:
@@ -29,9 +28,6 @@ env:
 jobs:
   # ── Build & Push Docker Image ──────────────────
   docker-build-push:
-    if: |
-      github.event_name == 'workflow_dispatch' ||
-      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -40,7 +36,7 @@ jobs:
       - name: Determine checkout ref
         id: ref
         run: |
-          REF="${{ github.event.inputs.version || github.event.workflow_run.head_branch }}"
+          REF="${{ github.event.inputs.version || github.ref_name }}"
           echo "ref=${REF}" >> "$GITHUB_OUTPUT"
 
       - uses: actions/checkout@v7
