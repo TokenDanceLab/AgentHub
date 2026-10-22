@@ -93,12 +93,15 @@ jobs:
           path: |
             ~/go/bin/staticcheck
             ~/go/bin/gosec
-          key: sa-tools-gosec-2.29.0-staticcheck-2026.2.2
+          key: sa-tools-gosec-05b9c4c0-staticcheck-2026.2.2
 
       - name: Install gosec
         run: |
+          # v2.29.0 still bundles x/tools v0.49 and cannot read Go 1.27
+          # export data. Pin master until the next tagged release includes
+          # the Go 1.27 loader fix (securego/gosec#1772).
           if [ ! -x ~/go/bin/gosec ]; then
-            go install github.com/securego/gosec/v2/cmd/gosec@v2.29.0
+            go install github.com/securego/gosec/v2/cmd/gosec@05b9c4c0a7f49e421d7a459922a11bc0c0dd7197
           fi
 
       - name: Security scan (gosec)
@@ -355,12 +358,14 @@ jobs:
           path: |
             ~/go/bin/staticcheck
             ~/go/bin/gosec
-          key: sa-tools-gosec-2.29.0-staticcheck-2026.2.2
+          key: sa-tools-gosec-05b9c4c0-staticcheck-2026.2.2
 
       - name: Install gosec
         run: |
+          # Keep the temporary commit pin synchronized with the Edge job
+          # above until securego/gosec publishes the Go 1.27 loader fix.
           if [ ! -x ~/go/bin/gosec ]; then
-            go install github.com/securego/gosec/v2/cmd/gosec@v2.29.0
+            go install github.com/securego/gosec/v2/cmd/gosec@05b9c4c0a7f49e421d7a459922a11bc0c0dd7197
           fi
 
       - name: Security scan (gosec)
