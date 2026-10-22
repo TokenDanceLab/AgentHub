@@ -512,3 +512,24 @@ func TestMigration0077BindsRefreshTokenToExactIdentity(t *testing.T) {
 		t.Fatalf("0077 down migration must preserve identity-bound refresh data, got %q", string(down))
 	}
 }
+
+func TestMigration0078RestoresFriendshipPairUniqueness(t *testing.T) {
+	up, err := os.ReadFile("../../migrations/0078_friendships_unique_pair.up.sql")
+	if err != nil {
+		t.Fatalf("read up migration: %v", err)
+	}
+	down, err := os.ReadFile("../../migrations/0078_friendships_unique_pair.down.sql")
+	if err != nil {
+		t.Fatalf("read down migration: %v", err)
+	}
+	upText := string(up)
+	if !strings.Contains(upText, "CREATE UNIQUE INDEX IF NOT EXISTS idx_friendships_user_friend_unique") {
+		t.Fatal("0078 must restore a unique friendship pair arbiter")
+	}
+	if strings.Contains(upText, "(user_id, friend_id, status)") {
+		t.Fatal("0078 arbiter must not include mutable status")
+	}
+	if !strings.Contains(string(down), "DROP INDEX IF EXISTS idx_friendships_user_friend_unique") {
+		t.Fatal("0078 down migration must drop the added unique index")
+	}
+}

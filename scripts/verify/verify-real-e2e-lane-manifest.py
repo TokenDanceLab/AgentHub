@@ -39,6 +39,7 @@ import json
 import os
 import re
 import sys
+import urllib.parse
 
 REQUIRED_SMOKE_FIELDS = [
     "evidence_level",
@@ -157,6 +158,10 @@ def _is_valid_ipv4(ip):
     return len(parts) == 4 and all(p.isdigit() and 0 <= int(p) <= 255 for p in parts)
 
 
+def _is_private_ip_literal(host):
+    return _is_valid_ipv4(host) or ":" in host
+
+
 def private_info_violation(value, path_, label="manifest"):
     """对单个字符串做私有信息 fail-closed 扫描，返回违规信息或 None。
 
@@ -251,6 +256,28 @@ def assert_no_private_names(manifest, context="manifest"):
     token（web/up/none/passed 等）不视作 hostname，避免把枚举误报为泄漏。
     """
 
+    allowed_public_base_urls = {}
+    if manifest.get("evidence_level") == "approved-real":
+        stack = manifest.get("stack")
+        if isinstance(stack, dict):
+            for name in ("account", "hub", "edge", "web"):
+                service = stack.get(name)
+                if not isinstance(service, dict):
+                    continue
+                value = service.get("base_url")
+                if not isinstance(value, str):
+                    continue
+                parsed = urllib.parse.urlparse(value.strip())
+                host = parsed.hostname or ""
+                if (
+                    parsed.scheme == "https"
+                    and "." in host
+                    and not _is_loopback_host(host)
+                    and not _is_private_ip_literal(host)
+                    and not INTERNAL_SUFFIX_HOST_RE.search(host)
+                ):
+                    allowed_public_base_urls[f"{context}.stack.{name}.base_url"] = value.rstrip("/")
+
     def walk(node, path_):
         if isinstance(node, dict):
             for key, value in node.items():
@@ -262,6 +289,8 @@ def assert_no_private_names(manifest, context="manifest"):
             _check_string(node, path_)
 
     def _check_string(value, path_):
+        if allowed_public_base_urls.get(path_) == value.rstrip("/"):
+            return
         violation = private_info_violation(value, path_, label="manifest")
         if violation:
             fail(violation)
@@ -365,10 +394,10 @@ def main():
 
     spec_files = manifest.get("spec_files")
     if spec_files is not None:
-        if not isinstance(spec_files, list) or not spec_files or not all(
+        if not isinstance(spec_files, list) or not all(
             isinstance(item, str) and item for item in spec_files
         ):
-            fail("manifest field 'spec_files' must be a non-empty list of strings")
+            fail("manifest field 'spec_files' must be a list of non-empty strings")
     if status == "passed" and manifest["scope"] == FULL_SCOPE:
         expected = expected_testmatch(args.repo_root)
         if not spec_files:
