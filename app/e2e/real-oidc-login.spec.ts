@@ -191,13 +191,26 @@ async function performRealOidcLogin(
 }
 
 async function hubMe(request: { get: Function }, hubBaseUrl: string, token: string): Promise<Record<string, unknown>> {
-  const response = await request.get(`${hubBaseUrl}/client/auth/me`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
+  const response = await withRateLimitRetry(() =>
+    request.get(`${hubBaseUrl}/client/auth/me`, {
+      headers: { Authorization: `Bearer ${token}` },
+    }),
+  );
   expect(response.status()).toBe(200);
   const body = (await response.json()) as HubEnvelope<Record<string, unknown>>;
   expect(body.code).toBe('ok');
   return body.data;
+}
+
+async function withRateLimitRetry<T extends { status(): number; headers(): Record<string, string> }>(
+  request: () => Promise<T>,
+): Promise<T> {
+  const response = await request();
+  if (response.status() !== 429) return response;
+  const retryAfter = Number(response.headers()['retry-after'] ?? '1');
+  const waitMs = Math.max(1, Math.min(retryAfter, 120)) * 1000;
+  await new Promise((resolve) => setTimeout(resolve, waitMs));
+  return request();
 }
 
 async function hubJson(
@@ -209,7 +222,7 @@ async function hubJson(
 ): Promise<{ status: number; body: Record<string, unknown> | null }> {
   const options: Record<string, unknown> = { headers: { Authorization: `Bearer ${token}` } };
   if (data) options.data = data;
-  const response = await request[method](url, options);
+  const response = await withRateLimitRetry(() => request[method](url, options));
   const text = await response.text();
   let body: Record<string, unknown> | null = null;
   try {
@@ -360,7 +373,8 @@ test.describe('真实 OIDC 浏览器登录与聊天动线', () => {
       expect(sessionId).toBeTruthy();
 
       // ── 侧栏出现该会话（会话列表 10s 轮询，放宽到 40s）──
-      const sessionButton = page.locator('button', { hasText: 'Hub 私聊' }).first();
+      // ARIA option 的稳定 ID 由 sessionId 派生；标题会随 i18n/昵称变化。
+      const sessionButton = page.locator(`#conversation-option-${sessionId}`);
       await expect(sessionButton).toBeVisible({ timeout: 40_000 });
       await sessionButton.click();
 
