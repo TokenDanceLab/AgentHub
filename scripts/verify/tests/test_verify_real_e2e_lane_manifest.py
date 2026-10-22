@@ -125,6 +125,16 @@ class LaneManifestPrivateNameTests(unittest.TestCase):
         m["stack"]["web"]["base_url"] = "http://[::1]:5174"
         self.assert_passes(m, "IPv6 loopback URL")
 
+    def test_approved_real_public_stack_urls_pass(self):
+        m = copy.deepcopy(GOOD)
+        m["evidence_level"] = "approved-real"
+        m["planned_evidence_levels"] = ["approved-real"]
+        m["rows"][0]["evidence_level"] = "approved-real"
+        m["stack"]["account"]["base_url"] = "https://account.example.com"
+        m["stack"]["hub"]["base_url"] = "https://hub.example.com"
+        m["stack"]["web"]["base_url"] = "https://hub.example.com"
+        self.assert_passes(m, "approved-real public stack URLs")
+
     def test_unc_path_fails(self):
         m = copy.deepcopy(GOOD)
         backslash = chr(92)
