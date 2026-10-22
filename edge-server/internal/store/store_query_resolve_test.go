@@ -102,11 +102,11 @@ func TestResolveCreateHelpers(t *testing.T) {
 		t.Fatalf("resolveCreateProject exists = %#v err=%v created=%v", project, err, created)
 	}
 
-	thread, created, err := resolveCreateThread(Thread{}, false, false, "t1", "p1", "title", "chat", "blue", "A", now)
+	_, created, err = resolveCreateThread(Thread{}, false, false, "t1", "p1", "title", "chat", "blue", "A", now)
 	if err != ErrNotFound || created {
 		t.Fatalf("resolveCreateThread missing project = err=%v created=%v", err, created)
 	}
-	thread, created, err = resolveCreateThread(
+	thread, created, err := resolveCreateThread(
 		Thread{ID: "t1", ProjectID: "other"}, true, true,
 		"t1", "p1", "title", "chat", "blue", "A", now,
 	)
@@ -234,15 +234,15 @@ func TestResolveSetRunStatusHelpers(t *testing.T) {
 func TestPrepareUpsertInputsAndPinRefs(t *testing.T) {
 	t.Parallel()
 
-	key, file, ok := prepareRunDiffFileUpsert(false, RunDiffFile{RunID: "r1", Path: "a.go"})
+	key, _, ok := prepareRunDiffFileUpsert(false, RunDiffFile{RunID: "r1", Path: "a.go"})
 	if ok || key != "" {
 		t.Fatalf("missing run should fail prepareRunDiffFileUpsert: key=%q ok=%v", key, ok)
 	}
-	key, file, ok = prepareRunDiffFileUpsert(true, RunDiffFile{RunID: "r1", Path: "  ", Status: "ADD"})
+	key, _, ok = prepareRunDiffFileUpsert(true, RunDiffFile{RunID: "r1", Path: "  ", Status: "ADD"})
 	if ok || key != "" {
-		t.Fatalf("empty path should fail: key=%q file=%#v ok=%v", key, file, ok)
+		t.Fatalf("empty path should fail: key=%q ok=%v", key, ok)
 	}
-	key, file, ok = prepareRunDiffFileUpsert(true, RunDiffFile{RunID: "r1", Path: "  src/a.go  ", Status: "ADD"})
+	key, file, ok := prepareRunDiffFileUpsert(true, RunDiffFile{RunID: "r1", Path: "  src/a.go  ", Status: "ADD"})
 	if !ok || key != runDiffFileKey("r1", "src/a.go") || file.Path != "src/a.go" || file.Status != "added" {
 		t.Fatalf("prepareRunDiffFileUpsert = key=%q file=%#v ok=%v", key, file, ok)
 	}
