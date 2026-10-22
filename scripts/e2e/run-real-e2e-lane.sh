@@ -116,6 +116,7 @@ emit_manifest() { # 请求 status -> stdout "最终status|manifest路径"（pass
   MANIFEST_WEB_STATE="$WEB_STATE" \
   MANIFEST_PW_RC="${PW_RC:-0}" \
   MANIFEST_RUN_STARTED_AT="${RUN_STARTED_AT:-0}" \
+    MANIFEST_REQUIRE_EDGE="$REQUIRE_EDGE" \
   python3 - <<'PYEOF'
 import glob, json, os, time
 
@@ -128,6 +129,8 @@ evidence_level = "observed-local"
 run_started = float(os.environ.get("MANIFEST_RUN_STARTED_AT") or 0)
 # SPEC_TARGET sentinel：all-testMatch = 不带位置过滤跑全部 testMatch spec。
 spec_target = os.environ["MANIFEST_SPEC_TARGET"]
+require_edge = os.environ.get("MANIFEST_REQUIRE_EDGE", "1") != "0"
+runtime_scope = "PG/Redis/TokenDance Account/hub" + ("/edge" if require_edge else "") + "/web"
 extra_args = os.environ.get("AGENTHUB_E2E_PLAYWRIGHT_EXTRA_ARGS", "").strip()
 spec_command = ("playwright test --config playwright.real.config.ts --project=chromium"
                 + ("" if spec_target == "all-testMatch" else " " + spec_target)
@@ -247,12 +250,12 @@ if requested == "passed":
     if real_tested:
         evidence_level = "approved-real"
         if spec_target == "all-testMatch" and not narrowed:
-            claim = ("真实全栈（PG/Redis/TokenDance Account/hub/edge/web）上 playwright.real.config.ts "
+            claim = (f"真实运行栈（{runtime_scope}）上 playwright.real.config.ts "
                      "testMatch 全部 spec 全绿，且至少一个 OIDC 登录 spec 通过；"
                      "evidence_level=approved-real（外部 Account issuer）")
         else:
             narrowed_note = "（含额外 Playwright 过滤参数）" if narrowed else ""
-            claim = ("真实全栈（PG/Redis/TokenDance Account/hub/edge/web）上仅 "
+            claim = (f"真实运行栈（{runtime_scope}）上仅 "
                      + spec_target + " 的选中用例全绿" + narrowed_note
                      + "；scope 不覆盖其余 testMatch spec；evidence_level=approved-real（外部 Account issuer）")
     elif api_only:
