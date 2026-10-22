@@ -1,6 +1,6 @@
 # AgentHub Mobile RN
 
-Expo + React Native is the active Mobile implementation. Mobile is a boundary and QA validation target, not an Android/iOS release candidate.
+Expo + React Native is the active Mobile implementation. Mobile defaults to a fixture and boundary-validation lane; it is not an Android/iOS release candidate.
 
 ## Scope
 
@@ -47,10 +47,10 @@ corepack pnpm ios
 | Static RN boundary | `corepack pnpm verify` | Typecheck, lint (import boundaries via `pnpm lint:boundaries`), brand/Metro config tests, and unit tests pass for current source (incl. shared auth-core session flows, deep-link/notification intent routing). | Native device behavior, live Hub, real login, push delivery, or packaged release. |
 | Mock Hub contract | `corepack pnpm mock:hub:check` | Local simulator endpoints and typed update stream shape are coherent. | Real Hub availability or auth. |
 | Expo Web visual QA | `corepack pnpm visual:qa` | 5177 browser preview layout, i18n, privacy text, and interaction geometry remain stable. | Native renderer, device APIs, or backend correctness. |
-| Native readiness shape | `corepack pnpm native:check` | Expo config and development profiles are no-secret and structurally valid. | Install/open proof, SecureStore persistence, notifications, media picker behavior, or real OIDC. |
+| Native readiness shape | `corepack pnpm native:check` | Expo config and development profiles are no-secret and structurally valid. | Install/open proof, SecureStore persistence, notifications, media picker behavior, or real Account login. |
 | Android packaging | `corepack pnpm android:package` | A local installable APK can be built on Windows (the script uses cmd.exe, mklink junctions, and gradlew.bat) when the Android toolchain is available. | Device proof unless the APK is installed/opened in the same task and evidence is recorded. |
 
-All mock, fixture, readiness-only, and preview-only results must be recorded with `real_tested=false`. `approved-real` is an evidence mode label, not proof by itself.
+All mock, fixture, readiness-only, and preview-only results must be recorded with `real_tested=false`. `approved-real` is an evidence mode label, not proof by itself. Fixture or stubbed Hub evidence cannot be reported as real Account L3.
 
 ## Push and notification capabilities
 
@@ -58,8 +58,10 @@ All mock, fixture, readiness-only, and preview-only results must be recorded wit
 
 ## Auth and deep-link boundaries
 
-- Login runs the real TokenDance ID OIDC flow through the shared auth core (`@agenthub/shared/api/auth` createHubAuthCore): PKCE → Hub authorize → `expo-web-browser` → `agenthub://auth/callback` → code exchange → SecureStore-backed session with refresh fallback and signed-out cleanup on refresh failure.
-- The OIDC pending state (PKCE verifier) is memory-only — parity with Desktop Tauri mode; if the OS kills the app mid-login the user restarts (no silent callback acceptance without the verifier).
+- Real Account login is opt-in. It is enabled only when `EXPO_PUBLIC_AGENTHUB_ACCOUNT_LOGIN_ENABLED=true` and `EXPO_PUBLIC_ACCOUNT_OIDC_ISSUER` is non-empty; otherwise Mobile remains fixture-only.
+- When enabled, the shared auth core uses Account public OIDC through Hub: PKCE → `POST /client/auth/oidc/authorize` → `expo-web-browser` → `agenthub://auth/callback` → `POST /client/auth/oidc/callback` → SecureStore-backed Hub session.
+- Account access/ID tokens remain server-side in Hub. Mobile stores the Hub-issued session token, not an Account token, and Hub REST/WS still require Hub HS256.
+- The OIDC pending state (PKCE verifier) is memory-only; if the OS kills the app mid-login the user restarts. There is no silent callback acceptance without the verifier.
 - Deep links (`agenthub://`, app.config.ts) cover cold start (`getInitialURL`) and warm start (`url` listener); **if the app is not installed there is no handler and no web fallback** — no-op by design.
 - Account `hubSync` status stays fixture/preview-backed until the mobile live data plane becomes the UI truth.
 

@@ -7,7 +7,7 @@ Desktop/Tauri renderer bridge、Hub health、Local Edge。唯一恒尝试启动�
 app workspace 依赖已就绪时启动；Hub 只探测（当前 server 入口依赖外部
 database 与 Redis）。
 
-RealTested 保持 false。不执行 TokenDanceID 登录、真实 CLI/model/API 执行、
+RealTested 保持 false。不执行 TokenDance Account 登录、真实 CLI/model/API 执行、
 部署、签名、打包或 Mobile 工作。CLI 参数同时接受 -Xxx 与 --Xxx；退出码
 0=通过 / 1=失败 / 2=参数非法。
 
@@ -311,7 +311,7 @@ def write_evidence(evidence_path, repo_root, artifact_root, log_root, edge_db_pa
         "artifact_root": artifact_root,
         "evidence_path": evidence_path,
         "claims": {
-            "real_tokendance_id_login": False,
+            "real_tokendance_account_login": False,
             "real_cli_or_model_invoked": real_cli_or_model_invoked,
             "real_api_budget_spend": False,
             "public_deploy_used": False,
@@ -345,7 +345,7 @@ def write_evidence(evidence_path, repo_root, artifact_root, log_root, edge_db_pa
             "Hub real startup still requires local database and Redis setup; this script probes Hub only",
             "Web/Desktop Vite startup requires app workspace dependencies to be installed",
             "Real CLI/model/API execution remains blocked by no-spend boundary",
-            "Real TokenDanceID login, deploy, signing, release upload, and Mobile remain out of scope",
+            "Real TokenDance Account login, deploy, signing, release upload, and Mobile remain out of scope",
         ],
     }
 

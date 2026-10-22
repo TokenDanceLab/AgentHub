@@ -31,6 +31,13 @@ export class AppError extends Error {
   }
 }
 
+/** A Hub session is only unrecoverable when the server explicitly rejects it. */
+export function isTerminalHubAuthError(error: unknown): boolean {
+  if (!error || typeof error !== 'object') return false;
+  const status = (error as { status?: unknown }).status;
+  return status === 401 || status === 403;
+}
+
 function normalizeDetails(body: ErrorBody): Record<string, unknown> | undefined {
   const details = { ...(body.error.details ?? {}) };
   for (const key of ['runId', 'projectId', 'threadId']) {

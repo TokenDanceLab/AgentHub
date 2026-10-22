@@ -45,14 +45,14 @@ GOOD = {
     "skipped_evidence_levels": ["fixture-unit", "playwright-ui"],
     "planned_evidence_levels": ["observed-local"],
     "stack": {
-        "id": {"base_url": "http://127.0.0.1:3000", "state": "up", "login": "real-browser-oidc-authorization-code-pkce"},
+        "account": {"base_url": "http://127.0.0.1:3000", "state": "up", "login": "real-browser-oidc-authorization-code-pkce"},
         "hub": {"base_url": "http://localhost:8080", "state": "up"},
         "edge": {"base_url": "http://127.0.0.1:3210", "state": "up"},
         "web": {"base_url": "http://127.0.0.1:5174", "state": "up"},
         "backend_services": ["postgres:16", "redis:7"],
     },
     "secret_handling": {
-        "account_mode": "runtime-random-test-identities (provision-real-e2e-stack.sh)",
+        "account_mode": "operator-supplied external identities (provision-real-e2e-stack.sh)",
         "credentials_path": "tests/artifacts/real-e2e-account.env (chmod 600, gitignored)",
         "manifest_secrets": "none",
     },

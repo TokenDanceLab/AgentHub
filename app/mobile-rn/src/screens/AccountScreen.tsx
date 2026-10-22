@@ -12,7 +12,7 @@ interface AccountScreenProps {
   themeMode: MobileThemeMode;
   onChangeThemeMode: (mode: MobileThemeMode) => void;
   onClose?: () => void;
-  /** Starts the TokenDance ID OIDC login through the shared Hub auth core. */
+  /** Starts the TokenDance Account OIDC login through the shared Hub auth core. */
   onSignIn?: () => void;
   /** Clears the local Hub session (best-effort hub logout). */
   onSignOut?: () => void;
@@ -53,9 +53,9 @@ export function AccountScreen({
   const compact = width <= 420;
   const railWidth = compact ? 76 : 96;
   const drawerWidth = Math.min(width - railWidth, compact ? 318 : 390);
-  const tokenDanceBadge = formatTokenDanceStatus(account.tokenDanceId, t);
-  const tokenDanceTone = getAccountTone(account.tokenDanceId);
-  const accountReady = account.tokenDanceId === 'signed_in' && account.hubSession === 'active';
+  const accountIdentityBadge = formatAccountIdentityStatus(account.accountIdentity, t);
+  const accountIdentityTone = getAccountTone(account.accountIdentity);
+  const accountReady = account.accountIdentity === 'signed_in' && account.hubSession === 'active';
   const themeLabels: Record<MobileThemeMode, string> = {
     light: t.themeLight,
     system: t.themeSystem,
@@ -66,7 +66,7 @@ export function AccountScreen({
     {
       title: t.identityAndSession,
       items: [
-        { icon: 'shield', label: 'TokenDance ID', status: account.tokenDanceId, color: tokens.color.moss },
+        { icon: 'shield', label: 'TokenDance Account', status: account.accountIdentity, color: tokens.color.moss },
         { icon: 'runs', label: 'AgentHub', status: account.hubSession, color: tokens.color.accent },
         { icon: 'grid', label: t.workspaceSettings, color: tokens.color.accent },
       ],
@@ -183,7 +183,7 @@ export function AccountScreen({
             </View>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: tokens.space.sm }}>
               <Text style={{ color: tokens.color.inkMuted, fontSize: 13, lineHeight: 18 }}>TokenDance</Text>
-              <Badge label={tokenDanceBadge} size="micro" tone={tokenDanceTone} />
+              <Badge label={accountIdentityBadge} size="micro" tone={accountIdentityTone} />
             </View>
           </View>
           <View
@@ -561,7 +561,7 @@ function AccountStatusBadge({ value }: { value: string }): React.ReactElement {
   return <Badge label={labelMap[value] ?? t.needsAction} size="micro" tone={toneMap[value] ?? 'warning'} />;
 }
 
-function formatTokenDanceStatus(status: MobileAccountState['tokenDanceId'], t: ReturnType<typeof useStrings>): string {
+function formatAccountIdentityStatus(status: MobileAccountState['accountIdentity'], t: ReturnType<typeof useStrings>): string {
   if (status === 'signed_in') {
     return t.signedIn;
   }
@@ -572,7 +572,7 @@ function formatTokenDanceStatus(status: MobileAccountState['tokenDanceId'], t: R
   return t.signedOut;
 }
 
-function getAccountTone(status: MobileAccountState['tokenDanceId']): 'success' | 'warning' | 'danger' {
+function getAccountTone(status: MobileAccountState['accountIdentity']): 'success' | 'warning' | 'danger' {
   if (status === 'signed_in') {
     return 'success';
   }

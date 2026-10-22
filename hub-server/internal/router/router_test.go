@@ -39,7 +39,7 @@ func TestNoRouteReturnsNotFound(t *testing.T) {
 	if err := SetupRoutes(
 		r,
 		&config.Config{},
-		middleware.NewAuthMiddleware(&config.Config{}, middleware.AuthDependencies{}, nil),
+		middleware.NewAuthMiddleware(&config.Config{}, middleware.AuthDependencies{}),
 		"",
 		cache.NewClient(redis.NewClient(&redis.Options{Addr: mr.Addr()})),
 		nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil,
@@ -107,7 +107,7 @@ func TestHealthRoutesExposeCompatibleLiveAndReadyEndpoints(t *testing.T) {
 	if err := SetupRoutes(
 		r,
 		&config.Config{},
-		middleware.NewAuthMiddleware(&config.Config{}, middleware.AuthDependencies{}, nil),
+		middleware.NewAuthMiddleware(&config.Config{}, middleware.AuthDependencies{}),
 		"",
 		cacheClient,
 		nil, nil, nil, nil, nil, nil, nil, nil, nil, nil,
@@ -202,7 +202,7 @@ func TestClientMessagesEditRouteIsRegistered(t *testing.T) {
 	if err := SetupRoutes(
 		r,
 		&config.Config{},
-		middleware.NewAuthMiddleware(&config.Config{}, middleware.AuthDependencies{}, nil),
+		middleware.NewAuthMiddleware(&config.Config{}, middleware.AuthDependencies{}),
 		"",
 		cache.NewClient(redis.NewClient(&redis.Options{Addr: mr.Addr()})),
 		nil, nil, nil, nil, nil,
@@ -235,7 +235,7 @@ func TestClientMessageReactionRoutesAreRegistered(t *testing.T) {
 	if err := SetupRoutes(
 		r,
 		&config.Config{},
-		middleware.NewAuthMiddleware(&config.Config{}, middleware.AuthDependencies{}, nil),
+		middleware.NewAuthMiddleware(&config.Config{}, middleware.AuthDependencies{}),
 		"",
 		cache.NewClient(redis.NewClient(&redis.Options{Addr: mr.Addr()})),
 		nil, nil, nil, nil, nil,
@@ -300,7 +300,7 @@ func TestCloudEdgeRegisterRateLimitedByIP(t *testing.T) {
 	if err := SetupRoutes(
 		r,
 		cfg,
-		middleware.NewAuthMiddleware(cfg, middleware.AuthDependencies{}, nil),
+		middleware.NewAuthMiddleware(cfg, middleware.AuthDependencies{}),
 		jwtSecret,
 		cache.NewClient(redis.NewClient(&redis.Options{Addr: mr.Addr()})),
 		nil, nil,
@@ -374,7 +374,7 @@ func TestEdgeDeviceRegisterRateLimitedByIP(t *testing.T) {
 	if err := SetupRoutes(
 		r,
 		cfg,
-		middleware.NewAuthMiddleware(cfg, middleware.AuthDependencies{}, nil),
+		middleware.NewAuthMiddleware(cfg, middleware.AuthDependencies{}),
 		jwtSecret,
 		cache.NewClient(redis.NewClient(&redis.Options{Addr: mr.Addr()})),
 		nil, nil,
@@ -439,7 +439,7 @@ func setupTestRouter(t *testing.T) *gin.Engine {
 	if err := SetupRoutes(
 		r,
 		&config.Config{},
-		middleware.NewAuthMiddleware(&config.Config{}, middleware.AuthDependencies{}, nil),
+		middleware.NewAuthMiddleware(&config.Config{}, middleware.AuthDependencies{}),
 		"",
 		cache.NewClient(redis.NewClient(&redis.Options{Addr: mr.Addr()})),
 		nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil,

@@ -2413,10 +2413,12 @@ paths:
         parameter is deliberately rejected (fail closed) because query strings
         leak into proxy logs, browser history, and Referer headers — see
         middleware.extractWSToken. Query-string auth is therefore not part of
-        this contract. TokenDance ID RS256 bearer tokens and TokenDance API
-        keys are not Hub WebSocket credentials. The legacy first-frame `auth`
-        event is only for tests and compatibility entries that do not install
-        AuthMiddleware.WSHandler(). See api/events.md for Hub event types.
+        this contract. TokenDance Account OIDC ID/access/refresh tokens and
+        TokenDance API keys are not Hub WebSocket credentials. Hub WebSocket
+        accepts only a Hub-issued HS256 product-session access token. The legacy
+        first-frame `auth` event is only for tests and compatibility entries
+        that do not install AuthMiddleware.WSHandler(). See api/events.md for Hub
+        event types.
       x-agenthub-status: implemented
       x-agenthub-owner: Hub
       security:
@@ -2874,12 +2876,22 @@ paths:
     post:
       tags: [HubSyncRelay]
       operationId: hubOidcAuthorize
-      summary: Generate TokenDance ID OIDC PKCE authorization URL.
+      summary: Start TokenDance Account OIDC login with Authorization Code + PKCE.
       description: >
-        Public login-start endpoint. The client generates a PKCE verifier/challenge,
-        sends the S256 challenge plus its Hub device proof, then opens the returned
-        TokenDance ID authorization URL in a browser. This endpoint does not accept
-        third-party provider tokens and does not require an existing Hub bearer token.
+        Public login-start endpoint for TokenDance Account OIDC. The client
+        generates a PKCE verifier/challenge, sends the S256 challenge plus its Hub
+        device identity, and opens the returned public Account authorization URL
+        in a browser. The response pins the configured Account issuer so the
+        client can compare it with the RFC 9207 `iss` returned on callback.
+        `redirect_uri` must exactly match a Hub-configured Account client callback
+        when supplied; omission uses the configured primary callback. The browser
+        callback page/UI is owned by that redirect target and is not part of the
+        Hub REST contract. This contract consumes only public OIDC discovery,
+        authorization, token, UserInfo, and JWKS endpoints; Account management
+        APIs, internal service endpoints, and database details are never exposed.
+        Account tokens are identity proof for login and are not Hub credentials.
+        Error codes: 400 `bad_request` for malformed PKCE/device/redirect input;
+        500 `internal_error` for Account discovery or transport failure.
       x-agenthub-status: implemented
       x-agenthub-owner: Hub
       security: []
@@ -2891,59 +2903,39 @@ paths:
               $ref: "#/components/schemas/HubOIDCAuthorizeRequest"
       responses:
         "200":
-          description: Hub state and TokenDance ID authorization URL.
+          description: One-time Hub state, pinned Account issuer, and public Account authorization URL.
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/HubOIDCAuthorizeResponse"
         "400":
           $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
 
   /client/auth/oidc/callback:
-    get:
-      tags: [HubSyncRelay]
-      operationId: hubOidcCallbackPage
-      summary: Render the browser OIDC callback result page.
-      description: >
-        Browser redirect endpoint for TokenDance ID Authorization Code callbacks.
-        It reads `code` and `state` from the query string and renders localized
-        HTML for Desktop/Web handoff. It does not exchange the code or mint Hub
-        session tokens; clients still call POST /client/auth/oidc/callback for
-        the server-side exchange.
-      x-agenthub-status: implemented
-      x-agenthub-owner: Hub
-      security: []
-      parameters:
-        - name: code
-          in: query
-          required: true
-          schema: { type: string }
-        - name: state
-          in: query
-          required: true
-          schema: { type: string }
-      responses:
-        "200":
-          description: Localized HTML success page.
-          content:
-            text/html:
-              schema: { type: string }
-        "400":
-          description: Localized HTML missing-parameter page.
-          content:
-            text/html:
-              schema: { type: string }
     post:
       tags: [HubSyncRelay]
       operationId: hubOidcCallback
-      summary: Exchange TokenDance ID OIDC code for a Hub session.
+      summary: Exchange a TokenDance Account OIDC authorization code for a Hub session.
       description: >
-        Public Hub session exchange endpoint. The client posts the browser callback
-        code/state, its PKCE verifier, and the same Hub device proof used at authorize
-        time. Hub exchanges the code with TokenDance ID, validates the ID token through
-        RS256/JWKS plus issuer/audience/expiration checks, maps TokenDance ID sub to a
-        Hub user, then returns Hub-local access and refresh tokens. Raw TokenDance ID
-        bearer tokens are not used as Hub sessions.
+        Public Hub session exchange endpoint. The client posts the Account
+        authorization response `code`, `state`, RFC 9207 `iss`, its PKCE verifier,
+        and the same Hub device identity used at authorize time. Hub consumes the
+        one-time state, exchanges the code server-side with Account, verifies the
+        ID token through a fixed RS256/JWKS algorithm plus issuer/audience/nonce/
+        expiry checks, confirms UserInfo returns the same subject, maps the exact
+        `(issuer, subject)` identity to a Hub user, and returns Hub-local
+        access/refresh tokens. `redirect_uri` must match the value bound to this
+        authorization transaction; omission is accepted only when authorize used
+        the configured primary callback. The browser redirect page/UI is owned by
+        the registered Account client callback and is not this REST endpoint.
+        Account ID/access/refresh tokens are never accepted as Hub REST or
+        WebSocket credentials. Error codes: 400 `bad_request`,
+        `oidc_invalid_state`, `oidc_issuer_invalid`,
+        `oidc_code_exchange_failed`, or `oidc_id_token_invalid`; 403
+        `oidc_identity_retired`; 502 `oidc_sub_not_found` or
+        `oidc_userinfo_invalid`; 500 `internal_error`.
       x-agenthub-status: implemented
       x-agenthub-owner: Hub
       security: []
@@ -2955,12 +2947,18 @@ paths:
               $ref: "#/components/schemas/HubOIDCCallbackRequest"
       responses:
         "200":
-          description: Hub-local session tokens and mapped Hub user.
+          description: Hub-issued HS256 access token, Hub refresh token, and mapped Hub user.
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/HubOIDCCallbackResponse"
         "400":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
+        "502":
           $ref: "#/components/responses/Error"
 
   # ── Contacts ──
@@ -3839,9 +3837,9 @@ paths:
       summary: List Hub-owned Agent Profiles for the signed-in user.
       description: >
         Returns user-managed Agent Profiles from Hub. Web clients use this
-        endpoint after TokenDance ID -> Hub session exchange; it is not an
+        endpoint after TokenDance Account OIDC login and Hub session exchange; it is not an
         Edge runtime inventory endpoint and must not be used with raw
-        TokenDance ID bearer tokens.
+        TokenDance Account OIDC ID/access/refresh tokens.
       x-agenthub-status: implemented
       x-agenthub-owner: Hub
       security: [{ bearerAuth: [] }]
@@ -4332,8 +4330,8 @@ paths:
             schema:
               type: object
               properties:
-                nickname: { type: string }
-                avatar_url: { type: string }
+                nickname: { type: string, minLength: 1, maxLength: 64 }
+                avatar_url: { type: string, format: uri, maxLength: 512 }
       responses:
         "200":
           $ref: "#/components/responses/Ok"
@@ -6680,8 +6678,8 @@ paths:
     post:
       tags: [HubSyncRelay]
       operationId: login
-      summary: Login.
-      x-agenthub-superseded-by: "GET /client/auth/oidc/authorize"
+      summary: Legacy password login; superseded by TokenDance Account OIDC.
+      x-agenthub-superseded-by: "POST /client/auth/oidc/authorize"
       x-agenthub-owner: Hub
       x-agenthub-status: planned
       responses:
@@ -7808,9 +7806,10 @@ components:
       scheme: bearer
       bearerFormat: Hub HS256 access token
       description: >
-        Hub-issued access token minted by Hub Server after password login or
-        TokenDance ID OIDC exchange. Do not send a raw TokenDance ID RS256
-        bearer token or a Relay API key to Hub REST/WebSocket endpoints.
+        Hub-issued HS256 access token minted only after TokenDance Account OIDC
+        login completes and Hub maps the external identity to a local user.
+        TokenDance Account ID/access/refresh tokens and Relay API keys are not
+        Hub REST or WebSocket credentials.
     edgeBearerAuth:
       type: http
       scheme: bearer
@@ -7818,7 +7817,7 @@ components:
       description: >
         Optional Local Edge token configured by AGENTHUB_EDGE_AUTH_TOKEN or
         --local-auth-token. This is only the loopback Edge process boundary and
-        is not a Hub session, TokenDance ID token, or Relay API key.
+        is not a Hub session, TokenDance Account OIDC token, or Relay API key.
     edgeLocalToken:
       type: apiKey
       in: header
@@ -7998,10 +7997,8 @@ components:
       properties:
         id: { type: string, format: uuid }
         username: { type: string }
-        nickname: { type: string }
-        avatar_url: { type: string }
-        tokendance_sub: { type: string, nullable: true }
-        tokendance_sub_linked_at: { type: string, format: date-time, nullable: true }
+        nickname: { type: string, maxLength: 64 }
+        avatar_url: { type: string, format: uri, maxLength: 512 }
         created_at: { type: string, format: date-time }
         updated_at: { type: string, format: date-time }
 
@@ -8271,6 +8268,8 @@ components:
       properties:
         code_challenge:
           type: string
+          minLength: 43
+          maxLength: 43
           description: PKCE S256 code challenge generated by the client.
         code_challenge_method:
           type: string
@@ -8279,7 +8278,7 @@ components:
           description: Hub accepts only S256; omitted values default to S256.
         device_type:
           type: string
-          enum: [desktop, web, cli]
+          enum: [desktop, web, cli, mobile]
           description: Hub device class for the resulting local session.
         device_id:
           type: string
@@ -8288,7 +8287,10 @@ components:
         redirect_uri:
           type: string
           format: uri
-          description: Optional browser redirect URI for this PKCE round trip. When omitted, Hub uses its configured TokenDance ID redirect URI.
+          description: >
+            Optional browser redirect URI for this Account PKCE round trip. When
+            supplied it must exactly match a Hub-configured Account client
+            callback; when omitted Hub uses the configured primary callback.
     HubOIDCAuthorizeResponse:
       type: object
       required: [code, data]
@@ -8300,7 +8302,7 @@ components:
           type: string
         data:
           type: object
-          required: [state, authorization_url]
+          required: [state, authorization_url, issuer]
           properties:
             state:
               type: string
@@ -8308,23 +8310,39 @@ components:
             authorization_url:
               type: string
               format: uri
-              description: TokenDance ID /oidc/authorize URL to open in the browser.
+              description: Public TokenDance Account authorization URL discovered from the configured issuer.
+            issuer:
+              type: string
+              format: uri
+              description: >
+                Configured TokenDance Account issuer pinned by Hub. The client
+                must compare this value with the RFC 9207 `iss` returned on
+                callback before exchanging the code.
     HubOIDCCallbackRequest:
       type: object
-      required: [code, state, code_verifier, device_type, device_id]
+      required: [code, state, iss, code_verifier, device_type, device_id]
       properties:
         code:
           type: string
-          description: Authorization code returned by TokenDance ID.
+          description: Authorization code returned by TokenDance Account.
         state:
           type: string
           description: Hub state returned from /client/auth/oidc/authorize.
+        iss:
+          type: string
+          format: uri
+          description: >
+            RFC 9207 authorization-response issuer returned by TokenDance
+            Account. It must exactly match the issuer pinned by the authorize
+            response and the configured Account issuer.
         code_verifier:
           type: string
+          minLength: 43
+          maxLength: 128
           description: Original PKCE verifier corresponding to the S256 challenge.
         device_type:
           type: string
-          enum: [desktop, web, cli]
+          enum: [desktop, web, cli, mobile]
         device_id:
           type: string
           format: uuid
@@ -8332,7 +8350,9 @@ components:
         redirect_uri:
           type: string
           format: uri
-          description: Same redirect URI used in the authorize request. Optional for legacy desktop clients that use the configured Hub redirect URI.
+          description: >
+            Same redirect URI bound by the authorize transaction. When omitted,
+            Hub uses the redirect URI stored with that transaction.
     HubOIDCCallbackResponse:
       type: object
       required: [code, data]
@@ -8351,7 +8371,7 @@ components:
               description: Hub-local HS256 access token for REST and WebSocket auth.
             refresh_token:
               type: string
-              description: Hub-local refresh token; not a TokenDance ID refresh token.
+              description: Hub-local opaque refresh token; not a TokenDance Account refresh token.
             expires_in:
               type: integer
               format: int64
@@ -8367,11 +8387,11 @@ components:
                   type: string
                 nickname:
                   type: string
+                  maxLength: 64
                 avatar_url:
                   type: string
-                tokendance_sub:
-                  type: string
-                  description: TokenDance ID subject mapped to this Hub user.
+                  format: uri
+                  maxLength: 512
     HubTaskAckRequest:
       type: object
       properties:

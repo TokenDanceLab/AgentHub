@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { AppError } from '@shared/errors';
 import type { HubClient } from './hubClient';
 import {
   clearStoredHubAccessToken,
@@ -7,6 +8,8 @@ import {
   saveStoredHubRefreshToken,
 } from './hubTokenStorage';
 import { createHubAuth, OidcError } from './hubAuth';
+
+const ACCOUNT_ISSUER = 'https://account.example';
 
 function clientFor(overrides: Partial<HubClient> = {}): HubClient {
   return {
@@ -95,8 +98,12 @@ describe('createHubAuth contract', () => {
     await saveStoredHubRefreshToken('refresh-invalid');
     const auth = createHubAuth(
       clientFor({
-        me: vi.fn().mockRejectedValue(new Error('unauthorized')),
-        refresh: vi.fn().mockRejectedValue(new Error('refresh rejected')),
+        me: vi.fn().mockRejectedValue(
+          new AppError({ error: { code: 'auth_invalid_token', message: 'unauthorized' } }, 401),
+        ),
+        refresh: vi.fn().mockRejectedValue(
+          new AppError({ error: { code: 'auth_refresh_invalid', message: 'refresh rejected' } }, 401),
+        ),
       }),
     );
 
@@ -147,11 +154,16 @@ describe('createHubAuth contract', () => {
         state: 'state-1',
         codeVerifier: 'verifier-1',
         deviceId: 'device-1',
-        redirectUri: 'http://localhost:5173/auth/tokendance/callback',
+        redirectUri: 'http://localhost:5173/auth/account/callback',
+        issuer: ACCOUNT_ISSUER,
         createdAt: Date.now(),
       }),
     );
-    window.history.pushState({}, '', '/auth/tokendance/callback?code=code-1&state=state-1');
+    window.history.pushState(
+      {},
+      '',
+      `/auth/account/callback?code=code-1&state=state-1&iss=${encodeURIComponent(ACCOUNT_ISSUER)}`,
+    );
 
     await expect(auth.tryAutoLogin()).resolves.toBe(true);
     expect(window.location.pathname).toBe('/');
@@ -160,7 +172,11 @@ describe('createHubAuth contract', () => {
 
   it('rejects browser callbacks with a missing pending state, mismatch, or expiry', async () => {
     const auth = createHubAuth(clientFor());
-    window.history.pushState({}, '', '/auth/tokendance/callback?code=code-1&state=state-1');
+    window.history.pushState(
+      {},
+      '',
+      `/auth/account/callback?code=code-1&state=state-1&iss=${encodeURIComponent(ACCOUNT_ISSUER)}`,
+    );
     await expect(auth.tryAutoLogin()).resolves.toBe(false);
 
     sessionStorage.setItem(
@@ -169,11 +185,16 @@ describe('createHubAuth contract', () => {
         state: 'state-expected',
         codeVerifier: 'v',
         deviceId: 'd',
-        redirectUri: '',
+        redirectUri: 'http://localhost:5173/auth/account/callback',
+        issuer: ACCOUNT_ISSUER,
         createdAt: Date.now(),
       }),
     );
-    window.history.pushState({}, '', '/auth/tokendance/callback?code=code-1&state=state-other');
+    window.history.pushState(
+      {},
+      '',
+      `/auth/account/callback?code=code-1&state=state-other&iss=${encodeURIComponent(ACCOUNT_ISSUER)}`,
+    );
     await expect(auth.tryAutoLogin()).rejects.toMatchObject({ code: 'stateMismatch' });
 
     sessionStorage.setItem(
@@ -182,11 +203,16 @@ describe('createHubAuth contract', () => {
         state: 'state-old',
         codeVerifier: 'v',
         deviceId: 'd',
-        redirectUri: '',
+        redirectUri: 'http://localhost:5173/auth/account/callback',
+        issuer: ACCOUNT_ISSUER,
         createdAt: Date.now() - 11 * 60 * 1000,
       }),
     );
-    window.history.pushState({}, '', '/auth/tokendance/callback?code=code-1&state=state-old');
+    window.history.pushState(
+      {},
+      '',
+      `/auth/account/callback?code=code-1&state=state-old&iss=${encodeURIComponent(ACCOUNT_ISSUER)}`,
+    );
     await expect(auth.tryAutoLogin()).rejects.toMatchObject({ code: 'timeout' });
     expect(auth.getState().isAuthenticated).toBe(false);
   });
@@ -194,8 +220,8 @@ describe('createHubAuth contract', () => {
   it('wraps authorize failures as an OIDC start error', async () => {
     const authorize = vi.fn().mockRejectedValue(new Error('hub unavailable'));
     const auth = createHubAuth(clientFor({ oidcAuthorize: authorize }));
-    await expect(auth.loginWithTokenDance()).rejects.toBeInstanceOf(OidcError);
-    await expect(auth.loginWithTokenDance()).rejects.toMatchObject({
+    await expect(auth.loginWithAccount()).rejects.toBeInstanceOf(OidcError);
+    await expect(auth.loginWithAccount()).rejects.toMatchObject({
       code: 'startFailed',
       detail: 'hub unavailable',
     });

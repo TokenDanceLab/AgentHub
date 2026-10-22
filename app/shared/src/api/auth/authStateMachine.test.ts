@@ -1,4 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
+import { AppError } from '../../errors';
 import type { HubClient } from '../../hub/hubClient';
 import { createHubAuthCore } from './authStateMachine';
 import type { HubAuthPorts, HubClientFactory } from './ports';
@@ -71,7 +72,7 @@ function createFakePorts(overrides: Partial<HubAuthPorts> = {}) {
     },
     callbackChannel: {
       start: async () => ({
-        redirectUri: 'http://localhost:5173/auth/tokendance/callback',
+        redirectUri: 'http://localhost:5173/auth/account/callback',
         callback: new Promise<OidcCallbackResult>(() => {}),
       }),
       readBrowserCallback: browserReadCallback,
@@ -87,6 +88,7 @@ function createFakePorts(overrides: Partial<HubAuthPorts> = {}) {
 }
 
 const alice = { id: 'user-1', username: 'alice', nickname: 'Alice', avatar_url: '' };
+const ACCOUNT_ISSUER = 'https://account.example';
 
 function createFakeClient(overrides: Partial<HubClient> = {}) {
   return {
@@ -109,18 +111,23 @@ function createAuth(
   return { auth, createClient };
 }
 
-function pushBrowserCallback(code: string, state: string) {
-  window.history.pushState({}, '', `/auth/tokendance/callback?code=${code}&state=${state}`);
+function pushBrowserCallback(code: string, state: string, iss = ACCOUNT_ISSUER) {
+  window.history.pushState(
+    {},
+    '',
+    `/auth/account/callback?code=${code}&state=${state}&iss=${encodeURIComponent(iss)}`,
+  );
 }
 
 /** Mirrors the real platform ports: reads code/state from the current URL. */
 function browserReadCallback(): OidcCallbackResult | null {
   const url = new URL(window.location.href);
-  if (url.pathname !== '/auth/tokendance/callback') return null;
+  if (url.pathname !== '/auth/account/callback') return null;
   const code = url.searchParams.get('code')?.trim();
   const state = url.searchParams.get('state')?.trim();
-  if (!code || !state) return null;
-  return { code, state };
+  const iss = url.searchParams.get('iss')?.trim();
+  if (!code || !state || !iss) return null;
+  return { code, state, iss };
 }
 
 function makePending(state: string, createdAt = Date.now()): BrowserOIDCPending {
@@ -128,7 +135,8 @@ function makePending(state: string, createdAt = Date.now()): BrowserOIDCPending 
     state,
     codeVerifier: 'verifier-1',
     deviceId: 'device-1',
-    redirectUri: 'http://localhost:5173/auth/tokendance/callback',
+    redirectUri: 'http://localhost:5173/auth/account/callback',
+    issuer: ACCOUNT_ISSUER,
     createdAt,
   };
 }
@@ -254,10 +262,10 @@ describe('createHubAuthCore', () => {
     const { ports, memory, sessionSync } = createFakePorts();
     memory.access = 'access-invalid';
     memory.refresh = 'refresh-invalid';
-    memory.source = 'tokendance';
+    memory.source = 'account';
     const client = createFakeClient({
-      me: vi.fn().mockRejectedValue(new Error('unauthorized')),
-      refresh: vi.fn().mockRejectedValue(new Error('refresh rejected')),
+      me: vi.fn().mockRejectedValue(new AppError({ error: { code: 'unauthorized', message: 'unauthorized' } }, 401)),
+      refresh: vi.fn().mockRejectedValue(new AppError({ error: { code: 'auth_refresh_invalid', message: 'refresh rejected' } }, 401)),
     });
     const { auth } = createAuth(ports, client);
 
@@ -272,6 +280,25 @@ describe('createHubAuthCore', () => {
     expect(memory.access).toBeNull();
     expect(memory.refresh).toBeNull();
     expect(sessionSync.clear).toHaveBeenCalled();
+  });
+
+  it('preserves stored credentials when profile refresh fails transiently', async () => {
+    const { ports, memory, sessionSync } = createFakePorts();
+    memory.access = 'access-stale';
+    memory.refresh = 'refresh-valid';
+    memory.source = 'account';
+    const client = createFakeClient({
+      me: vi.fn().mockRejectedValue(new AppError({ error: { code: 'unavailable', message: 'down' } }, 503)),
+      refresh: vi.fn().mockRejectedValue(new AppError({ error: { code: 'unavailable', message: 'down' } }, 503)),
+    });
+    const { auth } = createAuth(ports, client);
+
+    await expect(auth.tryAutoLogin()).resolves.toBe(false);
+    expect(memory.access).toBe('access-stale');
+    expect(memory.refresh).toBe('refresh-valid');
+    expect(auth.getState().tokenSource).toBe('account');
+    expect(auth.getState().isAuthenticated).toBe(false);
+    expect(sessionSync.clear).not.toHaveBeenCalled();
   });
 
   it('logs out remotely when authenticated and clears all local state', async () => {
@@ -327,22 +354,23 @@ describe('browser OIDC callback handling', () => {
       expect.objectContaining({
         code: 'code-1',
         state: 'state-1',
+        iss: ACCOUNT_ISSUER,
         code_verifier: 'verifier-1',
         device_type: 'web',
         device_id: 'device-1',
-        redirect_uri: 'http://localhost:5173/auth/tokendance/callback',
+        redirect_uri: 'http://localhost:5173/auth/account/callback',
       }),
     );
     expect(auth.getState()).toMatchObject({
       token: 'access-oidc',
       refreshToken: 'refresh-oidc',
-      tokenSource: 'tokendance',
+      tokenSource: 'account',
       isAuthenticated: true,
       user: { username: 'oidc-user' },
     });
     expect(memory.access).toBe('access-oidc');
     expect(memory.refresh).toBe('refresh-oidc');
-    expect(memory.source).toBe('tokendance');
+    expect(memory.source).toBe('account');
     expect(memory.pending).toBeNull();
     expect(sessionSync.setAuthenticated).toHaveBeenCalledWith('user-oidc', 'oidc-user');
     expect(ports.callbackChannel.leaveCallbackRoute).toHaveBeenCalled();
@@ -365,6 +393,18 @@ describe('browser OIDC callback handling', () => {
     const client = createFakeClient();
     const { auth } = createAuth(ports, client);
     await expect(auth.tryAutoLogin()).rejects.toMatchObject({ code: 'stateMismatch' });
+    expect(client.oidcCallback).not.toHaveBeenCalled();
+    expect(ports.callbackChannel.leaveCallbackRoute).toHaveBeenCalled();
+  });
+
+  it('rejects a callback whose RFC 9207 issuer differs from the pinned issuer', async () => {
+    const { ports } = createFakePorts();
+    ports.pendingStorage.save(makePending('state-1'));
+    pushBrowserCallback('code-1', 'state-1', 'https://other-account.example');
+
+    const client = createFakeClient();
+    const { auth } = createAuth(ports, client);
+    await expect(auth.tryAutoLogin()).rejects.toMatchObject({ code: 'issuerInvalid' });
     expect(client.oidcCallback).not.toHaveBeenCalled();
     expect(ports.callbackChannel.leaveCallbackRoute).toHaveBeenCalled();
   });
@@ -425,9 +465,9 @@ describe('browser OIDC callback handling', () => {
   });
 });
 
-// ── loginWithTokenDance (local-callback-server mode) ─
+// ── loginWithAccount (local-callback-server mode) ─
 
-describe('loginWithTokenDance', () => {
+describe('loginWithAccount', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
   });
@@ -439,7 +479,7 @@ describe('loginWithTokenDance', () => {
       resolveCallback = resolve;
     });
     ports.callbackChannel = {
-      start: async () => ({ redirectUri: 'http://127.0.0.1:49152/callback', callback }),
+      start: async () => ({ redirectUri: 'http://127.0.0.1:53682/callback', callback }),
       readBrowserCallback: () => null,
       leaveCallbackRoute: vi.fn(),
     };
@@ -452,6 +492,7 @@ describe('loginWithTokenDance', () => {
       oidcAuthorize: vi.fn().mockResolvedValue({
         state: 'server-state',
         authorization_url: 'https://id.example/authorize?code_challenge=abc',
+        issuer: ACCOUNT_ISSUER,
       }),
       oidcCallback: vi.fn().mockResolvedValue({
         access_token: 'access-oidc',
@@ -462,8 +503,8 @@ describe('loginWithTokenDance', () => {
     });
     const { auth } = createAuth(ports, client);
 
-    const loginPromise = auth.loginWithTokenDance();
-    resolveCallback({ code: 'code-1', state: 'server-state' });
+    const loginPromise = auth.loginWithAccount();
+    resolveCallback({ code: 'code-1', state: 'server-state', iss: ACCOUNT_ISSUER });
     await loginPromise;
 
     expect(client.oidcAuthorize).toHaveBeenCalledWith(
@@ -471,27 +512,25 @@ describe('loginWithTokenDance', () => {
         code_challenge_method: 'S256',
         device_type: 'web',
         device_id: 'device-1',
-        redirect_uri: 'http://127.0.0.1:49152/callback',
+        redirect_uri: 'http://127.0.0.1:53682/callback',
       }),
     );
     expect(client.oidcCallback).toHaveBeenCalledWith(
       expect.objectContaining({
         code: 'code-1',
         state: 'server-state',
-        redirect_uri: 'http://127.0.0.1:49152/callback',
+        iss: ACCOUNT_ISSUER,
+        redirect_uri: 'http://127.0.0.1:53682/callback',
       }),
     );
     expect(ports.redirectOpener.open).toHaveBeenCalledWith(
       'https://id.example/authorize?code_challenge=abc',
     );
-    expect(ports.pendingStorage.load()).toMatchObject({
-      state: 'server-state',
-      deviceId: 'device-1',
-    });
+    expect(ports.pendingStorage.load()).toBeNull();
     expect(auth.getState()).toMatchObject({
       token: 'access-oidc',
       isAuthenticated: true,
-      tokenSource: 'tokendance',
+      tokenSource: 'account',
       user: { username: 'alice' },
     });
     expect(memory.access).toBe('access-oidc');
@@ -505,7 +544,7 @@ describe('loginWithTokenDance', () => {
     });
     const { auth } = createAuth(ports, client);
 
-    const err = await auth.loginWithTokenDance().catch((e: unknown) => e);
+    const err = await auth.loginWithAccount().catch((e: unknown) => e);
     expect(err).toBeInstanceOf(OidcError);
     expect(err).toMatchObject({ code: 'startFailed', detail: 'hub unavailable' });
     expect(ports.redirectOpener.open).not.toHaveBeenCalled();
@@ -517,13 +556,35 @@ describe('loginWithTokenDance', () => {
       oidcAuthorize: vi.fn().mockResolvedValue({
         state: 'server-state',
         authorization_url: 'https://id.example/authorize',
+        issuer: ACCOUNT_ISSUER,
       }),
     });
     const { auth } = createAuth(ports, client);
 
-    const loginPromise = auth.loginWithTokenDance();
-    resolveCallback({ code: 'code-1', state: 'attacker-state' });
+    const loginPromise = auth.loginWithAccount();
+    resolveCallback({ code: 'code-1', state: 'attacker-state', iss: ACCOUNT_ISSUER });
     await expect(loginPromise).rejects.toMatchObject({ code: 'stateMismatch' });
+    expect(client.oidcCallback).not.toHaveBeenCalled();
+  });
+
+  it('rejects a callback with mismatched issuer', async () => {
+    const { ports, resolveCallback } = localServerPorts();
+    const client = createFakeClient({
+      oidcAuthorize: vi.fn().mockResolvedValue({
+        state: 'server-state',
+        authorization_url: 'https://id.example/authorize',
+        issuer: ACCOUNT_ISSUER,
+      }),
+    });
+    const { auth } = createAuth(ports, client);
+
+    const loginPromise = auth.loginWithAccount();
+    resolveCallback({
+      code: 'code-1',
+      state: 'server-state',
+      iss: 'https://other-account.example',
+    });
+    await expect(loginPromise).rejects.toMatchObject({ code: 'issuerInvalid' });
     expect(client.oidcCallback).not.toHaveBeenCalled();
   });
 
@@ -533,12 +594,13 @@ describe('loginWithTokenDance', () => {
       oidcAuthorize: vi.fn().mockResolvedValue({
         state: 'server-state',
         authorization_url: 'https://id.example/authorize',
+        issuer: ACCOUNT_ISSUER,
       }),
       oidcCallback: vi.fn().mockRejectedValue(new Error('exchange rejected')),
     });
     const { auth } = createAuth(ports, client);
-    const loginPromise = auth.loginWithTokenDance();
-    resolveCallback({ code: 'code-1', state: 'server-state' });
+    const loginPromise = auth.loginWithAccount();
+    resolveCallback({ code: 'code-1', state: 'server-state', iss: ACCOUNT_ISSUER });
     const err = await loginPromise.catch((e: unknown) => e);
     expect(err).toBeInstanceOf(OidcError);
     expect(err).toMatchObject({ code: 'tokenExchangeFailed', detail: 'exchange rejected' });

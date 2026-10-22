@@ -2,16 +2,16 @@
 
 > 子文档 | 主索引：[architecture.md](../architecture.md)
 >
-> 最后更新：2026-10-18
+> 最后更新：2026-10-23
 
-Hub Server（`hub-server/`）是 AgentHub 的云端控制面：TokenDance ID relying party、Hub session、IM、AgentTeam、同步、中继、审计和远程控制面。它不启动本机 Agent Runtime；执行仍由 Edge Server 和 adapter 负责。
+Hub Server（`hub-server/`）是 AgentHub 的云端控制面：TokenDance Account OIDC relying party、Hub session、IM、AgentTeam、同步、中继、审计和远程控制面。它不启动本机 Agent Runtime；执行仍由 Edge Server 和 adapter 负责。
 
 ## Boundaries
 
 | 主题 | Hub owns | 不拥有 |
 |---|---|---|
-| Identity | OIDC code exchange，`tokendance_sub` 到 Hub user 映射 | 第三方 provider OAuth app 或 provider token |
-| Session | Hub access/refresh session，WebSocket auth，device proof | TokenDance ID token 作为产品 session |
+| Identity | Account 公共 OIDC code exchange，`issuer + subject` 到 Hub user 映射 | Account 管理 API/DB、provider token 或 legacy `tokendance_sub` 自动认领 |
+| Session | Hub access/refresh session，WebSocket auth，device proof | Account token 作为产品 session |
 | Authorization | Hub-local membership/resource/action checks | 把身份认证等同授权 |
 | IM | Contacts、sessions、messages、attachments、notifications | Local filesystem / raw process |
 | Agent routing | Agent Profile、Execution Target、pending task、relay control | CLI process lifecycle |
@@ -61,20 +61,21 @@ Hub Server（`hub-server/`）是 AgentHub 的云端控制面：TokenDance ID rel
 
 ## Auth 中间件链与路由分组
 
-Hub 鉴权区分**身份证明**与**产品会话**：TokenDance ID RS256 JWT 只证明身份（"我是谁"），Hub-issued HS256 JWT 才是产品会话（"我能操作 Hub 资源"）。中间件实现在 `internal/middleware/`，路由注册见 `internal/router/router.go`。
+Hub 鉴权区分**身份证明**与**产品会话**：Account 的授权码、ID token、UserInfo 和 client secret 只由 Hub OIDC service 在服务端使用；Hub-issued HS256 JWT 才是产品会话（"我能操作 Hub 资源"）。Account token 不能作为 Hub REST/WS bearer。中间件实现在 `internal/middleware/`，路由注册见 `internal/router/router.go`。
 
 | 中间件 | 作用 | 应用于 |
 |---|---|---|
-| `AuthMiddleware` | 解析任意 Bearer token（先试 RS256 TokenDance，fallback HS256 Hub），注入 `auth_source` | `/client/*`、`/web/*`、`/edge/*`、`/cloud/*` 受保护路由 |
-| `RequireHubSession()` | 拒绝 `auth_source != "hub_local"`，即拒绝 TokenDance bearer 直接操作产品 API | `/client` 受保护子组、`/edge/*`、`/cloud/*`、`/web/*` |
-| `AuthMiddleware.WSHandler()` | 只接受 Hub-issued HS256 session；TokenDance bearer 不能在 WS 升级时通过 | `/client/ws` |
+| `AuthMiddleware` | 只解析 Hub-issued HS256 Bearer token，注入 `auth_source=hub_local` | `/client/*`、`/web/*`、`/edge/*`、`/cloud/*` 受保护路由 |
+| `RequireHubSession()` | 拒绝非 Hub session purpose/device 组合及 edge token | `/client` 受保护子组、`/edge/*`、`/cloud/*`、`/web/*` |
+| `AuthMiddleware.WSHandler()` | 只接受 Hub-issued HS256 session；Account token 不能通过 WS upgrade | `/client/ws` |
 | `RequireAdmin()` | `AGENTHUB_ADMIN_USERS` 逗号分隔白名单；空列表 = fail-closed | `/web/*` 下的 publish、audit、relay 路由 |
 
 路由分组（`router.go`）：
 
 ```text
 /health、/api/public      → 无鉴权
-/client/auth/oidc/*、/client/auth/refresh → 仅 rate limit（登录入口）
+/client/auth/refresh → POST + rate limit（登录入口）
+/client/auth/oidc/authorize、/client/auth/oidc/callback → POST + rate limit；旧 GET callback 不存在
 /client/ws                → WS IP rate limit + AuthMiddleware.WSHandler()（只接受 Hub session）
 /client/* 受保护路由      → AuthMiddleware + RequireHubSession
 /edge/*                   → Auth + RequireHubSession + DeviceTypeCheck(desktop)
@@ -110,7 +111,7 @@ Remote/cloud execution claims require relay/provisioning/device proof/workspace 
 | Handler/service/repository | `cd hub-server; go test ./... -short -count=1` or narrower focused package |
 | REST contract | OpenAPI YAML parse + affected handler tests |
 | WS event behavior | Hub WS tests + `api/events.md` sync |
-| Auth/session | OIDC/session tests；静态一致性门禁见 `docs/governance/verifier-map.md` 的 OIDC 行，真实流验证属于 L3 证据 |
+| Auth/session | Account OIDC/session tests；真实 Account issuer 的浏览器 code exchange/L3 另行取证，fixture 只算 contract evidence |
 | Performance/leak path | 机器门禁 `scripts/verify/verify-backend-perf-leak-gates.py` plus behavior test for the same path（证据等级见 [05-deployment.md](05-deployment.md) §Backend performance and leak evidence） |
 
 ## Related

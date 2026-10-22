@@ -51,7 +51,7 @@ export const E2E_EXTERNAL_FONT_HOSTS: ReadonlySet<string> = new Set([
  */
 export const E2E_PRODUCTION_BOUNDARIES: ReadonlySet<E2ERequestBoundary> = new Set([
   'hub',
-  'tokendance-id',
+  'account-oidc',
   'gateway',
 ]);
 

@@ -43,7 +43,9 @@ fn ensure_store() -> Result<(), String> {
         .clone()
 }
 
-pub fn credential_store_readiness_from_result(result: Result<(), String>) -> CredentialStoreReadiness {
+pub fn credential_store_readiness_from_result(
+    result: Result<(), String>,
+) -> CredentialStoreReadiness {
     match result {
         Ok(()) => CredentialStoreReadiness {
             available: true,
@@ -101,9 +103,7 @@ pub async fn read_hub_refresh_token(
 }
 
 #[tauri::command]
-pub async fn clear_hub_refresh_token(
-    window: tauri::WebviewWindow,
-) -> Result<(), String> {
+pub async fn clear_hub_refresh_token(window: tauri::WebviewWindow) -> Result<(), String> {
     crate::commands::validate_command_origin(&window)?;
     match refresh_token_entry()?.delete_credential() {
         Ok(()) | Err(keyring_core::Error::NoEntry) => Ok(()),
@@ -134,9 +134,7 @@ pub async fn store_hub_access_token(
 }
 
 #[tauri::command]
-pub async fn read_hub_access_token(
-    window: tauri::WebviewWindow,
-) -> Result<Option<String>, String> {
+pub async fn read_hub_access_token(window: tauri::WebviewWindow) -> Result<Option<String>, String> {
     crate::commands::validate_command_origin(&window)?;
     match access_token_entry()?.get_password() {
         Ok(token) => Ok(Some(token)),
@@ -146,9 +144,7 @@ pub async fn read_hub_access_token(
 }
 
 #[tauri::command]
-pub async fn clear_hub_access_token(
-    window: tauri::WebviewWindow,
-) -> Result<(), String> {
+pub async fn clear_hub_access_token(window: tauri::WebviewWindow) -> Result<(), String> {
     crate::commands::validate_command_origin(&window)?;
     match access_token_entry()?.delete_credential() {
         Ok(()) | Err(keyring_core::Error::NoEntry) => Ok(()),

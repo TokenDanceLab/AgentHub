@@ -83,7 +83,7 @@ test.describe('Settings toggle (smoke)', () => {
     expect(visibleButtons.length).toBeGreaterThanOrEqual(3);
   });
 
-  test('account drawer shows identity section with TokenDance ID', async ({ page }) => {
+  test('account drawer shows identity section with TokenDance Account', async ({ page }) => {
     const avatarButton = page.getByRole('button', { name: /account/i });
     await avatarButton.click();
     await page.waitForTimeout(1000);
@@ -145,13 +145,13 @@ test.describe('Settings interaction tests', () => {
     }
   });
 
-  test('clicking TokenDance ID menu item is responsive', async ({ page }) => {
+  test('clicking TokenDance Account menu item is responsive', async ({ page }) => {
     const avatarButton = page.getByRole('button', { name: /account/i });
     await avatarButton.click();
     await page.waitForTimeout(1000);
 
-    // TokenDance ID menu item should be clickable
-    const tdItem = page.getByText(/TokenDance ID/).first();
+    // TokenDance Account menu item should be clickable
+    const tdItem = page.getByText(/TokenDance Account/).first();
     await tdItem.click();
     await page.waitForTimeout(300);
 

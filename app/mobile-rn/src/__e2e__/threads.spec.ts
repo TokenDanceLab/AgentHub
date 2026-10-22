@@ -19,7 +19,7 @@ test.describe('Thread list render (smoke)', () => {
       'AgentHub Design Contract',
       'Agent Profiles',
       'AgentHub Docs',
-      'TokenDance ID',
+      'TokenDance Account',
     ];
 
     for (const title of expectedThreads) {
@@ -102,7 +102,7 @@ test.describe('Threads interaction tests', () => {
     await expect(page.getByText('AgentHub Design Contract').first()).toBeVisible({ timeout: 5000 });
 
     // A non-matching thread should not be visible
-    const tokensThread = page.getByText('TokenDance ID').first();
+    const tokensThread = page.getByText('TokenDance Account').first();
     const tokensVisible = await tokensThread.isVisible().catch(() => false);
     // Search filters may hide non-matching threads
   });

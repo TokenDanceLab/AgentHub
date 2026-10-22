@@ -96,8 +96,8 @@ const snapshot = {
       evidenceCount: 5,
     },
     {
-      id: 'tokendance-id',
-      title: 'TokenDance ID',
+      id: 'account-oidc',
+      title: 'TokenDance Account',
       subtitle: '身份、设备和通知状态只在账号面板展示，不进入聊天消息流。',
       initials: 'TD',
       avatarTone: 'warning',
@@ -287,7 +287,7 @@ const snapshot = {
     ],
   },
   account: {
-    tokenDanceId: 'signed_in',
+    accountIdentity: 'signed_in',
     hubSession: 'active',
     notification: 'prompt',
     hubSync: 'active',

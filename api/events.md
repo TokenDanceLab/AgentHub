@@ -68,7 +68,7 @@ Hub/Edge 实时面均为 **at-least-once**：重连、离线队列、outbox、�
 {"type":"message.new","seq_id":42,"payload":{"id":"<message-uuid>","session_id":"<session-uuid>","client_msg_id":"<client-uuid>","seq_id":7}}
 ```
 
-- `/client/ws` 仅 Hub-issued HS256 access token；TokenDance ID RS256 不能当 WS session。
+- `/client/ws` 仅接受 Hub-issued HS256 access token；TokenDance Account 的 ID/access token 不能当 WS session。
 - `seq_id` 服务端保留、单连接投递序；**不能**替代下表业务幂等键；客户端不得写入。
 - 与 Edge envelope 不同；进 transcript 须经 Hub normalizer。多数 bridge 用 RQ invalidation；直写 store 路径须遵守下表。
 

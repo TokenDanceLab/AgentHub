@@ -108,7 +108,7 @@ export function createMobileAuthCorePorts(
   // Shares the HubSessionStorage key so data-plane clients restored from the
   // same slot; the token state machine stays the only writer of auth tokens.
   const hubSessionStorage = createHubSessionStorage(options.storageAdapter);
-  const memoryTokenSource: { source: 'tokendance' | 'hub' | null } = { source: null };
+  const memoryTokenSource: { source: 'account' | 'hub' | null } = { source: null };
 
   const tokenStorage: HubTokenStoragePort = {
     async loadAccessToken() {
@@ -189,8 +189,12 @@ export function createMobileAuthCorePorts(
         rejectWaiters(new OidcError('stateMismatch', 'OIDC state mismatch — possible CSRF attack. Please try again.'));
         return;
       }
+      if (pending.issuer !== callback.iss) {
+        rejectWaiters(new OidcError('issuerInvalid', 'OIDC issuer mismatch — refusing the Account callback.'));
+        return;
+      }
       if (now() - pending.createdAt > OIDC_PENDING_EXPIRY_MS) {
-        rejectWaiters(new OidcError('timeout', 'OIDC login expired. Please start TokenDance ID login again.'));
+        rejectWaiters(new OidcError('timeout', 'OIDC login expired. Please start Account login again.'));
         return;
       }
     }

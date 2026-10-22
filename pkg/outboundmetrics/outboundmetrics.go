@@ -39,7 +39,7 @@ const (
 const (
 	ProviderEdge          = "edge"           // Hub→Edge dispatch
 	ProviderHub           = "hub"            // Edge→Hub callback, Edge MCP sync
-	ProviderTokenDanceID  = "tokendance_id"  // OIDC token exchange, JWKS fetch
+	ProviderAccountOIDC   = "account_oidc"   // Account OIDC discovery/token/userinfo/JWKS
 	ProviderModelProvider = "model_provider" // SDK adapters (openai/anthropic)
 )
 
@@ -47,7 +47,9 @@ const (
 const (
 	PurposeDispatch      = "dispatch"
 	PurposeCallback      = "callback"
+	PurposeDiscovery     = "discovery"
 	PurposeTokenExchange = "token_exchange"
+	PurposeUserInfo      = "userinfo"
 	PurposeJWKSFetch     = "jwks_fetch"
 	PurposeMCPSync       = "mcp_sync"
 )

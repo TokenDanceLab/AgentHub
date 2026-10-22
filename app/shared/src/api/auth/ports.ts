@@ -50,7 +50,7 @@ export interface OidcCallbackChannelPort {
   leaveCallbackRoute(): void;
 }
 
-/** Opens the TokenDance ID authorization URL (current window or system browser). */
+/** Opens the TokenDance Account authorization URL (current window or system browser). */
 export interface OidcRedirectPort {
   open(authorizationUrl: string): Promise<void>;
 }

@@ -86,7 +86,7 @@ export const WORKBENCH_MOCK_SERVICE_DESKS: ServiceDesk[] = [
     id: 'account',
     name: '账号与权限',
     initials: 'S',
-    description: 'TokenDance ID / 企业成员 / 外部联系人权限',
+    description: 'TokenDance Account / 企业成员 / 外部联系人权限',
   },
   {
     id: 'agent-runtime',

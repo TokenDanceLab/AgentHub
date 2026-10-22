@@ -99,7 +99,7 @@ function WebWorkbenchRoot() {
   const chatActions = workbench.chatActions;
   const agents = resolveWebWorkbenchAgents(agentList.data?.items, dataMode);
 
-  // Fetch real user profile from Hub (originates from TokenDance ID OIDC)
+  // Fetch real user profile from Hub (originates from TokenDance Account OIDC)
   const userProfile = useQuery({
     queryKey: webQueryKeys.authMe,
     queryFn: () => createHubClient({ getToken: getAccessToken }).me(),

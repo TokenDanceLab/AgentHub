@@ -122,11 +122,10 @@ func SetupRoutes(r *gin.Engine, cfg *config.Config, authMW *middleware.AuthMiddl
 		{
 			auth.POST("/refresh", middleware.RateLimit(cacheClient, config.AuthLoginRateLimit, config.AuthRateLimitWindow, middleware.IPKey), authHandler.Refresh)
 
-			// OIDC (TokenDance ID — the only auth entry point)
+			// Account OIDC (the only external auth entry point)
 			if oidcHandler != nil {
 				auth.POST("/oidc/authorize", middleware.RateLimit(cacheClient, config.AuthLoginRateLimit, config.AuthRateLimitWindow, middleware.IPKey), oidcHandler.PostOIDCAuthorize)
 				auth.POST("/oidc/callback", middleware.RateLimit(cacheClient, config.AuthLoginRateLimit, config.AuthRateLimitWindow, middleware.IPKey), oidcHandler.PostOIDCCallback)
-				auth.GET("/oidc/callback", middleware.RateLimit(cacheClient, config.AuthLoginRateLimit, config.AuthRateLimitWindow, middleware.IPKey), oidcHandler.GetOIDCCallback)
 			}
 		}
 

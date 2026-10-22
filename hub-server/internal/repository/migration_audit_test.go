@@ -460,3 +460,55 @@ func TestMigration0071PostgresUpCreatesTrgmIndexForMessageSearch(t *testing.T) {
 		t.Fatalf("trgm ILIKE smoke hits = %d, want 1", hits)
 	}
 }
+
+func TestMigration0076PreservesIdentityAndRetiresLegacySessions(t *testing.T) {
+	up, err := os.ReadFile("../../migrations/0076_user_identities.up.sql")
+	if err != nil {
+		t.Fatalf("read up migration: %v", err)
+	}
+	down, err := os.ReadFile("../../migrations/0076_user_identities.down.sql")
+	if err != nil {
+		t.Fatalf("read down migration: %v", err)
+	}
+
+	upText := string(up)
+	for _, want := range []string{
+		"CREATE TABLE IF NOT EXISTS user_identities",
+		"UNIQUE INDEX IF NOT EXISTS idx_user_identities_issuer_subject",
+		"'legacy:tokendance-id'",
+		"UPDATE refresh_tokens",
+		"SET revoked = TRUE",
+	} {
+		if !strings.Contains(upText, want) {
+			t.Errorf("up migration missing %q", want)
+		}
+	}
+	if strings.Contains(strings.ToUpper(string(down)), "DROP TABLE") {
+		t.Fatal("down migration must not destroy identity links")
+	}
+}
+
+func TestMigration0077BindsRefreshTokenToExactIdentity(t *testing.T) {
+	up, err := os.ReadFile("../../migrations/0077_refresh_identity_binding.up.sql")
+	if err != nil {
+		t.Fatalf("read up migration: %v", err)
+	}
+	down, err := os.ReadFile("../../migrations/0077_refresh_identity_binding.down.sql")
+	if err != nil {
+		t.Fatalf("read down migration: %v", err)
+	}
+	upText := string(up)
+	for _, want := range []string{
+		"ADD COLUMN IF NOT EXISTS user_identity_id UUID",
+		"REFERENCES user_identities(id) ON DELETE RESTRICT",
+		"CREATE INDEX IF NOT EXISTS idx_refresh_tokens_user_identity_id",
+	} {
+		if !strings.Contains(upText, want) {
+			t.Errorf("0077 up migration missing %q", want)
+		}
+	}
+	downText := strings.ToLower(string(down))
+	if !strings.Contains(downText, "select 1;") || strings.Contains(downText, "drop column") {
+		t.Fatalf("0077 down migration must preserve identity-bound refresh data, got %q", string(down))
+	}
+}

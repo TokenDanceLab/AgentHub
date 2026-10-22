@@ -265,9 +265,9 @@ func (a *App) initServices(ctx context.Context) error {
 	settingsSvc := usersettings.NewService(settingsRepo)
 	a.UserSettingsHandler = handler.NewUserSettingsHandler(settingsSvc)
 
-	// OIDC Service (optional — only when TokenDance ID client is configured)
-	if a.Config.TokenDanceID.ClientID != "" {
-		a.OIDCService = oidc.NewService(a.DB, a.Config.TokenDanceID, a.Config.JWT, a.CacheClient)
+	// Account OIDC BFF (optional until a client is configured).
+	if a.Config.AccountOIDC.ClientID != "" {
+		a.OIDCService = oidc.NewService(a.DB, a.Config.AccountOIDC, a.Config.JWT, a.CacheClient)
 		a.OIDCHandler = handler.NewOIDCHandler(a.OIDCService)
 	}
 

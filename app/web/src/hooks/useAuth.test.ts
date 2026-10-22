@@ -20,7 +20,7 @@ const authHarness = vi.hoisted(() => {
         listeners.delete(fn);
       };
     },
-    loginWithTokenDance: vi.fn(async () => undefined),
+    loginWithAccount: vi.fn(async () => undefined),
     logout: vi.fn(async () => undefined),
     tryAutoLogin: vi.fn(async () => false),
   };
@@ -40,7 +40,7 @@ const authHarness = vi.hoisted(() => {
         tokenSource: null,
       };
       listeners.clear();
-      vi.mocked(api.loginWithTokenDance).mockClear();
+      vi.mocked(api.loginWithAccount).mockClear();
       vi.mocked(api.logout).mockClear();
       vi.mocked(api.tryAutoLogin).mockClear();
     },
@@ -68,7 +68,7 @@ describe('useAuth', () => {
       authHarness.setState({
         token: 'hub-access',
         isAuthenticated: true,
-        tokenSource: 'tokendance',
+        tokenSource: 'account',
         user: {
           id: 'user-1',
           username: 'alice',
@@ -90,12 +90,12 @@ describe('useAuth', () => {
     const { result } = renderHook(() => useAuth());
 
     await act(async () => {
-      await result.current.loginWithTokenDance();
+      await result.current.loginWithAccount();
       await result.current.logout();
       await expect(result.current.tryAutoLogin()).resolves.toBe(true);
     });
 
-    expect(authHarness.api.loginWithTokenDance).toHaveBeenCalledTimes(1);
+    expect(authHarness.api.loginWithAccount).toHaveBeenCalledTimes(1);
     expect(authHarness.api.logout).toHaveBeenCalledTimes(1);
     expect(authHarness.api.tryAutoLogin).toHaveBeenCalledTimes(1);
   });

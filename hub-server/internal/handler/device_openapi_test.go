@@ -90,6 +90,137 @@ func TestOpenAPIHubAuthDeviceIDsUseUUIDContract(t *testing.T) {
 	assertSchemaRequiresUUIDDeviceID(t, schemas, "HubOIDCCallbackRequest")
 }
 
+func TestOpenAPITokenDanceAccountOIDCContract(t *testing.T) {
+	spec := loadOpenAPISpec(t)
+	paths := yamlMapField(t, spec, "paths", "paths")
+	components := yamlMapField(t, spec, "components", "components")
+	schemas := yamlMapField(t, components, "schemas", "components.schemas")
+
+	raw, err := os.ReadFile("../../../api/openapi.yaml")
+	if err != nil {
+		t.Fatalf("read openapi spec: %v", err)
+	}
+	for _, forbidden := range []string{"TokenDance ID", "tokendance_sub", "tokendance_sub_linked_at"} {
+		if strings.Contains(string(raw), forbidden) {
+			t.Fatalf("public OpenAPI must not contain legacy TokenDance ID identity surface %q", forbidden)
+		}
+	}
+
+	authorize := yamlMapField(t, paths, "/client/auth/oidc/authorize", "paths./client/auth/oidc/authorize")
+	authorizePost := yamlMapField(t, authorize, "post", "paths./client/auth/oidc/authorize.post")
+	authorizeDescription := yamlScalarField(t, authorizePost, "description", "authorize description")
+	for _, want := range []string{"TokenDance Account OIDC", "RFC 9207", "redirect_uri", "Account management APIs", "not Hub credentials"} {
+		if !strings.Contains(authorizeDescription, want) {
+			t.Fatalf("authorize description missing %q: %s", want, authorizeDescription)
+		}
+	}
+	for _, code := range []string{"bad_request", "internal_error"} {
+		if !strings.Contains(authorizeDescription, code) {
+			t.Fatalf("authorize description missing error code %q", code)
+		}
+	}
+	authorizeResponses := yamlMapField(t, authorizePost, "responses", "authorize responses")
+	for _, status := range []string{"400", "500"} {
+		_ = yamlMapField(t, authorizeResponses, status, "authorize responses."+status)
+	}
+
+	authorizeResponseSchema := yamlMapField(t, schemas, "HubOIDCAuthorizeResponse", "schemas.HubOIDCAuthorizeResponse")
+	authorizeResponseData := yamlMapField(t, yamlMapField(t, authorizeResponseSchema, "properties", "HubOIDCAuthorizeResponse.properties"), "data", "HubOIDCAuthorizeResponse.properties.data")
+	authorizeDataRequired := yamlStringSlice(t, yamlField(t, authorizeResponseData, "required", "HubOIDCAuthorizeResponse.data.required"), "HubOIDCAuthorizeResponse.data.required")
+	if !containsString(authorizeDataRequired, "issuer") {
+		t.Fatalf("HubOIDCAuthorizeResponse.data.required = %v, want issuer", authorizeDataRequired)
+	}
+	authorizeDataProperties := yamlMapField(t, authorizeResponseData, "properties", "HubOIDCAuthorizeResponse.data.properties")
+	_ = yamlMapField(t, authorizeDataProperties, "issuer", "HubOIDCAuthorizeResponse.data.properties.issuer")
+
+	callback := yamlMapField(t, paths, "/client/auth/oidc/callback", "paths./client/auth/oidc/callback")
+	if yamlOptionalMapField(callback, "get") != nil {
+		t.Fatal("/client/auth/oidc/callback must not document a browser GET/UI endpoint")
+	}
+	callbackPost := yamlMapField(t, callback, "post", "paths./client/auth/oidc/callback.post")
+	if got := yamlScalarField(t, callbackPost, "x-agenthub-status", "callback status"); got != "implemented" {
+		t.Fatalf("callback status = %q, want implemented", got)
+	}
+	callbackDescription := yamlScalarField(t, callbackPost, "description", "callback description")
+	for _, want := range []string{"RFC 9207", "never accepted as Hub REST", "browser redirect page/UI"} {
+		if !strings.Contains(callbackDescription, want) {
+			t.Fatalf("callback description missing %q: %s", want, callbackDescription)
+		}
+	}
+	for _, code := range []string{
+		"bad_request",
+		"oidc_invalid_state",
+		"oidc_issuer_invalid",
+		"oidc_code_exchange_failed",
+		"oidc_id_token_invalid",
+		"oidc_identity_retired",
+		"oidc_sub_not_found",
+		"oidc_userinfo_invalid",
+		"internal_error",
+	} {
+		if !strings.Contains(callbackDescription, code) {
+			t.Fatalf("callback description missing error code %q", code)
+		}
+	}
+	callbackResponses := yamlMapField(t, callbackPost, "responses", "callback responses")
+	for _, status := range []string{"400", "403", "500", "502"} {
+		_ = yamlMapField(t, callbackResponses, status, "callback responses."+status)
+	}
+
+	assertSchemaRequiredFields(t, schemas, "HubOIDCCallbackRequest", []string{"code", "state", "iss", "code_verifier", "device_type", "device_id"})
+	callbackRequest := yamlMapField(t, schemas, "HubOIDCCallbackRequest", "schemas.HubOIDCCallbackRequest")
+	callbackProperties := yamlMapField(t, callbackRequest, "properties", "HubOIDCCallbackRequest.properties")
+	issuerProperty := yamlMapField(t, callbackProperties, "iss", "HubOIDCCallbackRequest.properties.iss")
+	if got := yamlScalarField(t, issuerProperty, "format", "HubOIDCCallbackRequest.properties.iss.format"); got != "uri" {
+		t.Fatalf("HubOIDCCallbackRequest.iss format = %q, want uri", got)
+	}
+
+	for _, schemaName := range []string{"HubOIDCAuthorizeRequest", "HubOIDCCallbackRequest"} {
+		schema := yamlMapField(t, schemas, schemaName, "schemas."+schemaName)
+		properties := yamlMapField(t, schema, "properties", schemaName+".properties")
+		deviceType := yamlMapField(t, properties, "device_type", schemaName+".properties.device_type")
+		enum := yamlStringSlice(t, yamlField(t, deviceType, "enum", schemaName+".properties.device_type.enum"), schemaName+".properties.device_type.enum")
+		if !containsString(enum, "mobile") {
+			t.Fatalf("%s device_type enum = %v, want mobile", schemaName, enum)
+		}
+	}
+
+	assertSchemaHasOnlyProperties(t, schemas, "HubUser", []string{
+		"id", "username", "nickname", "avatar_url", "created_at", "updated_at",
+	})
+
+	securitySchemes := yamlMapField(t, components, "securitySchemes", "components.securitySchemes")
+	hubBearer := yamlMapField(t, securitySchemes, "bearerAuth", "securitySchemes.bearerAuth")
+	hubBearerDescription := yamlScalarField(t, hubBearer, "description", "bearerAuth.description")
+	for _, want := range []string{"Hub-issued HS256", "TokenDance Account ID/access/refresh tokens", "not Hub REST or WebSocket credentials"} {
+		if !strings.Contains(hubBearerDescription, want) {
+			t.Fatalf("bearerAuth description missing %q: %s", want, hubBearerDescription)
+		}
+	}
+
+	readme, err := os.ReadFile("../../../api/README.md")
+	if err != nil {
+		t.Fatalf("read API README: %v", err)
+	}
+	readmeText := string(readme)
+	for _, want := range []string{
+		"TokenDance Account OIDC",
+		"Hub REST 和 WebSocket 只接受 Hub-issued HS256",
+		"不暴露 Account 管理 API",
+		"oidc_invalid_state",
+		"oidc_issuer_invalid",
+		"oidc_code_exchange_failed",
+		"oidc_id_token_invalid",
+		"oidc_identity_retired",
+		"oidc_sub_not_found",
+		"oidc_userinfo_invalid",
+	} {
+		if !strings.Contains(readmeText, want) {
+			t.Fatalf("api/README.md missing %q", want)
+		}
+	}
+}
+
 func TestOpenAPICloudEdgeRegisterDocumentsEdgeScopedJWTAndNoCallerDeviceMatch(t *testing.T) {
 	spec := loadOpenAPISpec(t)
 	paths := yamlMapField(t, spec, "paths", "paths")
@@ -289,7 +420,7 @@ func TestOpenAPIHubImplementedRoutesMatchRouterPaths(t *testing.T) {
 		"/client/ws":                                                          {"get"},
 		"/client/auth/refresh":                                                {"post"},
 		"/client/auth/oidc/authorize":                                         {"post"},
-		"/client/auth/oidc/callback":                                          {"get", "post"},
+		"/client/auth/oidc/callback":                                          {"post"},
 		"/client/auth/me":                                                     {"get"},
 		"/client/auth/logout":                                                 {"post"},
 		"/client/auth/profile":                                                {"put"},
@@ -622,13 +753,11 @@ func TestOpenAPIBackendMigrationAuditCoverage(t *testing.T) {
 	spec := loadOpenAPISpec(t)
 	paths := yamlMapField(t, spec, "paths", "paths")
 
-	assertOperationStatus(t, paths, "/client/auth/oidc/callback", "get", "implemented")
 	assertOperationStatus(t, paths, "/client/auth/oidc/callback", "post", "implemented")
 	oidcCallback := yamlMapField(t, paths, "/client/auth/oidc/callback", "paths./client/auth/oidc/callback")
-	oidcGet := yamlMapField(t, oidcCallback, "get", "paths./client/auth/oidc/callback.get")
-	oidcGetResponses := yamlMapField(t, oidcGet, "responses", "paths./client/auth/oidc/callback.get.responses")
-	_ = yamlMapField(t, oidcGetResponses, "200", "paths./client/auth/oidc/callback.get.responses.200")
-	_ = yamlMapField(t, oidcGetResponses, "400", "paths./client/auth/oidc/callback.get.responses.400")
+	if yamlOptionalMapField(oidcCallback, "get") != nil {
+		t.Fatal("/client/auth/oidc/callback must not retain the retired browser GET operation")
+	}
 
 	assertOperationStatus(t, paths, "/cloud/edge/register", "post", "implemented")
 	assertPathHasNoDeviceType(t, paths, "/cloud/edge/register")
@@ -664,7 +793,7 @@ func TestOpenAPIHubWebSocketDocumentsUpgradeAuth(t *testing.T) {
 	wsGet := yamlMapField(t, yamlMapField(t, paths, "/client/ws", "paths./client/ws"), "get", "paths./client/ws.get")
 
 	description := yamlScalarField(t, wsGet, "description", "paths./client/ws.get.description")
-	for _, want := range []string{"HTTP upgrade", "AuthMiddleware.WSHandler()", "Sec-WebSocket-Protocol", "TokenDance ID RS256 bearer tokens"} {
+	for _, want := range []string{"HTTP upgrade", "AuthMiddleware.WSHandler()", "Sec-WebSocket-Protocol", "Hub-issued HS256", "TokenDance Account OIDC ID/access/refresh tokens"} {
 		if !strings.Contains(description, want) {
 			t.Fatalf("/client/ws description missing %q: %s", want, description)
 		}

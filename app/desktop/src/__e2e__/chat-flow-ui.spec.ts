@@ -325,7 +325,7 @@ async function blockLiveBackends(page: Page): Promise<BackendRequestLog> {
       return;
     }
 
-    if (boundary === 'hub' || boundary === 'local-edge' || boundary === 'tokendance-id' || boundary === 'gateway') {
+    if (boundary === 'hub' || boundary === 'local-edge' || boundary === 'account-oidc' || boundary === 'gateway') {
       backendRequests.push({ method: request.method(), url: request.url(), phase });
       await route.fulfill({
         contentType: 'application/json',

@@ -98,21 +98,13 @@ services:
       AGENTHUB_CORS_ORIGINS: ${AGENTHUB_CORS_ORIGINS:-}
       AGENTHUB_UPLOAD_DIR: /app/uploads
       AGENTHUB_UPLOAD_MAX_SIZE: "10485760"
-      # TokenDance ID OIDC
-      AGENTHUB_TOKENDANCE_ID_ISSUER_URL: ${AGENTHUB_TOKENDANCE_ID_ISSUER_URL:-https://id.example.com}
-      AGENTHUB_TOKENDANCE_ID_CLIENT_ID: ${AGENTHUB_TOKENDANCE_ID_CLIENT_ID:-}
-      AGENTHUB_TOKENDANCE_ID_CLIENT_SECRET: ${AGENTHUB_TOKENDANCE_ID_CLIENT_SECRET:-}
-      # Callback contract (issue #1651/#1656):
-      # - /api/auth/callback → SPA callback (nginx /api/auth/ → :3001 static)
-      # - /workbench/auth/tokendance/callback → workbench app/web (BASE_URL=/workbench/)
-      # - http://127.0.0.1/callback → desktop Tauri loopback (RFC 8252 port-tolerant)
-      # TDID oauth_clients.redirect_uris must match this set.
-      AGENTHUB_TOKENDANCE_ID_REDIRECT_URI: ${AGENTHUB_TOKENDANCE_ID_REDIRECT_URI:-https://hub.example.com/api/auth/callback}
-      AGENTHUB_TOKENDANCE_ID_ALLOWED_REDIRECT_URIS: ${AGENTHUB_TOKENDANCE_ID_ALLOWED_REDIRECT_URIS:-https://hub.example.com/api/auth/callback,https://hub.example.com/workbench/auth/tokendance/callback,http://127.0.0.1/callback}
-      # Machine-side code exchange endpoint: override TOKEN_URL/JWKS_URI for
-      # server-side OIDC if the public issuer blocks non-JS clients.
-      AGENTHUB_TOKENDANCE_ID_TOKEN_URL: ${AGENTHUB_TOKENDANCE_ID_TOKEN_URL:-}
-      AGENTHUB_TOKENDANCE_ID_JWKS_URI: ${AGENTHUB_TOKENDANCE_ID_JWKS_URI:-}
+      # TokenDance Account OIDC (public contract only; no internal endpoints).
+      # Production startup fails closed until these values are supplied.
+      AGENTHUB_ACCOUNT_OIDC_ISSUER_URL: ${AGENTHUB_ACCOUNT_OIDC_ISSUER_URL:-}
+      AGENTHUB_ACCOUNT_OIDC_CLIENT_ID: ${AGENTHUB_ACCOUNT_OIDC_CLIENT_ID:-}
+      AGENTHUB_ACCOUNT_OIDC_CLIENT_SECRET: ${AGENTHUB_ACCOUNT_OIDC_CLIENT_SECRET:-}
+      AGENTHUB_ACCOUNT_OIDC_REDIRECT_URI: ${AGENTHUB_ACCOUNT_OIDC_REDIRECT_URI:-}
+      AGENTHUB_ACCOUNT_OIDC_ALLOWED_REDIRECT_URIS: ${AGENTHUB_ACCOUNT_OIDC_ALLOWED_REDIRECT_URIS:-}
     ports:
       - "127.0.0.1:8090:8080"
       - "127.0.0.1:6060:6060"

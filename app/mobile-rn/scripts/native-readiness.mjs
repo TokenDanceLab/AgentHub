@@ -7,7 +7,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const projectRoot = path.resolve(__dirname, '..');
 const target = process.env.AGENTHUB_MOBILE_NATIVE_TARGET ?? 'all';
 const envHubUrl = process.env.EXPO_PUBLIC_AGENTHUB_HUB_URL;
-const envIssuer = process.env.EXPO_PUBLIC_TOKENDANCE_ID_ISSUER;
+const envIssuer = process.env.EXPO_PUBLIC_ACCOUNT_OIDC_ISSUER;
 
 const allowedTargets = new Set(['all', 'android-emulator', 'ios-simulator', 'physical']);
 const secretPattern = /(client_secret|password|private_key|api[_-]?key|bearer\s+[a-z0-9._-]{12,}|token\s*[:=]\s*['"][^'"]{12,})/i;
@@ -56,9 +56,9 @@ check('Image picker photos permission is AgentHub scoped and bilingual', appConf
 check('Image picker microphone permission stays disabled', appConfigSource.includes('microphonePermission: false'));
 check('SecureStore biometric permission is AgentHub scoped and bilingual', appConfigSource.includes('设备生物识别解锁本地 Hub 会话') && appConfigSource.includes('device biometrics'));
 check('Expo config reads Hub URL from EXPO_PUBLIC_AGENTHUB_HUB_URL', appConfigSource.includes('EXPO_PUBLIC_AGENTHUB_HUB_URL'));
-check('Expo config reads TokenDance ID issuer from EXPO_PUBLIC_TOKENDANCE_ID_ISSUER', appConfigSource.includes('EXPO_PUBLIC_TOKENDANCE_ID_ISSUER'));
+check('Expo config reads TokenDance Account issuer from EXPO_PUBLIC_ACCOUNT_OIDC_ISSUER', appConfigSource.includes('EXPO_PUBLIC_ACCOUNT_OIDC_ISSUER'));
 check('Resolved Expo config exposes Hub base URL', /^https?:\/\//.test(hubBaseUrl));
-check('TokenDance ID issuer is HTTPS when configured', oidcIssuer === '' || oidcIssuer.startsWith('https://'));
+check('TokenDance Account issuer is HTTPS when configured', oidcIssuer === '' || oidcIssuer.startsWith('https://'));
 check('EAS development profile enables development client', easJson.build?.development?.developmentClient === true);
 check('EAS development Android profile builds an APK', easJson.build?.development?.android?.buildType === 'apk');
 check('EAS development iOS profile targets simulator', easJson.build?.development?.ios?.simulator === true);
@@ -92,7 +92,7 @@ for (const item of targets) {
 }
 
 if (envIssuer) {
-  check('TokenDance ID issuer is HTTPS when overridden', envIssuer.startsWith('https://'));
+  check('TokenDance Account issuer is HTTPS when overridden', envIssuer.startsWith('https://'));
 }
 
 const failures = checks.filter((item) => !item.ok);
@@ -105,7 +105,7 @@ const summary = {
   remainingDeviceProof: [
     'Install Android development build on emulator or device.',
     'Install iOS development build through simulator or EAS Build.',
-    'Complete TokenDance ID AuthSession round trip in a development build.',
+    'Complete TokenDance Account AuthSession round trip in a development build.',
     'Verify SecureStore persistence and logout clearing on device.',
     'Verify camera, photo library, document picker, and evidence cache cleanup on device.',
     'Verify notification delivery and tap routing on device.',

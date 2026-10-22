@@ -302,7 +302,7 @@ func newWSTestServer(t *testing.T, manager *hubws.Manager) string {
 	r := gin.New()
 	h := handler.NewWebSocketHandler(manager, "")
 	cfg := &config.Config{JWT: config.JWTConfig{Secret: wsTestSecret}}
-	r.GET("/client/ws", middleware.NewAuthMiddleware(cfg, middleware.AuthDependencies{}, nil).WSHandler(), h.ServeWS)
+	r.GET("/client/ws", middleware.NewAuthMiddleware(cfg, middleware.AuthDependencies{}).WSHandler(), h.ServeWS)
 	server := httptest.NewServer(r)
 	t.Cleanup(server.Close)
 	return "ws" + strings.TrimPrefix(server.URL, "http") + "/client/ws"

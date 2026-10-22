@@ -70,10 +70,11 @@ const config = {
   ],
   extra: {
     hubBaseUrl: resolveDefaultHubBaseUrl(),
-    // Empty by default: publishing a build without EXPO_PUBLIC_TOKENDANCE_ID_ISSUER
+    // Empty by default: publishing a build without EXPO_PUBLIC_ACCOUNT_OIDC_ISSUER
     // must fail loudly at runtime (login disabled) instead of shipping a
     // placeholder issuer that can never succeed.
-    oidcIssuer: env?.EXPO_PUBLIC_TOKENDANCE_ID_ISSUER ?? '',
+    oidcIssuer: env?.EXPO_PUBLIC_ACCOUNT_OIDC_ISSUER ?? '',
+    accountLoginEnabled: env?.EXPO_PUBLIC_AGENTHUB_ACCOUNT_LOGIN_ENABLED === 'true',
   },
 } as ExpoConfig;
 

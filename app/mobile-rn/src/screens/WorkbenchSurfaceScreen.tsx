@@ -254,7 +254,7 @@ function getSurfaceConfig(
             title: t.docsShared,
             rows: [
               row('cloud', t.sharedWorkbenchDesignNotes, t.workbenchProjectDescription, t.sharedStatus),
-              row('cloud', t.tokenDanceIdRelyingParty, t.docsIdentityBoundaryDescription, t.sharedStatus),
+              row('cloud', t.accountRelyingParty, t.docsIdentityBoundaryDescription, t.sharedStatus),
             ],
           },
         ],
@@ -548,7 +548,7 @@ function getSurfaceConfig(
           {
             title: t.identityAndSession,
             rows: [
-              row('shield', t.tokenDanceIdentity, t.hubSessionSettingsDescription, t.account, 'account', onOpenAccount),
+              row('shield', t.accountIdentityLabel, t.hubSessionSettingsDescription, t.account, 'account', onOpenAccount),
               row('cloud', t.hubSession, t.hubSessionSettingsDescription, t.signedIn, 'account', onOpenAccount),
             ],
           },

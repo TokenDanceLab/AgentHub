@@ -9,6 +9,7 @@ export type ParsedOidcCallback =
       kind: 'success';
       code: string;
       state: string;
+      iss: string;
     }
   | {
       kind: 'error';
@@ -18,7 +19,7 @@ export type ParsedOidcCallback =
     }
   | {
       kind: 'invalid';
-      reason: 'invalid_callback' | 'missing_code' | 'missing_state';
+      reason: 'invalid_callback' | 'missing_code' | 'missing_state' | 'missing_issuer';
     };
 
 export type ParsedAgentHubDeepLink =
@@ -95,6 +96,7 @@ export function parseOidcCallback(url: string, scheme = 'agenthub'): ParsedOidcC
 
   const code = callbackUrl.searchParams.get('code');
   const state = callbackUrl.searchParams.get('state');
+  const iss = callbackUrl.searchParams.get('iss');
 
   if (!code) {
     return { kind: 'invalid', reason: 'missing_code' };
@@ -104,7 +106,11 @@ export function parseOidcCallback(url: string, scheme = 'agenthub'): ParsedOidcC
     return { kind: 'invalid', reason: 'missing_state' };
   }
 
-  return { kind: 'success', code, state };
+  if (!iss) {
+    return { kind: 'invalid', reason: 'missing_issuer' };
+  }
+
+  return { kind: 'success', code, state, iss };
 }
 
 export function parseAgentHubDeepLink(url: string, scheme = 'agenthub'): ParsedAgentHubDeepLink {

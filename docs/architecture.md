@@ -1,6 +1,6 @@
 # AgentHub 架构概览
 
-最后更新：2026-10-18
+最后更新：2026-10-23
 
 本文档是架构入口，只保留当前结构、边界和 owner 链接。
 
@@ -29,7 +29,7 @@ Web shared workbench
   -> Edge Server
   -> Agent Runtime adapter
 
-Mobile (fixture/boundary lane, independent RN rendering)
+Mobile (fixture-only by default; independent RN rendering)
   -> Mobile platform adapter
   -> Hub Server
   -> Edge routing / relay (via Hub)
@@ -41,9 +41,9 @@ Mobile (fixture/boundary lane, independent RN rendering)
 | Workbench | `app/workbench/` | 端级工作台 shell（`@agenthub/workbench`，依赖方向 workbench → shared 单向） |
 | Desktop | `app/desktop/` | Tauri shell、Desktop adapter、Local Edge、本机能力 |
 | Web | `app/web/` | Hub session、Web adapter、远程审批和查看 |
-| Mobile | `app/mobile-rn/` | RN shell、Mobile adapter、Hub viewer surface（fixture/边界验证 lane，独立渲染，非 release candidate） |
+| Mobile | `app/mobile-rn/` | RN shell、Mobile adapter、Hub viewer surface（默认 fixture-only；真实 Account 登录需显式开关，非 release candidate） |
 | Edge | `edge-server/` | 本地项目、Thread、Run lifecycle、Runtime adapter、Artifact index |
-| Hub | `hub-server/` | TokenDance ID relying party、Hub session、IM、AgentTeam、同步、中继、审计 |
+| Hub | `hub-server/` | TokenDance Account OIDC relying party、Hub session、IM、AgentTeam、同步、中继、审计 |
 | API | `api/` | REST API、WebSocket event 与 Hub→Edge dispatch 契约 |
 
 ## 核心数据流
@@ -58,6 +58,9 @@ Mobile (fixture/boundary lane, independent RN rendering)
 4. Hub 是控制面、不执行模型 Turn；Edge 是数据面；任务拆分、路由、审批、重试由确定性状态机承担。
 5. Hub/Edge 自有 REST/WS 是产品契约 SSOT；MCP/A2A/AG-UI 只做 capability mapping。
 6. 授权按最小代理权：task-scoped 凭据 + per-action 授权；secret 不进入 agent context/sandbox。
+7. Hub 只消费 Account 公开 OIDC endpoint，不持有或调用 Account 内部管理 API/DB；Account `issuer + subject` 是外部身份键。
+8. Account token 只停留在 Hub OIDC service；Hub REST/WS 只接受 Hub HS256 session token。Web 当前使用 tab-scoped `sessionStorage`，不是 HttpOnly cookie session。
+9. Mobile 默认是 fixture-only lane；真实 Account 登录必须显式开启，不能把 mock、fixture 或 stubbed Hub 结果记为真实 L3。
 
 ## 产品模型
 

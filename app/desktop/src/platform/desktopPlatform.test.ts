@@ -302,7 +302,7 @@ describe('createDesktopPlatform', () => {
           },
           real_e2e: {
             status: 'proposal_only',
-            reason: 'Real packaged login E2E requires an explicit TokenDance ID/browser gate.',
+            reason: 'Real packaged login E2E requires an explicit TokenDance Account/browser gate.',
           },
         },
         log_tail: {

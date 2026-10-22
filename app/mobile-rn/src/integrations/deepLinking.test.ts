@@ -17,22 +17,24 @@ describe('AgentHub mobile deep links', () => {
     expect(isAgentHubAuthCallback('agenthub://auth/callback?code=abc&state=123')).toBe(true);
     expect(isAgentHubAuthCallback('agenthub://runs/123')).toBe(false);
     expect(isAgentHubAuthCallback('agenthub://auth/callback-extra?code=abc&state=123')).toBe(false);
-    expect(isAgentHubAuthCallback('https://id.tokendancelab.com/callback')).toBe(false);
+    expect(isAgentHubAuthCallback('https://legacy-id.invalid/callback')).toBe(false);
   });
 
-  it('parses TokenDance ID OIDC authorization code callbacks', () => {
-    expect(parseOidcCallback('agenthub://auth/callback?code=auth-code&state=pkce-state')).toEqual({
+  it('parses TokenDance Account OIDC authorization code callbacks', () => {
+    expect(parseOidcCallback('agenthub://auth/callback?code=auth-code&state=pkce-state&iss=https%3A%2F%2Faccount.example')).toEqual({
       kind: 'success',
       code: 'auth-code',
       state: 'pkce-state',
+      iss: 'https://account.example',
     });
   });
 
   it('decodes callback parameters', () => {
-    expect(parseOidcCallback('agenthub://auth/callback?code=code%201&state=state%2F2')).toEqual({
+    expect(parseOidcCallback('agenthub://auth/callback?code=code%201&state=state%2F2&iss=https%3A%2F%2Faccount.example')).toEqual({
       kind: 'success',
       code: 'code 1',
       state: 'state/2',
+      iss: 'https://account.example',
     });
   });
 
@@ -50,7 +52,7 @@ describe('AgentHub mobile deep links', () => {
   });
 
   it('rejects non-AgentHub callbacks and malformed URLs', () => {
-    expect(parseOidcCallback('https://id.tokendancelab.com/callback?code=abc&state=123')).toEqual({
+    expect(parseOidcCallback('https://legacy-id.invalid/callback?code=abc&state=123')).toEqual({
       kind: 'invalid',
       reason: 'invalid_callback',
     });
@@ -72,6 +74,10 @@ describe('AgentHub mobile deep links', () => {
     expect(parseOidcCallback('agenthub://auth/callback?code=auth-code')).toEqual({
       kind: 'invalid',
       reason: 'missing_state',
+    });
+    expect(parseOidcCallback('agenthub://auth/callback?code=auth-code&state=pkce-state')).toEqual({
+      kind: 'invalid',
+      reason: 'missing_issuer',
     });
   });
 
@@ -116,12 +122,13 @@ describe('AgentHub mobile deep links', () => {
   });
 
   it('keeps OIDC callbacks separate from product navigation deep links', () => {
-    expect(parseAgentHubDeepLink('agenthub://auth/callback?code=auth-code&state=pkce-state')).toEqual({
+    expect(parseAgentHubDeepLink('agenthub://auth/callback?code=auth-code&state=pkce-state&iss=https%3A%2F%2Faccount.example')).toEqual({
       kind: 'auth_callback',
       callback: {
         kind: 'success',
         code: 'auth-code',
         state: 'pkce-state',
+        iss: 'https://account.example',
       },
     });
   });
@@ -131,7 +138,7 @@ describe('AgentHub mobile deep links', () => {
       kind: 'invalid',
       reason: 'invalid_url',
     });
-    expect(parseAgentHubDeepLink('https://id.tokendancelab.com/callback')).toEqual({
+    expect(parseAgentHubDeepLink('https://legacy-id.invalid/callback')).toEqual({
       kind: 'invalid',
       reason: 'invalid_scheme',
     });
@@ -165,7 +172,7 @@ describe('AgentHub mobile deep links', () => {
     });
 
     listener?.({ url: 'agenthub://run/run-agenthub?threadId=thread-demo' });
-    listener?.({ url: 'agenthub://auth/callback?code=auth-code&state=pkce-state' });
+    listener?.({ url: 'agenthub://auth/callback?code=auth-code&state=pkce-state&iss=https%3A%2F%2Faccount.example' });
     listener?.({ url: 'agenthub://run/run-agenthub?threadId=thread-demo' });
     bridge.stop();
 
@@ -184,6 +191,7 @@ describe('AgentHub mobile deep links', () => {
       kind: 'success',
       code: 'auth-code',
       state: 'pkce-state',
+      iss: 'https://account.example',
     });
     expect(remove).toHaveBeenCalledOnce();
   });
