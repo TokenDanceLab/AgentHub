@@ -8,7 +8,7 @@
 # ═══════════════════════════════════════════════
 # Stage 1: Build
 # ═══════════════════════════════════════════════
-FROM --platform=$BUILDPLATFORM golang:1.26.9-alpine AS builder
+FROM --platform=$BUILDPLATFORM golang:1.27.3-alpine AS builder
 ARG TARGETOS TARGETARCH
 ARG VERSION=dev
 WORKDIR /app
