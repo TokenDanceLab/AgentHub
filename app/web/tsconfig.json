@@ -16,6 +16,7 @@
     "noEmit": true,
     "lib": [
       "ES2021",
+      "ES2022.Array",
       "DOM",
       "DOM.Iterable"
     ],

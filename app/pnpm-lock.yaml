@@ -356,9 +356,9 @@ importers:
 
   shared:
     dependencies:
-      '@lobehub/icons':
-        specifier: 5.10.0
-        version: 5.10.0(@lobehub/ui@5.15.1)(@types/react@19.2.18)(antd@6.4.3(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      '@lobehub/icons-static-svg':
+        specifier: 1.95.1
+        version: 1.95.1
       class-variance-authority:
         specifier: ^0.7.1
         version: 0.7.1
@@ -1762,6 +1762,9 @@ packages:
     peerDependencies:
       react: ^19.0.0
       react-dom: ^19.0.0
+
+  '@lobehub/icons-static-svg@1.95.1':
+    resolution: {integrity: sha512-Hw7EPPgVnC4NZLXBfTNJG6hyQgqECfUPC11VVXodPSr1aebKcFxDZlSpxhWwYNdCc6bhxps/x5TtXoPmfKH2ag==}
 
   '@lobehub/icons@5.10.0':
     resolution: {integrity: sha512-CIpjkISCLRK7haDtSugGFd0o3odaJts8ewJOkUiEFtns3xvsqbl8i24eowBnjw+yMDQVQyNONlhqTD58YC6Ljg==}
@@ -5995,7 +5998,6 @@ packages:
 
   katex@0.18.11:
     resolution: {integrity: sha512-yvyz/2VMKqoho/35Hat5w37wIEdWJ5ElVMidTAlWrxr5uW4aBGsEpveTmKh18/zw08v/7lGswCPon4OhqmqrTA==}
-    deprecated: Accidentally published with breaking changes. Use 0.19.0 instead.
     hasBin: true
 
   keyv@4.5.4:
@@ -9950,6 +9952,8 @@ snapshots:
       - '@types/react'
       - antd
       - supports-color
+
+  '@lobehub/icons-static-svg@1.95.1': {}
 
   '@lobehub/icons@5.10.0(@lobehub/ui@5.15.1)(@types/react@19.2.18)(antd@6.4.3(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)':
     dependencies:
