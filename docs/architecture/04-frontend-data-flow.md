@@ -39,7 +39,7 @@ Desktop adapter 负责 Local Edge、Hub REST/WS、Tauri file/dialog/window/keyri
 
 Web 当前把 Hub access/refresh token 存入 tab-scoped `sessionStorage`，并使用内存 fallback。这是浏览器持有的 Hub token，不是 HttpOnly cookie session；任何 auth 改动都必须保持 Account token 仅在 Hub 服务端使用。
 
-Desktop 开发构建默认连接 loopback Hub，packaged build 默认连接 canonical public Hub；自建发布用 `VITE_HUB_URL` / `VITE_HUB_WS_URL` 显式覆盖。packaged CSP 与 Rust proxy 目标 allowlist 必须同步到同一 Hub origin。Rust proxy 只接受该精确 origin（开发环境为 loopback Hub），不会把 Hub bearer 转发到任意公网 HTTPS 目标。
+Desktop 开发构建默认连接 loopback Hub。Packaged build 必须通过 `VITE_HUB_URL` / `VITE_HUB_WS_URL` 提供同一 Hub origin；未配置时使用 `example.invalid` fail-closed sentinel。发布时必须同步 packaging CSP 与 Rust proxy allowlist。Rust proxy 只接受该精确 origin（开发环境为 loopback Hub），不会把 Hub bearer 转发到任意公网 HTTPS 目标。
 
 UI 可以根据 `capabilities` 隐藏或禁用动作，但不能 fork 另一套组件。
 

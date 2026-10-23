@@ -5,7 +5,7 @@
 
   Invite AI agents as teammates into your group chat. Real people, AI Builder, AI Reviewer — all in the same IM conversation. Messages are your task stream. Chat is your workbench.
 
-  [中文](README.md) · [Website](https://hub.example.invalid) · [Docs](https://hub.example.invalid/docs) · [API](api/)
+  [中文](README.md) · [Architecture](docs/architecture.md) · [API](api/)
 
   [![CI](https://img.shields.io/github/actions/workflow/status/TokenDanceLab/AgentHub/checks.yml?branch=master&style=flat-square&label=CI)](https://github.com/TokenDanceLab/AgentHub/actions/workflows/checks.yml)
   [![release](https://img.shields.io/github/v/release/TokenDanceLab/AgentHub?style=flat-square)](https://github.com/TokenDanceLab/AgentHub/releases)

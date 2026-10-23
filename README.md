@@ -5,7 +5,7 @@
 
   把 AI Agent 当队友一样拉进群聊。和真人好友、AI Builder、AI Reviewer 在同一个 IM 里聊天协作——消息就是任务流，聊天就是工作台。
 
-  [English](README_EN.md) · [官网](https://hub.example.invalid) · [文档](https://hub.example.invalid/docs) · [API](api/)
+  [English](README_EN.md) · [架构](docs/architecture.md) · [API](api/)
 
   [![CI](https://img.shields.io/github/actions/workflow/status/TokenDanceLab/AgentHub/checks.yml?branch=master&style=flat-square&label=CI)](https://github.com/TokenDanceLab/AgentHub/actions/workflows/checks.yml)
   [![release](https://img.shields.io/github/v/release/TokenDanceLab/AgentHub?style=flat-square)](https://github.com/TokenDanceLab/AgentHub/releases)

@@ -64,10 +64,10 @@ function envOrDev(key: string, devDefault: string): string {
   return devDefault;
 }
 
-// Development defaults point at the local stack; packaged builds use the
-// canonical public Hub. VITE_HUB_URL / VITE_HUB_WS_URL remain explicit
-// overrides for self-hosted releases. The packaged CSP and the Tauri proxy
-// allowlist pin the same production origin.
+// Development defaults point at the local stack. Packaged builds must provide
+// VITE_HUB_URL / VITE_HUB_WS_URL; the fallback is a fail-closed sentinel.
+// Release builds must keep the packaged CSP and Tauri proxy allowlist aligned
+// with the same Hub origin.
 export const HUB_URL = envOrDev(
   'VITE_HUB_URL',
   import.meta.env.DEV ? 'http://127.0.0.1:8080' : 'https://hub.example.invalid',
