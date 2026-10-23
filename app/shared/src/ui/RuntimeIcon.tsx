@@ -1,30 +1,31 @@
-import React, { type ComponentType } from 'react';
-// Provider marks come from the Color variant directly: the per-provider index
-// module also re-exports Mono/Text/Avatar/Combine, which shipped ~5x the SVG
-// payload for marks this file only ever renders in colour.
-import Alibaba from '@lobehub/icons/es/Alibaba/components/Color.js';
-import AlibabaCloud from '@lobehub/icons/es/AlibabaCloud/components/Color.js';
-import Azure from '@lobehub/icons/es/Azure/components/Color.js';
-import Aws from '@lobehub/icons/es/Aws/components/Color.js';
-import Bedrock from '@lobehub/icons/es/Bedrock/components/Color.js';
-import ByteDance from '@lobehub/icons/es/ByteDance/components/Color.js';
-import Claude from '@lobehub/icons/es/Claude/components/Color.js';
-import Cohere from '@lobehub/icons/es/Cohere/components/Color.js';
-import DeepSeek from '@lobehub/icons/es/DeepSeek/components/Color.js';
-import Doubao from '@lobehub/icons/es/Doubao/components/Color.js';
-import Gemini from '@lobehub/icons/es/Gemini/components/Color.js';
-import Google from '@lobehub/icons/es/Google/components/Color.js';
-import Meta from '@lobehub/icons/es/Meta/components/Color.js';
-import Mistral from '@lobehub/icons/es/Mistral/components/Color.js';
-import Perplexity from '@lobehub/icons/es/Perplexity/components/Color.js';
-import Qwen from '@lobehub/icons/es/Qwen/components/Color.js';
-import Volcengine from '@lobehub/icons/es/Volcengine/components/Color.js';
-import Zhipu from '@lobehub/icons/es/Zhipu/components/Color.js';
-// Runtime marks keep their index default (Mono) — that is what the runtime row renders.
-import ClaudeCode from '@lobehub/icons/es/ClaudeCode';
-import Codex from '@lobehub/icons/es/Codex';
-import GeminiCLI from '@lobehub/icons/es/GeminiCLI';
-import OpenCode from '@lobehub/icons/es/OpenCode';
+import React from 'react';
+import alibabaColor from '@lobehub/icons-static-svg/icons/alibaba-color.svg';
+import alibabaCloudColor from '@lobehub/icons-static-svg/icons/alibabacloud-color.svg';
+import azureColor from '@lobehub/icons-static-svg/icons/azure-color.svg';
+import awsColor from '@lobehub/icons-static-svg/icons/aws-color.svg';
+import bedrockColor from '@lobehub/icons-static-svg/icons/bedrock-color.svg';
+import byteDanceColor from '@lobehub/icons-static-svg/icons/bytedance-color.svg';
+import claudeColor from '@lobehub/icons-static-svg/icons/claude-color.svg';
+import cohereColor from '@lobehub/icons-static-svg/icons/cohere-color.svg';
+import deepSeekColor from '@lobehub/icons-static-svg/icons/deepseek-color.svg';
+import doubaoColor from '@lobehub/icons-static-svg/icons/doubao-color.svg';
+import geminiColor from '@lobehub/icons-static-svg/icons/gemini-color.svg';
+import googleColor from '@lobehub/icons-static-svg/icons/google-color.svg';
+import metaColor from '@lobehub/icons-static-svg/icons/meta-color.svg';
+import mistralColor from '@lobehub/icons-static-svg/icons/mistral-color.svg';
+import perplexityColor from '@lobehub/icons-static-svg/icons/perplexity-color.svg';
+import qwenColor from '@lobehub/icons-static-svg/icons/qwen-color.svg';
+import volcengineColor from '@lobehub/icons-static-svg/icons/volcengine-color.svg';
+import zhipuColor from '@lobehub/icons-static-svg/icons/zhipu-color.svg';
+import {
+  AnthropicMonoIcon,
+  ClaudeCodeMonoIcon,
+  CodexMonoIcon,
+  GeminiCliMonoIcon,
+  MoonshotMonoIcon,
+  OpenAIMonoIcon,
+  OpenCodeMonoIcon,
+} from './runtimeMonoIcons';
 import { resolveRuntimeIconRegistry } from './runtimeIconRegistry';
 
 export type RuntimeIconKind = 'model' | 'provider' | 'runtime' | 'tool';
@@ -116,84 +117,117 @@ export function RuntimeIcon({
 }
 
 // ═══════════════════════════════════════════════════════════════════════
-// Direct provider icon lookup — bypasses @lobehub/icons barrel
-// (ProviderIcon pulls providerMappings → providerConfig → ALL 302 icons)
-// Each entry maps a provider value (from runtimeIconRegistry) to a
-// lobehub icon component with a .Color subcomponent.
+// Direct provider icon lookup — static SVG assets from
+// @lobehub/icons-static-svg. Using the static package instead of the React
+// package keeps the icon tree free of @lobehub/ui/antd/mermaid peers while
+// still shipping the official brand marks.
 // ═══════════════════════════════════════════════════════════════════════
 
-type LobeIcon = ComponentType<{ size?: number }>;
+const providerColorIconMap: Record<string, string | undefined> = {
+  alibaba: alibabaColor,
+  alibabacloud: alibabaCloudColor,
+  azure: azureColor,
+  aws: awsColor,
+  bedrock: bedrockColor,
+  bytedance: byteDanceColor,
+  claude: claudeColor,
+  cohere: cohereColor,
+  deepseek: deepSeekColor,
+  doubao: doubaoColor,
+  gemini: geminiColor,
+  google: googleColor,
+  meta: metaColor,
+  mistral: mistralColor,
+  perplexity: perplexityColor,
+  qwen: qwenColor,
+  volcengine: volcengineColor,
+  zhipu: zhipuColor,
+};
 
-const providerIconMap: Record<string, LobeIcon | undefined> = {
-  alibaba: Alibaba,
-  alibabacloud: AlibabaCloud,
-  azure: Azure,
-  aws: Aws,
-  bedrock: Bedrock,
-  bytedance: ByteDance,
-  claude: Claude,
-  cohere: Cohere,
-  deepseek: DeepSeek,
-  doubao: Doubao,
-  gemini: Gemini,
-  google: Google,
-  meta: Meta,
-  mistral: Mistral,
-  perplexity: Perplexity,
-  qwen: Qwen,
-  volcengine: Volcengine,
-  zhipu: Zhipu,
+type MonoIcon = React.ComponentType<{ size?: number | undefined }>;
+
+// Marks whose upstream colour component does not exist (monochrome brands).
+// Inlining them keeps `currentColor` inheritance; an <img> would freeze it.
+const providerMonoIconMap: Record<string, MonoIcon | undefined> = {
+  anthropic: AnthropicMonoIcon,
+  moonshot: MoonshotMonoIcon,
+  openai: OpenAIMonoIcon,
 };
 
 // ═══════════════════════════════════════════════════════════════════════
-// Direct model icon lookup — bypasses @lobehub/icons barrel
-// (ModelIcon pulls modelMappings → modelConfig → ALL 302 icons)
+// Direct model icon lookup — resolves a model family to its provider mark.
 // ═══════════════════════════════════════════════════════════════════════
 
-const modelIconMap: Record<string, LobeIcon | undefined> = {
-  claude: Claude,
-  deepseek: DeepSeek,
-  doubao: Doubao,
-  gemini: Gemini,
-  glm: Zhipu,       // ChatGLM → Zhipu icon
-  qwen: Qwen,
+const modelIconMap: Record<string, string | undefined> = {
+  claude: 'claude',
+  deepseek: 'deepseek',
+  doubao: 'doubao',
+  gemini: 'gemini',
+  glm: 'zhipu',       // ChatGLM → Zhipu icon
+  gpt: 'openai',
+  kimi: 'moonshot',
+  qwen: 'qwen',
+  'o1': 'openai',
+  'o3': 'openai',
+  'o4': 'openai',
 };
 
-function resolveModelIcon(modelName: string): LobeIcon | undefined {
+function resolveModelIcon(modelName: string): string | undefined {
   const key = modelName.toLowerCase().replace(/[._/]+/g, '-').replace(/[^a-z0-9-]+/g, '-');
   // Try exact match first, then prefix match (e.g. "claude-sonnet-4" → "claude")
   if (modelIconMap[key]) return modelIconMap[key];
-  for (const [prefix, Icon] of Object.entries(modelIconMap)) {
-    if (key.startsWith(prefix + '-') || key.startsWith(prefix)) return Icon;
+  for (const [prefix, provider] of Object.entries(modelIconMap)) {
+    if (key.startsWith(prefix + '-') || key.startsWith(prefix)) return provider;
   }
   return undefined;
 }
 
-function renderProviderColorIcon(provider: string, size: number): React.ReactNode {
-  const Icon = providerIconMap[provider.toLowerCase()];
-  return Icon ? <Icon size={size} /> : runtimeIconFallbackSvg('provider', size);
+function renderProviderIcon(provider: string, size: number): React.ReactNode {
+  const key = provider.toLowerCase();
+  const colorUrl = providerColorIconMap[key];
+  if (colorUrl) {
+    return (
+      <img
+        alt=""
+        data-runtime-icon-asset={key}
+        data-runtime-icon-size={size}
+        height={size}
+        src={colorUrl}
+        width={size}
+      />
+    );
+  }
+  const Mono = providerMonoIconMap[key];
+  if (Mono) return <Mono size={size} />;
+  return runtimeIconFallbackSvg('provider', size);
 }
 
-function renderModelColorIcon(model: string, size: number): React.ReactNode {
-  const Icon = resolveModelIcon(model);
-  return Icon ? <Icon size={size} /> : runtimeIconFallbackSvg('model', size);
+function renderModelIcon(model: string, size: number): React.ReactNode {
+  const provider = resolveModelIcon(model);
+  if (provider) return renderProviderIcon(provider, size);
+  return runtimeIconFallbackSvg('model', size);
 }
 
 function renderRuntimeIcon(resolution: RuntimeIconResolution, iconSize: number): React.ReactNode {
   if (resolution.source === 'lobehub') {
     if (resolution.lobeType === 'runtime') return renderLobeRuntimeIcon(resolution.value, iconSize);
-    if (resolution.lobeType === 'provider') return renderProviderColorIcon(resolution.value, iconSize);
-    return renderModelColorIcon(resolution.value, iconSize);
+    if (resolution.lobeType === 'provider') return renderProviderIcon(resolution.value, iconSize);
+    return renderModelIcon(resolution.value, iconSize);
   }
 
   return runtimeIconFallbackSvg(resolution.fallback, iconSize);
 }
 
+const runtimeIconMap: Record<string, MonoIcon | undefined> = {
+  'claude-code': ClaudeCodeMonoIcon,
+  codex: CodexMonoIcon,
+  'gemini-cli': GeminiCliMonoIcon,
+  opencode: OpenCodeMonoIcon,
+};
+
 function renderLobeRuntimeIcon(value: string, iconSize: number): React.ReactNode {
-  if (value === 'claude-code') return <ClaudeCode size={iconSize} />;
-  if (value === 'codex') return <Codex size={iconSize} />;
-  if (value === 'gemini-cli') return <GeminiCLI size={iconSize} />;
-  if (value === 'opencode') return <OpenCode size={iconSize} />;
+  const Icon = runtimeIconMap[value];
+  if (Icon) return <Icon size={iconSize} />;
   return runtimeIconFallbackSvg('runtime', iconSize);
 }
 
