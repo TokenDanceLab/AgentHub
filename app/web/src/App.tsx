@@ -279,7 +279,10 @@ function WebWorkbenchRoot() {
       .then(() => undefined);
   }, []);
 
-  if (realMode && authReady && !getAccessToken()) {
+  if (realMode && !authReady) {
+    return <div role="status">{t('loading', { ns: 'common' })}</div>;
+  }
+  if (realMode && !getAccessToken()) {
     return <AuthPage onLoginSuccess={() => setShowAuthModal(false)} />;
   }
 

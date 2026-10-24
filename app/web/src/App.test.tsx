@@ -149,6 +149,15 @@ describe('Web app root', () => {
     expect(screen.queryByRole('heading', { name: 'Agent 协作群' })).not.toBeInTheDocument();
   });
 
+  it('does not show demo conversations while production auto-login is pending', () => {
+    vi.stubEnv('PROD', true);
+    vi.stubEnv('VITE_AGENTHUB_DATA_MODE', '');
+    useWebAuthMock.mockReturnValue({ ensureAuth: ensureAuthMock, authReady: false });
+    render(<App />);
+    expect(screen.getByRole('status')).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Agent 协作群' })).not.toBeInTheDocument();
+  });
+
   it('mounts the shared v4 workbench shell without legacy demo chrome', () => {
     const { container } = render(<App />);
     const text = visibleText(container);
@@ -422,6 +431,8 @@ describe('Web app root', () => {
   });
 
   it('opens auth instead of silently using mock data for guarded unauthenticated Hub work', async () => {
+    vi.stubEnv('VITE_AGENTHUB_DATA_MODE', 'observed');
+    getAccessTokenMock.mockReturnValue('web-token');
     ensureAuthMock.mockImplementation(() => {
       useHubStore.getState().setShowAuthModal(true);
       return false;

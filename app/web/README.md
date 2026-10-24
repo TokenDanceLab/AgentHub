@@ -1,6 +1,6 @@
 # AgentHub Web
 
-最后更新：2026-10-23
+最后更新：2026-10-24
 
 `app/web/` 是 AgentHub 浏览器端工作台。它负责 Hub 登录后的远程查看、审批、IM、项目视图、Agent/Profile 展示和 Web 预览；真实执行仍由 Edge Server 完成。
 
@@ -12,7 +12,8 @@ Web UI -> Hub Server -> Edge relay / sync -> Edge Server -> Agent Runtime adapte
 
 - Web 不直接启动 Codex/OpenCode/Claude Code，也不直连 Local Edge。
 - Web 生产路径只通过 Hub session、Hub REST/WS、Edge target routing 访问执行能力。
-- 未登录 preview fallback 只能表示演示状态，不能冒充真实 Runtime 在线。
+- 生产构建默认使用真实 Hub 数据，自动登录检查完成后，无会话时直接展示 Account 登录页。开发默认保留 auto；显式 mock/fixture 仅用于演示，不表示真实 Runtime 在线。
+- Account 头像通过 `https://img.tokendancelab.com` 展示；Web CSP 仅增加该精确图片来源。
 - Web 当前把 Hub access/refresh token 放在 tab-scoped `sessionStorage`，并保留内存 fallback。它不是 HttpOnly cookie session，也不是 BFF-owned server session。
 - TokenDance Account 只作为 Hub 的公共 OIDC provider。Web 不直接调用 Account 管理 API，不持有 Account access/ID token；登录成功后只使用 Hub session。
 - Hub 认证状态机（OIDC PKCE、token 生命周期、refresh fallback、logout 清理）共享自 `../shared/src/api/auth/`；`src/api/hubAuth.ts` 只注入 Web Port（sessionStorage token、`/auth/account/callback` 浏览器 callback 路由、当前窗口跳转）。
