@@ -95,12 +95,13 @@ function getComposerInput(): HTMLTextAreaElement {
 
 describe('Web app root', () => {
   beforeEach(() => {
+    vi.stubEnv('VITE_AGENTHUB_DATA_MODE', 'fixture');
     localStorage.clear();
     sessionStorage.clear();
     queryClient.clear();
     getAccessTokenMock.mockReturnValue(null);
     ensureAuthMock.mockReturnValue(true);
-    useWebAuthMock.mockReturnValue({ ensureAuth: ensureAuthMock });
+    useWebAuthMock.mockReturnValue({ ensureAuth: ensureAuthMock, authReady: true });
     useHubStore.getState().clear();
     useAgentListMock.mockReturnValue({
       data: undefined,
@@ -137,6 +138,15 @@ describe('Web app root', () => {
   afterEach(() => {
     cleanup();
     vi.clearAllMocks();
+    vi.unstubAllEnvs();
+  });
+
+  it('shows Account login instead of demo conversations in a production build without a session', () => {
+    vi.stubEnv('PROD', true);
+    vi.stubEnv('VITE_AGENTHUB_DATA_MODE', '');
+    render(<App />);
+    expect(screen.getByRole('dialog', { name: 'TokenDance Account login' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Agent 协作群' })).not.toBeInTheDocument();
   });
 
   it('mounts the shared v4 workbench shell without legacy demo chrome', () => {
