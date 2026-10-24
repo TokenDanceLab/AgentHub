@@ -30,6 +30,8 @@ overrides:
   colord: ">=2.9.4 <3"
   vitest: ">=4.1.11 <5"
   "@vitest/mocker": ">=4.1.11 <5"
+  "zod@4": ">=4.6.6 <5"
+  "@expo/cli>zod": ">=4.6.6 <5"
 allowBuilds:
   esbuild: true
 onlyBuiltDependencies:
