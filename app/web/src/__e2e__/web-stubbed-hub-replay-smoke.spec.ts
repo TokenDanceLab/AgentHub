@@ -36,18 +36,9 @@ test.describe('Web stubbed Hub replay smoke', () => {
     await setApprovedRealMode(page);
     await page.goto('/');
 
-    await expect(page.getByTestId('agenthub-workbench')).toHaveAttribute('data-page', 'chat');
-    // The composer status bar renders Chinese product labels
-    // (unifiedComposerHelpers.buildComposerStatusItems) regardless of i18n.
-    await expect(page.getByRole('status').filter({ hasText: '数据：真实数据' })).toBeVisible();
-    await expect(page.getByText('目标：signed-out')).toBeVisible();
-    await expect(page.getByRole('status').filter({ hasText: 'Hub replay: no active Hub session' })).toBeVisible();
-    await expect(page.getByText('Sign in to Hub before Web can select a local_edge execution target.')).toBeVisible();
-
-    await page.getByRole('button', { name: 'Projects' }).click();
-    await expect(page.getByRole('region', { name: 'Workbench page' })).toContainText(
-      'Sign in to Hub to load workspace projects.',
-    );
+    await expect(page.getByRole('button', { name: /TokenDance Account/ })).toBeVisible();
+    await expect(page.getByTestId('agenthub-workbench')).toHaveCount(0);
+    await expect(page.getByText('Builder')).toHaveCount(0);
     buildE2EDataModeManifest(WEB_HUB_SMOKE_SCENARIO, requests.requests, {
       scenario: 'signed-out',
     });

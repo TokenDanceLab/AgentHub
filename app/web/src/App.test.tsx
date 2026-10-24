@@ -440,6 +440,9 @@ describe('Web app root', () => {
 
     render(<App />);
 
+    // Simulate the token expiring after the workbench mounted, before sending.
+    getAccessTokenMock.mockReturnValue(null);
+
     // Drive the real composer, so the auth gate is exercised through the real
     // shared shell → web platform adapter path rather than a stub button.
     fireEvent.change(getComposerInput(), { target: { value: '需要真实 Hub 会话' } });
