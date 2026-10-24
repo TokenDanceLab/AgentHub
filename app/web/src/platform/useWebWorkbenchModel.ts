@@ -137,7 +137,11 @@ export function resolveWebActiveHubSessionId(
   return matched ? activeConversationId : null;
 }
 
-export function useWebWorkbenchModel(selectedConversationId?: string, selectedProjectId?: string) {
+export function useWebWorkbenchModel(
+  selectedConversationId?: string,
+  selectedProjectId?: string,
+  shellDataMode?: WorkbenchDataMode,
+) {
   const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE);
   const { t: tCommon } = useTranslation();
   const dataModeOverride = useSyncExternalStore(
@@ -145,7 +149,14 @@ export function useWebWorkbenchModel(selectedConversationId?: string, selectedPr
     getWorkbenchDataModeOverrideSnapshot,
     getWorkbenchDataModeOverrideSnapshot,
   );
-  const dataMode = resolveWorkbenchDataMode(import.meta.env.VITE_AGENTHUB_DATA_MODE, dataModeOverride || undefined);
+  // The shell owns the production default (approved-real). Reuse its resolved
+  // mode instead of independently treating a missing Vite value as auto,
+  // which would re-enable fixture conversations inside an authenticated real
+  // shell. The browser override remains the final explicit choice.
+  const dataMode = resolveWorkbenchDataMode(
+    shellDataMode ?? import.meta.env.VITE_AGENTHUB_DATA_MODE,
+    dataModeOverride || undefined,
+  );
   const dataModeContract = getWorkbenchDataModeContract(dataMode);
   const authenticated = useHubStore((state) => state.authenticated);
   const realMode = dataModeContract.isRealDataMode;

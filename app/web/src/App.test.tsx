@@ -22,6 +22,14 @@ const useWebAuthMock = vi.hoisted(() => vi.fn());
 const ensureAuthMock = vi.hoisted(() => vi.fn());
 const logoutMock = vi.hoisted(() => vi.fn(async () => undefined));
 const getAccessTokenMock = vi.hoisted(() => vi.fn<() => string | null>(() => null));
+const authUserMock = vi.hoisted(() => ({
+  current: undefined as undefined | {
+    id: string;
+    username: string;
+    nickname: string;
+    avatar_url: string;
+  },
+}));
 const hubClientStub = vi.hoisted(() => ({
   me: vi.fn(async () => ({ id: 'web-user', username: 'web-user', nickname: 'Web User', avatar_url: '' })),
   listPublicSkills: vi.fn(async () => ({ items: [] })),
@@ -63,7 +71,7 @@ vi.mock('@/hooks/useWebAuth', () => ({
 }));
 
 vi.mock('@/hooks/useAuth', () => ({
-  useAuth: () => ({ logout: logoutMock }),
+  useAuth: () => ({ logout: logoutMock, user: authUserMock.current }),
   getAccessToken: getAccessTokenMock,
 }));
 
@@ -100,6 +108,7 @@ describe('Web app root', () => {
     sessionStorage.clear();
     queryClient.clear();
     getAccessTokenMock.mockReturnValue(null);
+    authUserMock.current = undefined;
     ensureAuthMock.mockReturnValue(true);
     useWebAuthMock.mockReturnValue({ ensureAuth: ensureAuthMock, authReady: true });
     useHubStore.getState().clear();
@@ -147,6 +156,35 @@ describe('Web app root', () => {
     render(<App />);
     expect(screen.getByRole('dialog', { name: 'TokenDance Account login' })).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'Agent 协作群' })).not.toBeInTheDocument();
+    expect(useWebWorkbenchModelMock).toHaveBeenCalledWith(
+      undefined,
+      undefined,
+      'approved-real',
+    );
+  });
+
+  it('passes the explicit fixture mode to the workbench model in development', () => {
+    render(<App />);
+    expect(useWebWorkbenchModelMock).toHaveBeenCalledWith(
+      undefined,
+      undefined,
+      'fixture',
+    );
+  });
+
+  it('reuses the profile returned by login without a duplicate auth/me request', async () => {
+    getAccessTokenMock.mockReturnValue('web-token');
+    authUserMock.current = {
+      id: 'account-user',
+      username: 'account-user',
+      nickname: 'Delicious233',
+      avatar_url: 'https://img.tokendancelab.com/avatar.webp',
+    };
+
+    render(<App />);
+
+    expect(await screen.findByRole('button', { name: 'Delicious233' })).toBeInTheDocument();
+    expect(hubClientStub.me).not.toHaveBeenCalled();
   });
 
   it('does not show demo conversations while production auto-login is pending', () => {

@@ -58,7 +58,7 @@ function WebWorkbenchRoot() {
   const [savingAgentId, setSavingAgentId] = useState<string | undefined>();
   const [deletingAgentId, setDeletingAgentId] = useState<string | undefined>();
   const { ensureAuth, authReady } = useWebAuth();
-  const { logout } = useAuth();
+  const { logout, user: authUser } = useAuth();
   const sessionQueryClient = useQueryClient();
   const showAuthModal = useHubStore((state) => state.showAuthModal);
   const setShowAuthModal = useHubStore((state) => state.setShowAuthModal);
@@ -98,17 +98,26 @@ function WebWorkbenchRoot() {
   const createAgentProfile = useCreateAgentProfile();
   const updateAgentProfile = useUpdateAgentProfile();
   const deleteAgentProfile = useDeleteAgentProfile();
-  const workbench = useWebWorkbenchModel(selectedConversationId, selectedProjectId);
+  const workbench = useWebWorkbenchModel(
+    selectedConversationId,
+    selectedProjectId,
+    dataModeContract.mode,
+  );
   const chatActions = workbench.chatActions;
   const agents = resolveWebWorkbenchAgents(agentList.data?.items, dataMode);
 
-  // Fetch real user profile from Hub (originates from TokenDance Account OIDC)
+  // OIDC callback and auto-login already resolve the Hub profile. Only fetch
+  // here for legacy/injected auth states that contain a token without a user;
+  // issuing a second /client/auth/me after every login needlessly consumes the
+  // global request budget and can hide an otherwise successful login behind a
+  // transient 429.
   const userProfile = useQuery({
     queryKey: webQueryKeys.authMe,
     queryFn: () => createHubClient({ getToken: getAccessToken }).me(),
-    enabled: Boolean(getAccessToken()),
+    enabled: Boolean(getAccessToken()) && !authUser,
     staleTime: 60_000,
   });
+  const currentUser = authUser ?? userProfile.data;
   const agentLoadError = realMode && agentList.error
     ? errorMessage(agentList.error, t('error.agentProfile.load'))
     : undefined;
@@ -398,9 +407,9 @@ function WebWorkbenchRoot() {
         workbenchStatus={workbench.workbenchStatus}
         transcript={workbench.transcript}
         transcriptLoading={workbench.transcriptLoading}
-        userDisplayName={userProfile.data?.nickname || userProfile.data?.username}
-        userAvatarUrl={userProfile.data?.avatar_url}
-        currentUserId={userProfile.data?.id}
+        userDisplayName={currentUser?.nickname || currentUser?.username}
+        userAvatarUrl={currentUser?.avatar_url}
+        currentUserId={currentUser?.id}
         skillMarketItems={skillMarketItems}
         skillMarketLoading={hubReady && skillMarketQuery.isFetching}
         {...(hubReady && skillMarketQuery.error
