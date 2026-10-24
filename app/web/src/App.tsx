@@ -57,7 +57,7 @@ function WebWorkbenchRoot() {
   const [agentActionError, setAgentActionError] = useState<string | undefined>();
   const [savingAgentId, setSavingAgentId] = useState<string | undefined>();
   const [deletingAgentId, setDeletingAgentId] = useState<string | undefined>();
-  const { ensureAuth } = useWebAuth();
+  const { ensureAuth, authReady } = useWebAuth();
   const { logout } = useAuth();
   const sessionQueryClient = useQueryClient();
   const showAuthModal = useHubStore((state) => state.showAuthModal);
@@ -75,7 +75,10 @@ function WebWorkbenchRoot() {
     getWorkbenchDataModeOverrideSnapshot,
     getWorkbenchDataModeOverrideSnapshot,
   );
-  const dataMode = resolveWorkbenchDataMode(import.meta.env.VITE_AGENTHUB_DATA_MODE, dataModeOverride || undefined);
+  const dataMode = resolveWorkbenchDataMode(
+    import.meta.env.VITE_AGENTHUB_DATA_MODE || (import.meta.env.PROD ? 'approved-real' : 'auto'),
+    dataModeOverride || undefined,
+  );
   const dataModeContract = getWorkbenchDataModeContract(dataMode);
   const realMode = dataModeContract.isRealDataMode;
   const webPlatform = useMemo(
@@ -275,6 +278,13 @@ function WebWorkbenchRoot() {
       .regenerateAgentTask(taskId)
       .then(() => undefined);
   }, []);
+
+  if (realMode && !authReady) {
+    return <div role="status">{t('loading', { ns: 'common' })}</div>;
+  }
+  if (realMode && !getAccessToken()) {
+    return <AuthPage onLoginSuccess={() => setShowAuthModal(false)} />;
+  }
 
   return (
     <>

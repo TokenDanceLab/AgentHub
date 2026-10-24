@@ -95,12 +95,13 @@ function getComposerInput(): HTMLTextAreaElement {
 
 describe('Web app root', () => {
   beforeEach(() => {
+    vi.stubEnv('VITE_AGENTHUB_DATA_MODE', 'fixture');
     localStorage.clear();
     sessionStorage.clear();
     queryClient.clear();
     getAccessTokenMock.mockReturnValue(null);
     ensureAuthMock.mockReturnValue(true);
-    useWebAuthMock.mockReturnValue({ ensureAuth: ensureAuthMock });
+    useWebAuthMock.mockReturnValue({ ensureAuth: ensureAuthMock, authReady: true });
     useHubStore.getState().clear();
     useAgentListMock.mockReturnValue({
       data: undefined,
@@ -137,6 +138,24 @@ describe('Web app root', () => {
   afterEach(() => {
     cleanup();
     vi.clearAllMocks();
+    vi.unstubAllEnvs();
+  });
+
+  it('shows Account login instead of demo conversations in a production build without a session', () => {
+    vi.stubEnv('PROD', true);
+    vi.stubEnv('VITE_AGENTHUB_DATA_MODE', '');
+    render(<App />);
+    expect(screen.getByRole('dialog', { name: 'TokenDance Account login' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Agent 协作群' })).not.toBeInTheDocument();
+  });
+
+  it('does not show demo conversations while production auto-login is pending', () => {
+    vi.stubEnv('PROD', true);
+    vi.stubEnv('VITE_AGENTHUB_DATA_MODE', '');
+    useWebAuthMock.mockReturnValue({ ensureAuth: ensureAuthMock, authReady: false });
+    render(<App />);
+    expect(screen.getByRole('status')).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Agent 协作群' })).not.toBeInTheDocument();
   });
 
   it('mounts the shared v4 workbench shell without legacy demo chrome', () => {
@@ -412,12 +431,17 @@ describe('Web app root', () => {
   });
 
   it('opens auth instead of silently using mock data for guarded unauthenticated Hub work', async () => {
+    vi.stubEnv('VITE_AGENTHUB_DATA_MODE', 'observed');
+    getAccessTokenMock.mockReturnValue('web-token');
     ensureAuthMock.mockImplementation(() => {
       useHubStore.getState().setShowAuthModal(true);
       return false;
     });
 
     render(<App />);
+
+    // Simulate the token expiring after the workbench mounted, before sending.
+    getAccessTokenMock.mockReturnValue(null);
 
     // Drive the real composer, so the auth gate is exercised through the real
     // shared shell → web platform adapter path rather than a stub button.
