@@ -8,9 +8,6 @@ import type { DocRow, ProjectDraft } from '@agenthub/workbench';
 import { resolveFailedToastKey } from '@shared/chatview/failedToastKey';
 import {
   getWorkbenchDataModeContract,
-  getWorkbenchDataModeOverrideSnapshot,
-  resolveWorkbenchDataMode,
-  subscribeWorkbenchDataModeOverride,
   type WorkbenchDataMode,
 } from '@shared/demo';
 import {
@@ -137,15 +134,9 @@ export function resolveWebActiveHubSessionId(
   return matched ? activeConversationId : null;
 }
 
-export function useWebWorkbenchModel(selectedConversationId?: string, selectedProjectId?: string) {
+export function useWebWorkbenchModel(dataMode: WorkbenchDataMode, selectedConversationId?: string, selectedProjectId?: string) {
   const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE);
   const { t: tCommon } = useTranslation();
-  const dataModeOverride = useSyncExternalStore(
-    subscribeWorkbenchDataModeOverride,
-    getWorkbenchDataModeOverrideSnapshot,
-    getWorkbenchDataModeOverrideSnapshot,
-  );
-  const dataMode = resolveWorkbenchDataMode(import.meta.env.VITE_AGENTHUB_DATA_MODE, dataModeOverride || undefined);
   const dataModeContract = getWorkbenchDataModeContract(dataMode);
   const authenticated = useHubStore((state) => state.authenticated);
   const realMode = dataModeContract.isRealDataMode;
