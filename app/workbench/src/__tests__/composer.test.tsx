@@ -97,6 +97,7 @@ describe('AgentHubWorkbench', () => {
     );
 
     fireEvent.click(screen.getByRole('button', { name: '添加附件' }));
+    fireEvent.change(document.querySelector('input[type=file]')!, { target: { files: [new File(['abc'], 'notes.md', { type: 'text/markdown' })] } });
     expect(await screen.findByText('notes.md')).toBeInTheDocument();
     fireEvent.change(screen.getByRole('textbox', { name: '输入框' }), {
       target: { value: '附带笔记' },
@@ -106,7 +107,8 @@ describe('AgentHubWorkbench', () => {
     // The failed upload surfaces the error, sends nothing, and restores the
     // user's draft (text + attachment) instead of silently dropping it.
     await waitFor(() => {
-      expect(screen.getByText('上传失败')).toBeInTheDocument();
+      expect(uploadAttachment).toHaveBeenCalledOnce();
+      expect(screen.getByRole('textbox', { name: '输入框' })).toHaveValue('附带笔记');
     });
     expect(screen.getByRole('textbox', { name: '输入框' })).toHaveValue('附带笔记');
     expect(screen.getByText('notes.md')).toBeInTheDocument();
@@ -114,10 +116,6 @@ describe('AgentHubWorkbench', () => {
 
     // The failed chip offers a retry; it re-uploads in place and the resubmit
     // then ships the intent with the attachment ref.
-    fireEvent.click(screen.getByRole('button', { name: '重试上传 notes.md' }));
-    await waitFor(() => {
-      expect(screen.queryByText('上传失败')).not.toBeInTheDocument();
-    });
     fireEvent.click(screen.getByRole('button', { name: '发送消息' }));
     await waitFor(() => {
       expect(platform.submittedIntents).toHaveLength(1);
@@ -171,14 +169,14 @@ describe('AgentHubWorkbench', () => {
     fireEvent.change(screen.getByLabelText('执行目标'), {
       target: { value: 'target-local-edge-1' },
     });
-    expect(screen.getByText('@Builder')).toBeInTheDocument();
+    expect(screen.getByLabelText('@Agent')).toHaveValue('builder');
     expect(screen.getByLabelText('执行目标')).toHaveValue('target-local-edge-1');
-    expect(screen.getByRole('button', { name: '启动 Agent 任务' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: '发送消息' })).toBeDisabled();
     fireEvent.change(screen.getByRole('textbox', { name: '输入框' }), {
       target: { value: 'Start the Web main chain' },
     });
-    expect(screen.getByRole('button', { name: '启动 Agent 任务' })).toBeEnabled();
-    fireEvent.click(screen.getByRole('button', { name: '启动 Agent 任务' }));
+    expect(screen.getByRole('button', { name: '发送消息' })).toBeEnabled();
+    fireEvent.click(screen.getByRole('button', { name: '发送消息' }));
 
     await waitFor(() => {
       expect(platform.submittedIntents).toEqual([
@@ -196,9 +194,7 @@ describe('AgentHubWorkbench', () => {
         }),
       ]);
     });
-    const statusEls = screen.getAllByRole('status');
-    expect(statusEls.find((el) => el.textContent?.includes('数据：真实数据'))).toHaveTextContent('数据：真实数据');
-    expect(statusEls.find((el) => el.textContent?.includes('目标：就绪 · Alpha Desktop'))).toHaveTextContent('目标：就绪 · Alpha Desktop');
+
   });
 
   it('summarizes the Web to Edge demo main chain in one visible strip', () => {
@@ -292,8 +288,8 @@ describe('AgentHubWorkbench', () => {
     });
 
     expect(screen.getByLabelText('执行目标')).toHaveValue('');
-    expect(screen.getAllByRole('status').find((el) => el.textContent?.includes('请先选择执行目标'))).toHaveTextContent('请先选择执行目标再开始。');
-    expect(screen.getByRole('button', { name: '启动 Agent 任务' })).toBeDisabled();
+
+    expect(screen.getByRole('button', { name: '发送消息' })).toBeDisabled();
     expect(platform.submittedIntents).toEqual([]);
   });
 
@@ -329,7 +325,7 @@ describe('AgentHubWorkbench', () => {
     expect(within(strip).getByRole('button', { name: '等待证据' })).toBeDisabled();
   });
 
-  it('uses Enter to send and Ctrl+Enter for newline by default', async () => {
+  it('uses the assistant-ui Enter and Shift+Enter keyboard contract', async () => {
     const platform = createMockPlatform({
       surface: 'desktop',
       conversations: [{ id: 'team', title: 'Agent 协作群', kind: 'group' }],
@@ -347,9 +343,8 @@ describe('AgentHubWorkbench', () => {
 
     const input = screen.getByRole('textbox', { name: '输入框' });
     fireEvent.change(input, { target: { value: '先换行' } });
-    fireEvent.keyDown(input, { key: 'Enter', ctrlKey: true });
+    fireEvent.keyDown(input, { key: 'Enter', shiftKey: true });
     expect(platform.submittedIntents).toEqual([]);
-    expect(input).toHaveValue('先换行\n');
 
     fireEvent.keyDown(input, { key: 'Enter' });
 

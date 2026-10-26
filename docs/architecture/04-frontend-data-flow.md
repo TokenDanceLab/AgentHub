@@ -1,12 +1,12 @@
 # Frontend Data Flow
 
-> 子文档 | 主索引：[architecture.md](../architecture.md) · Hub API：[01-hub-server.md](01-hub-server.md) · 最后更新：2026-10-23
+> 子文档 | 主索引：[architecture.md](../architecture.md) · Hub API：[01-hub-server.md](01-hub-server.md) · 最后更新：2026-10-26
 
 本文档只记录 Desktop/Web/Mobile 共享前端的数据流合同和 source owner。具体 hook、组件 props、测试用例数量以源码和测试为准，不在这里复制清单。
 
 ## 设计边界
 
-前端分三层：`app shell（Desktop/Web） -> platform adapter -> @agenthub/workbench shell + app/shared chatview -> transcript normalizer + renderer`。Mobile 默认是独立 RN fixture/边界验证 lane：不复用 workbench/chatview 渲染，数据走 MobileAppFixture/mock-hub（非 release candidate）。仅当 `EXPO_PUBLIC_AGENTHUB_ACCOUNT_LOGIN_ENABLED=true` 且配置 Account issuer 时，才进入显式开启的真实登录验证路径。
+前端分三层：`app shell（Desktop/Web） -> platform adapter -> @agenthub/workbench shell + shared assistant-ui conversation`。Hub/Edge 提供规范化消息，assistant-ui ExternalStoreRuntime 管理聊天交互。Mobile 默认是独立 RN fixture/边界验证 lane，不复用 DOM 聊天组件。仅当 `EXPO_PUBLIC_AGENTHUB_ACCOUNT_LOGIN_ENABLED=true` 且配置 Account issuer 时，才进入显式开启的真实登录验证路径。
 
 规则：
 
@@ -48,7 +48,8 @@ UI 可以根据 `capabilities` 隐藏或禁用动作，但不能 fork 另一套�
 | 责任 | Owner |
 |---|---|
 | Workbench shell / rail / inspector / routes | `app/workbench/src/` |
-| Chat transcript renderer | `app/shared/src/chatview/` |
+| Active conversation runtime and official Thread components | `app/shared/src/ui/assistant-ui/` |
+| Read-only split transcript and remaining card consumers | `app/shared/src/chatview/` |
 | Transcript block types, ordering, Hub/Edge normalization, evidence | `app/shared/src/transcript/` |
 | Data mode compatibility contract | `app/shared/src/demo/dataMode.ts`, `app/shared/src/testing/e2eDataModeContract.ts` |
 | Desktop app shell and adapter wiring | `app/desktop/src/App.tsx`, `app/desktop/src/platform/`, `app/desktop/src/api/` |
@@ -79,20 +80,24 @@ The visible chat flow is a single timeline:
 Hub / Edge / fixture / mock source
   -> TranscriptBlock[]
   -> order + normalize + filter diagnostics
-  -> ChatViewBridge
-  -> ChatViewTranscript
-  -> blocksToTranscriptItems
-  -> TranscriptItem[]
-  -> UserMessage / AgentGroup / RowItem
+  -> assistant-ui transcriptMessages projection
+  -> ExternalStoreRuntime
+  -> official Thread / Composer / Message / Markdown / Tool components
 ```
 
 Stable behavior:
 
 - User messages are optimistic and must appear immediately after submit; refetch, replay, or runtime events must not make them flash away.
 - All sources are ordered by event time, then stable input order. User text, agent text, tool call/result, approval, subagent report, diff, artifact, deploy, context usage and preview stay in one linear transcript.
-- Adjacent agent blocks from the same author are grouped by shared chatview adapter. Tool result replaces its matching tool call when a call id or tool name matches.
+- Tool results join calls by call ID; matching tool names alone do not establish identity. Human authors remain human messages, including other participants.
 - Runtime diagnostics and mock/mode/debug labels are filtered before rendering as chat bubbles. Markdown, code blocks and tables render inside shared bubble/card components, not as escaped plaintext.
 - Auto-follow scrolls on first render, near-bottom updates, or a local user submit; user-initiated scrollback must not be forcibly overridden.
+
+The platform query cache owns optimistic message insertion and server ID reconciliation. The view does not infer acknowledgements from matching text. assistant-ui owns composer text, attachments, submission recovery and scroll behavior; the shell retains only execution settings. Each conversation mounts its own runtime, and draft persistence subscribes to that runtime.
+
+`MessageNotSentError` restores a failed send to the composer. If the message was stored but Agent dispatch failed, the platform returns `dispatchError` or `turnInProgress`; the UI retries only `redispatchTask` against the stored message ID. There is no background browser retry queue. An active run disables new sends while keeping the draft editable and the stop action available.
+
+Production Web selects real data mode once at the root. Its model receives that value directly, and the existing auth state supplies the user profile; neither stale demo preferences nor a second profile request can change the authenticated data source.
 
 ## Realtime And Cache Flow
 

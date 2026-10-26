@@ -23,8 +23,8 @@ beforeAll(async () => {
 /** Captured ChatViewBridge props so tests can trigger the checkpoint click. */
 const bridgePropsLog = vi.hoisted(() => ({ last: null as Record<string, unknown> | null }));
 
-vi.mock('./ChatViewBridge', () => ({
-  ChatViewBridge: (props: Record<string, unknown>) => {
+vi.mock('@shared/ui/assistant-ui/AssistantConversation', () => ({
+  AssistantConversation: (props: Record<string, unknown>) => {
     bridgePropsLog.last = props;
     return <div data-testid="chat-view-bridge" />;
   },

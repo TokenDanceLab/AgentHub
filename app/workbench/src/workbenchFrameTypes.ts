@@ -142,6 +142,7 @@ export interface WorkspaceLoadErrorStateProps {
 }
 
 export interface ChatConversationHostFrameProps {
+  currentUserId?: string | undefined;
   platform: AgentHubPlatform;
   session: WorkbenchSessionChrome;
   transcriptChrome: WorkbenchTranscriptChrome;

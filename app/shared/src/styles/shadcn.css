@@ -37,6 +37,16 @@
 }
 
 @layer base {
+  /* Registry components expect native controls to inherit the app typography. */
+  .aui-root :where(button, input, textarea, select) {
+    font: inherit;
+    color: inherit;
+  }
+
+  .aui-root :where(button, textarea, select) {
+    background-color: transparent;
+  }
+
   *,
   ::before,
   ::after {

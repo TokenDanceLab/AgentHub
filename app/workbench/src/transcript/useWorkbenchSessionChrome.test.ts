@@ -180,11 +180,8 @@ describe('useWorkbenchSessionChrome', () => {
     expect(result.current.searchOpen).toBe(false);
     expect(result.current.searchHighlightId).toBeNull();
     expect(result.current.composer).toMatchObject({
-      conversationId: 'default',
-      text: '',
       mode: 'ask',
       mentions: [],
-      attachments: [],
     });
     expect(result.current.evidence).toEqual([]);
     expect(result.current.mainchainSummary.exportEnabled).toBe(false);
@@ -215,7 +212,7 @@ describe('useWorkbenchSessionChrome', () => {
 
     expect(result.current.currentConversationId).toBe('a');
     expect(result.current.activeConversation).toMatchObject({ id: 'a', title: 'A' });
-    expect(result.current.composer.conversationId).toBe('a');
+
   });
 
   it('prefers a valid controlled activeConversationId', () => {
@@ -256,6 +253,8 @@ describe('useWorkbenchSessionChrome', () => {
 
   it('dispatches composer actions against the current conversation', () => {
     const { result } = renderSessionChrome();
+    const setText = vi.fn();
+    act(() => result.current.bindConversationRuntime({ thread: { composer: { setText } } } as never));
 
     act(() => {
       result.current.dispatchComposer({ type: 'setText', text: 'hello agent' });
@@ -266,30 +265,21 @@ describe('useWorkbenchSessionChrome', () => {
       });
     });
 
+    expect(setText).toHaveBeenCalledWith('hello agent');
+    expect(result.current.composer).not.toHaveProperty('text');
     expect(result.current.composer).toMatchObject({
-      conversationId: 'default',
-      text: 'hello agent',
       mode: 'code',
       mentions: [{ id: 'agent-1', label: 'Coder' }],
     });
   });
 
-  it('saves a draft before resetting the composer on conversation switch', () => {
-    const conversations = [conversation({ id: 'a', title: 'A' }), conversation({ id: 'b', title: 'B' })];
-    const { result } = renderSessionChrome({ conversations });
-
-    act(() => {
-      result.current.dispatchComposer({ type: 'setText', text: 'draft text' });
-    });
-    act(() => {
-      result.current.selectConversation('b');
-    });
-
-    expect(result.current.composer.conversationId).toBe('b');
-    expect(result.current.composer.text).toBe('');
-    expect(window.localStorage.getItem('agenthub.composer.draft.a')).toBe(
-      JSON.stringify({ text: 'draft text', mentions: [] }),
-    );
+  it('detaches shell actions when the active conversation runtime unmounts', () => {
+    const { result } = renderSessionChrome();
+    const setText = vi.fn();
+    act(() => result.current.bindConversationRuntime({ thread: { composer: { setText } } } as never));
+    act(() => result.current.bindConversationRuntime(null));
+    act(() => result.current.dispatchComposer({ type: 'setText', text: 'not sent to a stale runtime' }));
+    expect(setText).not.toHaveBeenCalled();
   });
 
   it('maps runtime agents into composer mentions', () => {

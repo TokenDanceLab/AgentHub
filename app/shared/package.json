@@ -44,6 +44,8 @@
     "react-i18next": ">=15.0.0"
   },
   "dependencies": {
+    "@assistant-ui/react": "0.15.31",
+    "@assistant-ui/react-markdown": "0.14.24",
     "@lobehub/icons-static-svg": "1.95.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
@@ -60,6 +62,7 @@
     "remark-cjk-friendly": "2.3.1",
     "remark-gfm": "^4.0.1",
     "tailwind-merge": "^3.7.0",
+    "tw-shimmer": "0.4.14",
     "virtua": "^0.50.1",
     "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",
     "zustand": "^5.0.14"

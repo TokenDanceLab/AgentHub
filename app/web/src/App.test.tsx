@@ -42,7 +42,7 @@ const authPageSuccessUser = vi.hoisted(() => ({
 const workspaceLabel = /^(Workspace|aria\.workspace)$/;
 const workspaceTabsLabel = /^(Workspace tabs|aria\.workspaceTabs)$/;
 const conversationSidebarLabel = /^(Conversation sidebar|aria\.conversationSidebar)$/;
-const composerInputLabel = /^(Composer input|aria\.composerInput)$/;
+const composerInputLabel = /^(Message input|输入框)$/;
 const globalRailLabel = /^(Global rail|aria\.globalRail)$/;
 const mainChainStatusLabel = /^(Main chain status|aria\.mainChainStatus)$/;
 const sendMessageLabel = /^(发送消息|Send message|profile\.sendMessage)$/;

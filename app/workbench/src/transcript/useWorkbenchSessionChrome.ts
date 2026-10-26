@@ -2,17 +2,12 @@ import {
   useCallback,
   useEffect,
   useMemo,
-  useReducer,
   useRef,
   useState,
 } from 'react';
 import type { SetStateAction } from 'react';
-import {
-  composerReducer,
-  createInitialComposerState,
-  saveDraft,
-  serializeDraft,
-} from '@shared/composer';
+import type { ComposerAction } from '@shared/composer';
+import type { ConversationRuntime } from '@shared/ui/assistant-ui/AssistantConversation';
 import { toggleAppliedAgentHubTheme } from '@shared/theme';
 import { collectTranscriptEvidence } from '@shared/transcript';
 import { buildMainchainSummary } from '../mainchain/index';
@@ -160,11 +155,29 @@ export function useWorkbenchSessionChrome({
   const [searchHighlightId, setSearchHighlightId] = useState<string | null>(null);
   const workspaceRef = useRef<HTMLElement>(null);
   const composerInputRef = useRef<HTMLTextAreaElement>(null);
-  const [composer, dispatchComposer] = useReducer(
-    composerReducer,
-    currentConversationId,
-    createInitialComposerState,
-  );
+  const conversationRuntimeRef = useRef<ConversationRuntime | null>(null);
+  const bindConversationRuntime = useCallback((runtime: ConversationRuntime | null) => {
+    conversationRuntimeRef.current = runtime;
+  }, []);
+  const [composer, setComposer] = useState<WorkbenchSessionChrome['composer']>({
+    mode: 'ask', approvalMode: 'suggest', mentions: [], workDir: '',
+  });
+  // Shell actions target the active library runtime; text and attachments have no shell copy.
+  const dispatchComposer = useCallback((action: ComposerAction) => {
+    const runtime = conversationRuntimeRef.current;
+    switch (action.type) {
+      case 'setText': runtime?.thread.composer.setText(action.text); break;
+      case 'prependText': runtime?.thread.composer.setText(action.text + (runtime.thread.composer.getState().text || '')); break;
+      case 'setQuote': runtime?.thread.composer.setQuote(action.quote ? { text: action.quote.text, messageId: action.quote.messageId ?? '' } : undefined); break;
+      case 'setReplyTo': runtime?.thread.composer.setQuote(action.replyTo ? { text: action.replyTo.preview, messageId: action.replyTo.messageId } : undefined); break;
+      case 'setEditingMessage': if (action.messageId) runtime?.thread.getMessageById(action.messageId).composer.beginEdit(); break;
+      case 'setMode': setComposer((current) => ({ ...current, mode: action.mode })); break;
+      case 'setApprovalMode': setComposer((current) => ({ ...current, approvalMode: action.approvalMode })); break;
+      case 'setWorkDir': setComposer((current) => ({ ...current, workDir: action.workDir })); break;
+      case 'addMention': setComposer((current) => ({ ...current, mentions: [...current.mentions.filter((item) => item.id !== action.mention.id), action.mention] })); break;
+      case 'removeMention': setComposer((current) => ({ ...current, mentions: current.mentions.filter((item) => item.id !== action.mentionId) })); break;
+    }
+  }, []);
 
   function selectConversation(conversationId: string): void {
     setLocalConversationId(conversationId);
@@ -210,23 +223,6 @@ export function useWorkbenchSessionChrome({
   // when the agent data actually changes.
   const mentionableAgents = useMemo(() => mapAgentsToComposerMentions(agents), [agents]);
 
-  useEffect(() => {
-    // Flush current composer state as a draft for the outgoing session
-    // before resetting so the draft is available on switch-back.
-    // #1822: serialize attachments (ref'd ones) + reply/quote context too —
-    // the old text+mentions-only save dropped them on conversation switch.
-    if (composer.text || composer.mentions.length > 0 || composer.attachments.length > 0 ||
-        composer.replyTo !== null || composer.quote !== null) {
-      saveDraft(composer.conversationId, serializeDraft({
-        text: composer.text,
-        mentions: composer.mentions,
-        attachments: composer.attachments,
-        replyTo: composer.replyTo,
-        quote: composer.quote,
-      }));
-    }
-    dispatchComposer({ type: 'setConversationId', conversationId: currentConversationId });
-  }, [currentConversationId]);
 
   useEffect(() => {
     if (shouldClearSelectedExecutionTarget(composerExecutionTargets, selectedExecutionTargetId)) {
@@ -419,6 +415,7 @@ export function useWorkbenchSessionChrome({
     setSearchHighlightId,
     workspaceRef,
     composerInputRef,
+    bindConversationRuntime,
     composer,
     dispatchComposer,
     evidence,

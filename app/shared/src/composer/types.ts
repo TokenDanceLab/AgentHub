@@ -122,6 +122,8 @@ export interface ComposerIntent {
 
 export interface ComposerSubmitResult {
   intentId: string;
+  /** Message is persisted, but execution did not start. Retry dispatch using intentId, never resend. */
+  dispatchError?: string;
   /**
    * Present when the Hub returned a recoverable 409 `turn_in_progress` — the
    * agent instance already has a non-terminal task (#1430). The composer

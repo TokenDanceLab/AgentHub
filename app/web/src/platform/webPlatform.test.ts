@@ -728,7 +728,9 @@ describe('webPlatform workbench agent mapping', () => {
       mentions: [{ id: 'profile-builder', label: 'Hub Builder', runtimeId: 'claude-code' }],
       attachments: [],
       approvalMode: 'suggest',
-    }, 'target-local-edge-dispatch-failed'))).rejects.toThrow('task dispatch failed');
+    }, 'target-local-edge-dispatch-failed'))).resolves.toEqual({
+      intentId: 'hub-message-dispatch-failed', dispatchError: 'task dispatch failed',
+    });
 
     expect(hubMessages(queryClient)).toEqual([
       expect.objectContaining({
