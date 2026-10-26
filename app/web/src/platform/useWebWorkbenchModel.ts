@@ -618,10 +618,8 @@ export function useWebWorkbenchModel(dataMode: WorkbenchDataMode, selectedConver
     [activeAgentTaskId, activeAgentTaskApprovals.error, activeAgentTaskArtifacts.error],
   );
   const surfacedTranscript = useMemo(
-    () => (executionTargetStatus.block
-      ? [executionTargetStatus.block, ...taskContractStatusBlocks, ...transcript]
-      : [...taskContractStatusBlocks, ...transcript]),
-    [executionTargetStatus.block, taskContractStatusBlocks, transcript],
+    () => [...taskContractStatusBlocks, ...transcript],
+    [taskContractStatusBlocks, transcript],
   );
   const runtimeEvidence = useMemo(
     () => resolveWebRuntimeEvidence(surfacedTranscript),

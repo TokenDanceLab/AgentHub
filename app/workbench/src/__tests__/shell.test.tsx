@@ -56,7 +56,7 @@ describe('AgentHubWorkbench', () => {
     expect(overviewTabIcon).toHaveAttribute('stroke-width', String(DESIGN_NAV_GLYPH_STROKE_WIDTH));
     expect(screen.getByRole('separator', { name: '调整右侧栏宽度' })).toHaveAttribute('aria-valuenow', '400');
     expect(screen.getByRole('button', { name: '收起右侧概览' })).toBeInTheDocument();
-    expect(screen.getByPlaceholderText('发消息给 Builder')).toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: '输入框' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '发送消息' })).toBeInTheDocument();
     expect(screen.queryByRole('toolbar', { name: 'Composer modes' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '@Agent' })).not.toBeInTheDocument();
@@ -67,7 +67,7 @@ describe('AgentHubWorkbench', () => {
     expect(screen.queryByTestId('composer-attachment-input')).not.toBeInTheDocument();
     const transcriptRegion = screen.getByRole('region', { name: '会话记录' });
     expect(within(transcriptRegion).getByText('全面参考当前工作台规范')).toBeInTheDocument();
-    expect(within(transcriptRegion).getAllByText('Read desktop/index.html').length).toBeGreaterThan(0);
+    expect(transcriptRegion.querySelector('[data-slot=tool-group-trigger]')).toBeInTheDocument();
     expect(within(transcriptRegion).queryByText('Hub replay for desktop run')).not.toBeInTheDocument();
     expect(within(transcriptRegion).queryByText('Source: Hub replay')).not.toBeInTheDocument();
     expect(within(transcriptRegion).queryByText('Mode: Replay')).not.toBeInTheDocument();
@@ -134,7 +134,7 @@ describe('AgentHubWorkbench', () => {
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
 
     // '?' inside an editable element must not open the overlay.
-    const composer = screen.getByPlaceholderText('发消息给 Builder');
+    const composer = screen.getByRole('textbox', { name: '输入框' });
     composer.focus();
     fireEvent.keyDown(composer, { key: '?' });
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();

@@ -198,7 +198,7 @@ describe('AgentHubWorkbench', () => {
 
     expect(handleConversationChange).toHaveBeenCalledWith('reviewer');
     expect(reviewer).toHaveAttribute('aria-current', 'true');
-    expect(screen.getByPlaceholderText('发消息给 Reviewer')).toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: '输入框' })).toBeInTheDocument();
   });
 
   describe('conversation sort', () => {

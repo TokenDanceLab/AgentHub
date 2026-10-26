@@ -122,7 +122,8 @@ export interface WorkbenchSessionChrome {
   setSearchHighlightId: Dispatch<SetStateAction<string | null>>;
   workspaceRef: RefObject<HTMLElement | null>;
   composerInputRef: RefObject<HTMLTextAreaElement | null>;
-  composer: ComposerState;
+  composer: Pick<ComposerState, 'mode' | 'approvalMode' | 'workDir' | 'mentions'>;
+  bindConversationRuntime: (runtime: import('@shared/ui/assistant-ui/AssistantConversation').ConversationRuntime | null) => void;
   dispatchComposer: Dispatch<ComposerAction>;
   evidence: EvidenceRef[];
   mainchainSummary: MainchainSummary;

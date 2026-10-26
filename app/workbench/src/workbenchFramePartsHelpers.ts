@@ -122,6 +122,7 @@ export function buildChatConversationHostProps(
   const { openAgentProfile } = profile;
 
   const hostProps: ConversationHostProps = {
+    currentUserId: props.currentUserId,
     transcript,
     inspectorCollapsed,
     onToggleInspector: toggleInspector,
@@ -150,6 +151,7 @@ export function buildChatConversationHostProps(
     composer,
     dispatchComposer,
     composerInputRef,
+    bindConversationRuntime: session.bindConversationRuntime,
     searchOpen,
     onSearchOpenChange: setSearchOpen,
   };

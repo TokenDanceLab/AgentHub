@@ -368,7 +368,7 @@ async function submitWebComposerIntent(
     if (isTurnInProgressError(error)) {
       return { intentId: message.message_id, turnInProgress: true };
     }
-    throw error;
+    return { intentId: message.message_id, dispatchError: error instanceof Error ? error.message : 'Agent dispatch failed' };
   }
   if (task.id) {
     const targetId = task.target_id ?? dispatchTarget?.id;

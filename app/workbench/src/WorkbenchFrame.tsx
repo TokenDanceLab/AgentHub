@@ -289,6 +289,7 @@ export function WorkbenchFrame({
 
   const chatHostElement = (
     <ChatConversationHostFrame
+      currentUserId={currentUserId}
       platform={platform}
       session={session}
       transcriptChrome={transcriptChrome}
