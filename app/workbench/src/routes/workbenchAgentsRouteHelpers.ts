@@ -328,6 +328,12 @@ export function withToolPermission(
 }
 
 export function buildAgentFieldPatch(field: string, value: string): Partial<AgentConfig> {
+  if (field === 'engine') {
+    const runtimeIds: Record<string, string> = { 'Claude Code': 'claude-code', Codex: 'codex', 'Browser Worker': 'browser-worker', DeepSeek: 'deepseek', 'openai-sdk': 'openai-sdk' };
+    return { engine: value, runtimeId: runtimeIds[value] ?? value,
+      ...(value === 'openai-sdk' ? { model: '', provider: '' } : {}),
+    };
+  }
   if (field === 'state') {
     return { state: value as AgentConfig['state'] };
   }

@@ -29,6 +29,8 @@ export interface DevicesPageTarget {
 export interface DevicesPageProps {
   /** undefined = shell is not Hub-connected (renders sign-in guidance). */
   targets?: DevicesPageTarget[] | undefined;
+  /** Surface-owned enrollment UI, shown alongside every signed-in inventory state. */
+  pairing?: React.ReactNode;
   loading?: boolean | undefined;
   error?: string | null | undefined;
   onRetry?: (() => void) | undefined;
@@ -104,6 +106,7 @@ function repairKey(bucket: string): string | undefined {
 
 export function DevicesPage({
   targets,
+  pairing,
   loading,
   error,
   onRetry,
@@ -126,6 +129,7 @@ export function DevicesPage({
   if (error && targets.length === 0) {
     return (
       <div className={styles.page} data-testid="devices-page">
+        {pairing}
         <div className={styles.placeholder} role="alert">
           <h2 className={styles.placeholderTitle}>{t('devices.error.title')}</h2>
           <p className={styles.placeholderBody}>{friendlyErrorMessage(error, t('devices.error.title'))}</p>
@@ -147,6 +151,7 @@ export function DevicesPage({
   if (loading && targets.length === 0) {
     return (
       <div className={styles.page} data-testid="devices-page">
+        {pairing}
         <div className={styles.placeholder} role="status">
           <p className={styles.placeholderBody}>{t('connection.connecting')}</p>
         </div>
@@ -157,6 +162,7 @@ export function DevicesPage({
   if (targets.length === 0) {
     return (
       <div className={styles.page} data-testid="devices-page">
+        {pairing}
         <div className={styles.placeholder} role="status">
           <h2 className={styles.placeholderTitle}>{t('devices.empty.title')}</h2>
           <p className={styles.placeholderBody}>{t('devices.empty.body')}</p>
@@ -179,6 +185,7 @@ export function DevicesPage({
 
   return (
     <div className={styles.page} data-testid="devices-page">
+      {pairing}
       <header className={styles.header}>
         <h2 className={styles.title}>{t('devices.title')}</h2>
         <p className={styles.summary} data-testid="devices-summary">

@@ -1,4 +1,5 @@
 import type { HubAgentInstance } from './hubClientTeamTypes';
+import type { HubEdgeEnrollmentPreview, HubEdgeEnrollmentConfirmation, HubEdgeDeviceRevocation } from './edgeEnrollmentTypes';
 
 import type {
   HubClientOptions,
@@ -59,6 +60,7 @@ import { withHubAuthTransport } from './hubClientAuthTransport';
 
 // ── Public type / envelope re-exports (extracted #810) ──
 export * from './hubClientPublicReexports';
+export type { HubEdgeEnrollmentPreview, HubEdgeEnrollmentConfirmation, HubEdgeDeviceRevocation } from './edgeEnrollmentTypes';
 
 export function createHubClient(opts: HubClientOptions = {}) {
   opts = withHubAuthTransport(opts);
@@ -187,6 +189,13 @@ export function createHubClient(opts: HubClientOptions = {}) {
         hubPayload.buildReadAllNotificationsPaths(),
         hubPayload.buildPostInit(),
       ),
+
+    previewEdgeEnrollment: (userCode: string) =>
+      request<HubEdgeEnrollmentPreview>(`/web/edge-enrollments/${encodeURIComponent(userCode)}`),
+    confirmEdgeEnrollment: (userCode: string) =>
+      request<HubEdgeEnrollmentConfirmation>('/web/edge-enrollments/confirm', hubPayload.buildJsonPostInit({ user_code: userCode })),
+    revokeEdgeDevice: (deviceId: string) =>
+      request<HubEdgeDeviceRevocation>(`/web/edge-devices/${encodeURIComponent(deviceId)}/revoke`, hubPayload.buildPostInit()),
 
     registerDevice: (body: HubRegisterDeviceRequest) =>
       invokeNormalizedRegisterDeviceRequest(

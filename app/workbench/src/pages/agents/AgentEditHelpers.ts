@@ -24,11 +24,7 @@ export type EditHelpersTranslator = TFunction<'sharedWorkbench'>;
 
 /* ── Select option arrays ── */
 
-export const EDIT_ENGINE_OPTIONS: [string, string][] = ['Claude Code', 'DeepSeek', 'Codex', 'Browser Worker'].map(
-  (opt) => [opt, opt],
-);
-
-export const EDIT_MODEL_OPTIONS: [string, string][] = ['DeepSeek-V4-Pro', 'kimi-k2.6', 'glm-5.1', 'gpt-5-codex'].map(
+export const EDIT_ENGINE_OPTIONS: [string, string][] = ['Claude Code', 'DeepSeek', 'Codex', 'Browser Worker', 'openai-sdk'].map(
   (opt) => [opt, opt],
 );
 
@@ -69,7 +65,7 @@ export function getEditFieldConfigs(t: EditHelpersTranslator): EditFieldConfig[]
     { key: 'name', label: t('agents.edit.fields.name'), type: 'text' },
     { key: 'role', label: t('agents.edit.fields.role'), type: 'text' },
     { key: 'engine', label: t('agents.detail.runtime'), type: 'select', options: EDIT_ENGINE_OPTIONS },
-    { key: 'model', label: t('agents.detail.model'), type: 'select', options: EDIT_MODEL_OPTIONS },
+    { key: 'model', label: t('agents.detail.model'), type: 'text' },
     { key: 'mode', label: t('agents.detail.mode'), type: 'select', options: EDIT_MODE_OPTIONS },
     { key: 'state', label: t('agents.detail.status'), type: 'select', options: getEditStateOptions(t) },
     { key: 'approval', label: t('agents.detail.approvalPolicy'), type: 'text' },

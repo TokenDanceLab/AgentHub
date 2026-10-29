@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useTranslation } from 'react-i18next';
+import { getI18n, useTranslation } from 'react-i18next';
 import { fetchAllPages } from '@shared/hub/paginate';
 import { createHubClient } from './hubClient';
 import type { AgentProfile, CreateAgentProfileRequest, UpdateAgentProfileRequest } from './hubClient';
@@ -23,6 +23,14 @@ const defaultCapabilities: AgentCapabilities = {
 };
 
 const runtimeCapabilities: Record<string, Partial<AgentCapabilities>> = {
+  'openai-sdk': {
+    toolCalls: false,
+    fileChanges: false,
+    thinkingVisible: false,
+    permissionHooks: false,
+    mcpIntegration: false,
+    subAgentSpawn: false,
+  },
   'claude-code': {
     mcpIntegration: true,
     subAgentSpawn: true,
@@ -84,7 +92,7 @@ function normalizeRuntimeID(runtimeID: string | undefined): string {
 
 function normalizeRuntimeInput(value: string | undefined): string {
   const normalized = normalizeRuntimeID(value).replace(/\s+/g, '-');
-  if (normalized === 'claude-code' || normalized === 'codex' || normalized === 'opencode') {
+  if (normalized === 'claude-code' || normalized === 'codex' || normalized === 'opencode' || normalized === 'openai-sdk') {
     return normalized;
   }
   return 'codex';
@@ -92,7 +100,7 @@ function normalizeRuntimeInput(value: string | undefined): string {
 
 function optionalRuntimeInput(value: string | undefined): string | undefined {
   const normalized = normalizeRuntimeID(value).replace(/\s+/g, '-');
-  return normalized === 'claude-code' || normalized === 'codex' || normalized === 'opencode'
+  return normalized === 'claude-code' || normalized === 'codex' || normalized === 'opencode' || normalized === 'openai-sdk'
     ? normalized
     : undefined;
 }
@@ -122,6 +130,15 @@ function splitModelLabel(value: string | undefined): { provider?: string; model?
     return provider ? { provider, model } : { model };
   }
   return { model: trimmed };
+}
+
+function modelParamsForAgent(agent: AgentConfig): { provider?: string; model?: string } {
+  if (normalizeRuntimeID(agent.engine) !== 'openai-sdk') return splitModelLabel(agent.model);
+  const model = agent.model.trim();
+  if (!model || model === '未配置模型') throw new Error(getI18n().t('edgePairing.modelRequired', { ns: 'common' }));
+  // Provider model IDs may contain slashes. SDK profiles store the exact ID;
+  // provider URL/key selection is exclusively owned by the enrolled Edge.
+  return { model };
 }
 
 function persistableAgentDescription(value: string | undefined): string | undefined {
@@ -194,7 +211,7 @@ function capabilitiesForProfile(profile: AgentProfile): AgentCapabilities {
   return {
     ...defaultCapabilities,
     ...(runtimeCapabilities[runtimeID] ?? {}),
-    mcpIntegration: (runtimeCapabilities[runtimeID]?.mcpIntegration ?? false) || mcpServers.length > 0,
+    mcpIntegration: runtimeID !== 'openai-sdk' && ((runtimeCapabilities[runtimeID]?.mcpIntegration ?? false) || mcpServers.length > 0),
   };
 }
 
@@ -239,7 +256,7 @@ export function mapHubAgentProfileToAgentInfo(profile: AgentProfile): AgentInfo 
 }
 
 export function agentConfigToCreateAgentProfileRequest(agent: AgentConfig, t?: (key: string) => string): CreateAgentProfileRequest {
-  const model = splitModelLabel(agent.model);
+  const model = modelParamsForAgent(agent);
   const description = persistableAgentDescription(agent.role);
   const reasoningEffort = reasoningEffortFromMode(agent.mode);
   const skills = jsonStringArray(agent.skills);
@@ -267,7 +284,7 @@ export function agentConfigToCreateAgentProfileRequest(agent: AgentConfig, t?: (
 }
 
 export function agentConfigToUpdateAgentProfileRequest(agent: AgentConfig, t?: (key: string) => string): UpdateAgentProfileRequest {
-  const model = splitModelLabel(agent.model);
+  const model = modelParamsForAgent(agent);
   const description = persistableAgentDescription(agent.role);
   const runtimeID = optionalRuntimeInput(agent.engine);
   const permissionMode = optionalPermissionMode(agent.scope);

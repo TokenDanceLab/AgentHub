@@ -1,0 +1,16 @@
+.panel { display: grid; gap: var(--td-space-3); min-width: 0; margin-bottom: var(--td-space-5); color: var(--td-ink); overflow-wrap: anywhere; }
+.panel h2, .panel h3, .panel p { margin: 0; }
+.panel p { color: var(--td-ink-muted); font: var(--body); }
+.form { display: grid; gap: var(--td-space-2); }
+.actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--td-space-2); }
+.codeInput { min-width: 0; max-width: 100%; width: 16ch; }
+.preview { display: grid; gap: var(--td-space-3); padding: var(--td-space-4); border: 1px solid var(--td-line); border-radius: var(--td-radius-panel); }
+.preview > button { justify-self: start; }
+.details { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 3fr); gap: var(--td-space-2) var(--td-space-4); margin: 0; }
+.details dt { color: var(--td-ink-muted); }
+.details dd { margin: 0; overflow-wrap: anywhere; }
+.panel .error { color: var(--td-danger); }
+.paired { display: grid; gap: var(--td-space-3); }
+.device { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--td-space-3); padding-block: var(--td-space-3); border-bottom: 1px solid var(--td-line); }
+.device > div { min-width: 0; }
+.device code { overflow-wrap: anywhere; }

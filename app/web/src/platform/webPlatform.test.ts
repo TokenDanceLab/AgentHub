@@ -411,7 +411,6 @@ describe('webPlatform workbench agent mapping', () => {
       display_name: 'Hub Builder',
     });
     expect(hubClient.listExecutionTargets).toHaveBeenCalledWith({
-      target_type: 'local_edge',
       pageSize: 50,
     });
     expect(hubClient.triggerAgentTask).toHaveBeenCalledWith('hub-message-1', {
@@ -872,7 +871,6 @@ describe('webPlatform workbench agent mapping', () => {
     expect(hubClient.addAgentToSession).not.toHaveBeenCalled();
     expect(hubClient.sendMessage).not.toHaveBeenCalled();
     expect(hubClient.listExecutionTargets).toHaveBeenCalledWith({
-      target_type: 'local_edge',
       pageSize: 50,
     });
     expect(hubClient.triggerAgentTask).not.toHaveBeenCalled();

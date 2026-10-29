@@ -795,7 +795,7 @@ describe('useWebWorkbenchModel helpers', () => {
     })).toMatchObject({
       state: 'no-target',
       selectedTarget: undefined,
-      block: { text: expect.stringContaining('No online local_edge execution target') },
+      block: { text: expect.stringContaining('No Desktop or paired Edge execution target') },
     });
 
     expect(resolveWebExecutionTargetStatus({
@@ -817,7 +817,7 @@ describe('useWebWorkbenchModel helpers', () => {
     })).toMatchObject({
       state: 'wrong-profile',
       selectedTarget: undefined,
-      block: { text: expect.stringContaining('none are local_edge') },
+      block: { text: expect.stringContaining('none are supported Desktop or paired Edge targets') },
     });
 
     expect(resolveWebExecutionTargetStatus({

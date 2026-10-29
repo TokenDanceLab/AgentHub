@@ -235,6 +235,19 @@ describe('web agent profile queries', () => {
     });
   });
 
+  it('persists SDK profiles without changing the runtime or namespaced model and reports text-only capabilities', () => {
+    const config = {
+      id: 'sdk-profile', name: 'Text agent', role: '', engine: 'openai-sdk', model: 'provider/model-name',
+      mode: 'Research', approval: '', scope: 'default', state: 'ready' as const, skills: [], tools: {},
+    };
+    expect(agentConfigToCreateAgentProfileRequest(config)).toMatchObject({ runtime_id: 'openai-sdk', model: 'provider/model-name' });
+    expect(agentConfigToUpdateAgentProfileRequest(config)).toMatchObject({ runtime_id: 'openai-sdk', model: 'provider/model-name' });
+    expect(() => agentConfigToCreateAgentProfileRequest({ ...config, model: ' ' })).toThrow();
+    expect(() => agentConfigToUpdateAgentProfileRequest({ ...config, model: '未配置模型' })).toThrow();
+    expect(mapHubAgentProfileToAgentInfo({ id: 'sdk-profile', name: 'Text agent', runtime_id: 'openai-sdk', mcp_servers: '["not-executable"]' } as never).capabilities)
+      .toMatchObject({ streaming: true, multiTurn: true, toolCalls: false, fileChanges: false, permissionHooks: false, mcpIntegration: false });
+  });
+
   it('does not write display fallback labels back to Hub on update', () => {
     const req = agentConfigToUpdateAgentProfileRequest({
       id: 'agent-profile-1',

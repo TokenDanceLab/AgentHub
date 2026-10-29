@@ -11,7 +11,7 @@ import {
 } from './webPlatformAgentTask';
 import {
   buildHubAgentTaskModelParams,
-  isDispatchableLocalEdgeTarget,
+  isDispatchableWebTarget,
   targetDispatchBlockerLabel,
 } from './webPlatformDispatchHelpers';
 import {
@@ -216,7 +216,7 @@ describe('webPlatformAgentTask pure helpers', () => {
 
 describe('webPlatformDispatchHelpers pure helpers', () => {
   it('classifies dispatchable local_edge targets and builds model params', () => {
-    expect(isDispatchableLocalEdgeTarget({
+    expect(isDispatchableWebTarget({
       id: 't-online',
       name: 'Edge',
       target_type: 'local_edge',
@@ -224,7 +224,7 @@ describe('webPlatformDispatchHelpers pure helpers', () => {
       health_state: 'healthy',
     } as never)).toBe(true);
 
-    expect(isDispatchableLocalEdgeTarget({
+    expect(isDispatchableWebTarget({
       id: 't-stale',
       name: 'Edge',
       target_type: 'local_edge',

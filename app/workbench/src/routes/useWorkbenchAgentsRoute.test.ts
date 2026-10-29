@@ -85,6 +85,17 @@ describe('useWorkbenchAgentsRoute — demo mode mock fallback', () => {
 });
 
 describe('useWorkbenchAgentsRoute — real data mode', () => {
+  it('saves a new SDK text profile with the selected runtime and arbitrary provider model', async () => {
+    const onAgentCreate = vi.fn();
+    const { result } = renderAgentsRoute({ realDataMode: true, agents: [], onAgentCreate });
+    act(() => result.current.handleAgentAdd());
+    act(() => result.current.handleAgentFieldChange('engine', 'openai-sdk'));
+    expect(result.current.agentConfigs.find((agent) => agent.id === result.current.effectiveSelectedAgentId)?.model).toBe('');
+    act(() => result.current.handleAgentFieldChange('model', 'provider-text-model'));
+    await act(async () => result.current.handleAgentSave());
+    expect(onAgentCreate).toHaveBeenCalledWith(expect.objectContaining({ engine: 'openai-sdk', runtimeId: 'openai-sdk', model: 'provider-text-model' }));
+  });
+
   it('shows an empty, inert route when real mode has no agents yet', async () => {
     const onAgentCreate = vi.fn();
     const onAgentUpdate = vi.fn();

@@ -10,6 +10,14 @@ import { WorkbenchDevicesRouteView } from './WorkbenchDevicesRouteView';
    ═══════════════════════════════════════════════════════════════════════ */
 
 describe('WorkbenchDevicesRouteView', () => {
+  it.each(['empty', 'loading', 'error'])('keeps device pairing reachable in the %s inventory state', (state) => {
+    const pair = vi.fn();
+    render(<WorkbenchDevicesRouteView targets={[]} loading={state === 'loading'}
+      error={state === 'error' ? 'unavailable' : null} pairing={<button onClick={pair}>Pair device</button>} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Pair device' }));
+    expect(pair).toHaveBeenCalledOnce();
+  });
+
   it('passes targets, ping, and retry through to DevicesPage', () => {
     const onPingTarget = vi.fn();
     const onRetry = vi.fn();

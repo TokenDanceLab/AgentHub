@@ -4,7 +4,6 @@ import { SHARED_WORKBENCH_I18N_NAMESPACE } from '@shared/i18n';
 import { useTestI18nLanguage } from '@shared/testing/i18n';
 import {
   EDIT_ENGINE_OPTIONS,
-  EDIT_MODEL_OPTIONS,
   EDIT_MODE_OPTIONS,
   TOOL_PERMISSION_LABELS,
   buildStatusNoticeClassName,
@@ -29,15 +28,10 @@ describe('AgentEditHelpers', () => {
   /* ── Option arrays ── */
 
   it('exports engine options as [value, label] pairs', () => {
-    expect(EDIT_ENGINE_OPTIONS).toHaveLength(4);
+    expect(EDIT_ENGINE_OPTIONS).toHaveLength(5);
+    expect(EDIT_ENGINE_OPTIONS).toContainEqual(['openai-sdk', 'openai-sdk']);
     expect(EDIT_ENGINE_OPTIONS).toContainEqual(['Claude Code', 'Claude Code']);
     expect(EDIT_ENGINE_OPTIONS).toContainEqual(['Codex', 'Codex']);
-  });
-
-  it('exports model options as [value, label] pairs', () => {
-    expect(EDIT_MODEL_OPTIONS).toHaveLength(4);
-    expect(EDIT_MODEL_OPTIONS).toContainEqual(['glm-5.1', 'glm-5.1']);
-    expect(EDIT_MODEL_OPTIONS).toContainEqual(['gpt-5-codex', 'gpt-5-codex']);
   });
 
   it('exports mode options as [value, label] pairs', () => {
@@ -68,8 +62,8 @@ describe('AgentEditHelpers', () => {
     const textFields = configs.filter((c) => c.type === 'text');
     const selectFields = configs.filter((c) => c.type === 'select');
 
-    expect(textFields).toHaveLength(5);
-    expect(selectFields).toHaveLength(4);
+    expect(textFields).toHaveLength(6);
+    expect(selectFields).toHaveLength(3);
 
     // Verify specific keys
     const keys = configs.map((c) => c.key);
