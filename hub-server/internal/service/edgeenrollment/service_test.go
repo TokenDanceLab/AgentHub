@@ -40,10 +40,15 @@ func seedIdentity(t *testing.T, db *gorm.DB) Authorizer {
 	t.Helper()
 	user := model.User{Username: uuid.NewString(), Nickname: "Pairing test"}
 	require.NoError(t, db.Create(&user).Error)
-	id := model.UserIdentity{UserID: user.ID, Provider: model.IdentityProviderAccount, Issuer: "https://account.test", Subject: uuid.NewString(), Status: model.IdentityStatusActive, LinkedAt: time.Now()}
+	return seedIdentityForUser(t, db, user.ID)
+}
+
+func seedIdentityForUser(t *testing.T, db *gorm.DB, userID string) Authorizer {
+	t.Helper()
+	id := model.UserIdentity{UserID: userID, Provider: model.IdentityProviderAccount, Issuer: "https://account.test", Subject: uuid.NewString(), Status: model.IdentityStatusActive, LinkedAt: time.Now()}
 	require.NoError(t, db.Create(&id).Error)
 	require.NoError(t, db.Create(&model.OIDCSubjectEpoch{Issuer: id.Issuer, Subject: id.Subject}).Error)
-	return Authorizer{UserID: user.ID, IdentityID: id.ID, OIDCClientID: "hub-test-client"}
+	return Authorizer{UserID: userID, IdentityID: id.ID, OIDCClientID: "hub-test-client"}
 }
 
 func startInput() StartInput {
@@ -101,6 +106,9 @@ func TestPairingKeepsSecretsSeparateAndConsumesOnce(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, auth.IdentityID, p.IdentityID)
 	require.Equal(t, in.DeviceID, p.DeviceID)
+	var device model.Device
+	require.NoError(t, s.db.Where("id = ?", in.DeviceID).Take(&device).Error)
+	require.Equal(t, "cloud_edge", device.DeviceType)
 	require.NoError(t, s.ValidatePrincipal(ctx, p))
 	var stored model.EdgeDeviceCredential
 	require.NoError(t, s.db.First(&stored).Error)
@@ -333,4 +341,80 @@ func TestTransactionalValidationRejectsForgedOrRotatedScope(t *testing.T) {
 	current, err := s.Authenticate(ctx, next.Credential)
 	require.NoError(t, err)
 	require.NoError(t, validate(current))
+}
+
+func TestDeviceQuotaCountsExistingCloudDevicesAndAllowsReenrollment(t *testing.T) {
+	t.Setenv("AGENTHUB_MAX_CLOUD_EDGE_DEVICES", "1")
+	s, auth := testService(t)
+	ctx := context.Background()
+	legacy := startInput()
+	require.NoError(t, s.db.Create(&model.Device{ID: legacy.DeviceID, UserID: auth.UserID,
+		DeviceType: "cloud_edge", Capabilities: "[]", LastActiveAt: time.Now()}).Error)
+	start, err := s.Start(ctx, startInput())
+	require.NoError(t, err)
+	_, err = s.Confirm(ctx, auth, start.UserCode)
+	require.NoError(t, err)
+	_, err = s.Exchange(ctx, start.EnrollmentID, start.PollSecret)
+	require.ErrorIs(t, err, errcode.DeviceLimitExceeded)
+	var row model.EdgeEnrollment
+	require.NoError(t, s.db.Where("id = ?", start.EnrollmentID).Take(&row).Error)
+	require.Nil(t, row.ExchangedAt)
+	_, first := pair(t, s, auth, legacy)
+	_, next := pair(t, s, auth, legacy)
+	require.Equal(t, first.TargetID, next.TargetID)
+	_, err = s.Authenticate(ctx, first.Credential)
+	require.ErrorIs(t, err, errcode.AuthInvalidToken)
+	require.NoError(t, s.Revoke(ctx, auth.UserID, legacy.DeviceID))
+	_, err = s.Exchange(ctx, start.EnrollmentID, start.PollSecret)
+	require.ErrorIs(t, err, errcode.DeviceLimitExceeded, "revoked devices still retain ownership and count toward quota")
+	other := seedIdentity(t, s.db)
+	pair(t, s, other, startInput())
+	t.Setenv("AGENTHUB_MAX_CLOUD_EDGE_DEVICES", "0")
+	_, err = s.Exchange(ctx, start.EnrollmentID, start.PollSecret)
+	require.NoError(t, err)
+}
+
+func assertBoundedEnrollmentPruning(t *testing.T, s *Service, auth Authorizer) {
+	t.Helper()
+	ctx := context.Background()
+	start, exchange := pair(t, s, auth, startInput())
+	require.NoError(t, s.Revoke(ctx, auth.UserID, exchange.DeviceID))
+	now := time.Now().UTC().Truncate(time.Microsecond)
+	s.now = func() time.Time { return now }
+	require.NoError(t, s.db.Model(&model.EdgeEnrollment{}).Where("id = ?", start.EnrollmentID).Update("expires_at", now.Add(-2*time.Hour)).Error)
+	rows := make([]model.EdgeEnrollment, 0, 1004)
+	for i := 0; i < 1004; i++ {
+		expiresAt := now.Add(-2 * time.Hour)
+		if i == 1000 {
+			expiresAt = now.Add(-time.Hour)
+		}
+		if i >= 1001 {
+			expiresAt = now.Add(-time.Hour).Add(time.Duration(i-1000) * time.Minute)
+		}
+		if i == 1003 {
+			expiresAt = now.Add(time.Hour)
+		}
+		rows = append(rows, model.EdgeEnrollment{ID: uuid.NewString(), DeviceID: uuid.NewString(), Name: "Expired test proof",
+			RuntimeID: "openai-sdk", WorkspaceRoot: "/workspace/project", UserCodeHash: digest(uuid.NewString()),
+			PollSecretHash: digest(uuid.NewString()), CreatedAt: now.Add(-3 * time.Hour), ExpiresAt: expiresAt})
+	}
+	require.NoError(t, s.db.CreateInBatches(rows, 100).Error)
+	var count int64
+	require.NoError(t, s.PruneExpiredEnrollments(ctx))
+	require.NoError(t, s.db.Model(&model.EdgeEnrollment{}).Count(&count).Error)
+	require.EqualValues(t, 5, count, "one call must delete at most 1000 proofs")
+	require.NoError(t, s.PruneExpiredEnrollments(ctx))
+	require.NoError(t, s.db.Model(&model.EdgeEnrollment{}).Count(&count).Error)
+	require.EqualValues(t, 3, count, "proofs expired for less than one hour are retained")
+	for _, row := range rows[1001:] {
+		require.NoError(t, s.db.Where("id = ?", row.ID).Take(&model.EdgeEnrollment{}).Error)
+	}
+	var credential model.EdgeDeviceCredential
+	require.NoError(t, s.db.Where("device_id = ?", exchange.DeviceID).Take(&credential).Error)
+	require.NotNil(t, credential.RevokedAt, "pruning must preserve the revoked credential routing marker")
+}
+
+func TestBoundedEnrollmentPruningKeepsRevokedCredentialMarkers(t *testing.T) {
+	s, auth := testService(t)
+	assertBoundedEnrollmentPruning(t, s, auth)
 }

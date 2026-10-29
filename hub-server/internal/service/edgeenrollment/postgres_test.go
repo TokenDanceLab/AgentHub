@@ -358,3 +358,50 @@ func TestPostgresProtectedWriteWaitsForRevocationAndRejectsPrincipal(t *testing.
 	require.NoError(t, <-revoked)
 	require.ErrorIs(t, <-validated, errcode.AuthInvalidToken)
 }
+
+func TestPostgresDistinctIdentityEnrollmentsCannotExceedOwnerQuota(t *testing.T) {
+	t.Setenv("AGENTHUB_MAX_CLOUD_EDGE_DEVICES", "2")
+	s, auth := postgresService(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	const workers = 8
+	enrollments := make([]*StartResult, workers)
+	for i := range workers {
+		identity := seedIdentityForUser(t, s.db, auth.UserID)
+		start, err := s.Start(ctx, startInput())
+		require.NoError(t, err)
+		_, err = s.Confirm(ctx, identity, start.UserCode)
+		require.NoError(t, err)
+		enrollments[i] = start
+	}
+	var wins atomic.Int32
+	var wg sync.WaitGroup
+	ready := make(chan struct{})
+	errors := make(chan error, workers)
+	for _, start := range enrollments {
+		wg.Go(func() {
+			<-ready
+			_, err := s.Exchange(ctx, start.EnrollmentID, start.PollSecret)
+			if err == nil {
+				wins.Add(1)
+			} else {
+				errors <- err
+			}
+		})
+	}
+	close(ready)
+	wg.Wait()
+	close(errors)
+	require.EqualValues(t, 2, wins.Load())
+	for err := range errors {
+		require.ErrorIs(t, err, errcode.DeviceLimitExceeded)
+	}
+	count, err := repository.CountDevicesByUserAndType(s.db, auth.UserID, "cloud_edge")
+	require.NoError(t, err)
+	require.EqualValues(t, 2, count)
+}
+
+func TestPostgresBoundedEnrollmentPruningKeepsRevokedCredentialMarkers(t *testing.T) {
+	s, auth := postgresService(t)
+	assertBoundedEnrollmentPruning(t, s, auth)
+}

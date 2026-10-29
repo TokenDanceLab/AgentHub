@@ -7,6 +7,7 @@ import (
 	"errors"
 	"time"
 
+	"github.com/agenthub/hub-server/internal/config"
 	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/model"
 	"github.com/agenthub/hub-server/internal/repository"
@@ -80,10 +81,13 @@ func (s *Service) Exchange(ctx context.Context, enrollmentID, pollSecret string)
 		if err := s.checkIdentity(tx, auth, true); err != nil {
 			return err
 		}
+		if err := lockOwnerAndCheckDeviceQuota(tx, auth.UserID, row.DeviceID); err != nil {
+			return err
+		}
 		now := s.now()
 		// ON CONFLICT plus the subsequent lock serializes even the first claim
 		// from different enrollments of the same previously unknown device.
-		device := model.Device{ID: row.DeviceID, UserID: auth.UserID, DeviceType: "edge", Capabilities: `[]`, LastActiveAt: now}
+		device := model.Device{ID: row.DeviceID, UserID: auth.UserID, DeviceType: deviceType, Capabilities: `[]`, LastActiveAt: now}
 		if err := tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&device).Error; err != nil {
 			return err
 		}
@@ -91,7 +95,7 @@ func (s *Service) Exchange(ctx context.Context, enrollmentID, pollSecret string)
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ?", row.DeviceID).Take(&device).Error; err != nil {
 			return err
 		}
-		if device.UserID != auth.UserID || device.DeviceType != "edge" {
+		if device.UserID != auth.UserID || device.DeviceType != deviceType {
 			return ErrConflict
 		}
 		target, err := pairedTarget(tx, row, auth.UserID)
@@ -130,6 +134,32 @@ func (s *Service) Exchange(ctx context.Context, enrollmentID, pollSecret string)
 		return nil, storageError(err)
 	}
 	return &result, nil
+}
+
+func lockOwnerAndCheckDeviceQuota(tx *gorm.DB, userID, deviceID string) error {
+	// This also serializes different Account identities bound to the same
+	// owner. NO KEY UPDATE permits unrelated device/task foreign-key KEY SHARE
+	// checks, avoiding an owner/device inversion with in-flight task writes.
+	var owner model.User
+	if err := tx.Select("id").Clauses(clause.Locking{Strength: "NO KEY UPDATE"}).Where("id = ?", userID).Take(&owner).Error; err != nil {
+		return err
+	}
+	limit := config.MaxCloudEdgeDevicesPerUser()
+	if limit <= 0 {
+		return nil
+	}
+	exists, err := repository.DeviceExistsForUser(tx, deviceID, userID, deviceType)
+	if err != nil || exists {
+		return err
+	}
+	count, err := repository.CountDevicesByUserAndType(tx, userID, deviceType)
+	if err != nil {
+		return err
+	}
+	if count >= int64(limit) {
+		return errcode.DeviceLimitExceeded
+	}
+	return nil
 }
 
 func pairedTarget(tx *gorm.DB, enrollment model.EdgeEnrollment, userID string) (*model.ExecutionTarget, error) {
@@ -191,7 +221,7 @@ func (s *Service) activeCredential(tx *gorm.DB, hash string) (*model.EdgeDeviceC
 		Joins("JOIN devices AS d ON d.id = c.device_id AND d.user_id = c.user_id").
 		Joins("JOIN execution_targets AS t ON t.id = c.target_id AND t.owner_id = c.user_id AND t.device_id = c.device_id").
 		Where("c.credential_hash = ? AND c.revoked_at IS NULL AND c.expires_at > ? AND c.oidc_client_id = ?", hash, s.now(), s.clientID).
-		Where("i.provider = 'account' AND i.status = 'active' AND e.generation = c.generation AND d.device_type = 'edge'").
+		Where("i.provider = 'account' AND i.status = 'active' AND e.generation = c.generation AND d.device_type = ?", deviceType).
 		Where("t.deleted_at IS NULL AND t.target_type = 'cloud_edge' AND t.workspace_root = c.workspace_root AND c.runtime_id = 'openai-sdk'").Take(&row).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, errcode.AuthInvalidToken
@@ -279,7 +309,7 @@ func (s *Service) Revoke(ctx context.Context, userID, deviceID string) error {
 	}
 	err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var device model.Device
-		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ? AND user_id = ? AND device_type = 'edge'", deviceID, userID).Take(&device).Error; err != nil {
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ? AND user_id = ? AND device_type = ?", deviceID, userID, deviceType).Take(&device).Error; err != nil {
 			return err
 		}
 		var credential model.EdgeDeviceCredential

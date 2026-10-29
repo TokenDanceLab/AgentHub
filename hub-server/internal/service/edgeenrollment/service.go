@@ -27,6 +27,7 @@ const (
 	EnrollmentTTL = 10 * time.Minute
 	CredentialTTL = 7 * 24 * time.Hour
 	HeartbeatTTL  = 90 * time.Second
+	deviceType    = "cloud_edge"
 )
 
 var (
@@ -231,7 +232,7 @@ func (s *Service) Confirm(ctx context.Context, auth Authorizer, userCode string)
 		}
 		var device model.Device
 		err := tx.Where("id = ?", row.DeviceID).Take(&device).Error
-		if err == nil && (device.UserID != auth.UserID || device.DeviceType != "edge") {
+		if err == nil && (device.UserID != auth.UserID || device.DeviceType != deviceType) {
 			return ErrConflict
 		}
 		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
@@ -249,4 +250,18 @@ func (s *Service) Confirm(ctx context.Context, auth Authorizer, userCode string)
 		return nil, storageError(err)
 	}
 	return summary(row), nil
+}
+
+// PruneExpiredEnrollments deletes at most 1000 proofs that have already been
+// expired for an hour. Credential/revocation rows are durable authorization and
+// routing markers and are deliberately outside this cleanup operation.
+func (s *Service) PruneExpiredEnrollments(ctx context.Context) error {
+	cutoff := s.now().Add(-time.Hour)
+	err := s.db.WithContext(ctx).
+		Where("id IN (SELECT id FROM edge_enrollments WHERE expires_at <= ? ORDER BY expires_at, id LIMIT 1000)", cutoff).
+		Delete(&model.EdgeEnrollment{}).Error
+	if err != nil {
+		return storageError(err)
+	}
+	return nil
 }
