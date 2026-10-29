@@ -4365,20 +4365,25 @@ paths:
         "503":
           $ref: "#/components/responses/Error"
 
-  /web/edge-enrollments/{code}:
-    get:
+  /web/edge-enrollments/preview:
+    post:
       tags: [HubSyncRelay]
       operationId: hubPreviewEdgeEnrollment
       summary: Preview the device, runtime and workspace before confirming.
-      description: Requires a current Hub product session and bounded code lookup attempts. Never returns a poll secret or credential. Responses use no-store.
+      description: Requires a current Hub product session and bounded code lookup attempts. The short code stays in the JSON body to avoid URL, proxy access log and history exposure. Cookie requests require Origin and CSRF validation. Never returns a poll secret or credential. Responses use no-store.
       x-agenthub-status: implemented
       x-agenthub-owner: Hub
       security: [{ browserSession: [] }, { bearerAuth: [] }]
-      parameters:
-        - name: code
-          in: path
-          required: true
-          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [user_code]
+              properties:
+                user_code: { type: string }
       responses:
         "200":
           description: Enrollment preview.
@@ -4394,6 +4399,8 @@ paths:
         "400":
           $ref: "#/components/responses/Error"
         "401":
+          $ref: "#/components/responses/Error"
+        "403":
           $ref: "#/components/responses/Error"
         "404":
           $ref: "#/components/responses/Error"

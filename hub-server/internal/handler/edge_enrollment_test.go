@@ -20,7 +20,14 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-type emptyEdgeChannel struct{ enrollment *edgeenrollment.Service }
+type emptyEdgeChannel struct {
+	enrollment *edgeenrollment.Service
+	channel    *edgedevice.Service
+}
+
+func (ch emptyEdgeChannel) IsPairedDevice(ctx context.Context, deviceID string) (bool, error) {
+	return ch.channel.IsPairedDevice(ctx, deviceID)
+}
 
 func (ch emptyEdgeChannel) Poll(ctx context.Context, p *edgeenrollment.Principal) (*edgedevice.PollResult, error) {
 	if err := ch.enrollment.ValidatePrincipal(ctx, p); err != nil {
@@ -50,19 +57,21 @@ func pairedHTTPFixture(t *testing.T) (*browserHTTPFixture, *edgeenrollment.Servi
 		failure_category TEXT, observed_target_id TEXT, route_key TEXT, observed_at DATETIME,
 		expires_at DATETIME, created_at DATETIME, updated_at DATETIME)`).Error)
 	svc := edgeenrollment.New(f.db, "hub-fixture")
-	h := NewEdgeEnrollmentHandler(svc, emptyEdgeChannel{svc}, "hub-fixture")
+	h := NewEdgeEnrollmentHandler(svc, emptyEdgeChannel{svc, edgedevice.New(f.db, svc)}, "hub-fixture")
 	cfg := &config.Config{BrowserSession: f.handler.cfg, JWT: f.jwt}
 	mw := middleware.NewAuthMiddleware(cfg, middleware.AuthDependencies{Sessions: f.handler.auth})
 	f.router.POST("/edge/enrollments/start", h.Start)
 	f.router.POST("/edge/enrollments/exchange", h.Exchange)
 	web := f.router.Group("/web", mw.Handler(), mw.RequireHubSession())
-	web.GET("/edge-enrollments/:code", h.Preview)
+	web.POST("/edge-enrollments/preview", h.Preview)
 	web.POST("/edge-enrollments/confirm", h.Confirm)
 	web.POST("/edge-devices/:device_id/revoke", h.Revoke)
 	device := f.router.Group("/edge/device", h.DeviceAuth)
 	device.POST("/heartbeat", h.Heartbeat)
 	device.GET("/poll", h.Poll)
 	device.POST("/tasks/:id/ack", h.TaskAuthorization, func(c *gin.Context) { t.Error("foreign task reached callback"); OK(c, nil) })
+	legacy := f.router.Group("/edge/agent-tasks", mw.Handler(), mw.RequireHubSession(), middleware.DeviceTypeCheck("desktop"), h.LegacyCallback)
+	legacy.POST("/:id/ack", func(c *gin.Context) { OK(c, nil) })
 	return f, svc
 }
 
@@ -109,15 +118,17 @@ func TestEdgeEnrollmentBrowserFlowAndTokenSeparation(t *testing.T) {
 	w := edgeHTTP(t, f, "POST", "/edge/enrollments/exchange", exchangeBody, "")
 	require.Equal(t, 202, w.Code)
 	require.NotContains(t, w.Body.String(), "credential")
-	previewPath := "/web/edge-enrollments/" + start.UserCode
-	w = f.request("GET", previewPath, nil, nil, "")
+	previewPath := "/web/edge-enrollments/preview"
+	confirmBody := map[string]string{"user_code": start.UserCode}
+	w = f.request("POST", previewPath, confirmBody, nil, "")
 	require.Equal(t, 401, w.Code)
-	w = f.request("GET", previewPath, nil, cookie, "")
+	w = f.request("POST", previewPath, confirmBody, cookie, "")
+	require.Equal(t, 403, w.Code)
+	w = f.request("POST", previewPath, confirmBody, cookie, session.CSRFToken)
 	require.Equal(t, 200, w.Code)
 	for _, forbidden := range []string{start.PollSecret, "credential", "identity", "user_id"} {
 		require.NotContains(t, w.Body.String(), forbidden)
 	}
-	confirmBody := map[string]string{"user_code": start.UserCode}
 	w = f.request("POST", "/web/edge-enrollments/confirm", confirmBody, cookie, "")
 	require.Equal(t, 403, w.Code)
 	w = f.request("POST", "/web/edge-enrollments/confirm", confirmBody, cookie, session.CSRFToken)
@@ -139,7 +150,7 @@ func TestEdgeEnrollmentBrowserFlowAndTokenSeparation(t *testing.T) {
 	require.JSONEq(t, `{"code":"ok","data":{"deliveries":[],"controls":[]}}`, w.Body.String())
 	w = f.request("POST", "/edge/device/heartbeat", nil, cookie, session.CSRFToken)
 	require.Equal(t, 401, w.Code, "product cookie must not authenticate device channel")
-	w = edgeHTTP(t, f, "GET", previewPath, nil, exchanged.Credential)
+	w = edgeHTTP(t, f, "POST", previewPath, confirmBody, exchanged.Credential)
 	require.Equal(t, 401, w.Code, "device credential must not authenticate product route")
 	for _, query := range []string{"wait_seconds=-1", "wait_seconds=21", "wait_seconds=0&wait_seconds=1", "wait_seconds=x"} {
 		w = edgeHTTP(t, f, "GET", "/edge/device/poll?"+query, nil, exchanged.Credential)
@@ -176,6 +187,12 @@ func TestEdgeEnrollmentNativeIdentityAndLogoutGeneration(t *testing.T) {
 	require.NoError(t, err)
 	w = edgeHTTP(t, f, "POST", "/edge/device/heartbeat", nil, edgeToken)
 	require.Equal(t, 401, w.Code, "Edge API JWT is not a paired device credential")
+	claimedDeviceToken, err := jwtutil.GenerateIdentityAccessToken(session.User.ID, "desktop", exchanged.DeviceID, identity.ID, epoch.Generation, f.jwt.Secret, time.Hour, "hub-fixture")
+	require.NoError(t, err)
+	w = edgeHTTP(t, f, "POST", "/edge/agent-tasks/"+uuid.NewString()+"/ack", map[string]string{"run_id": "run-1"}, claimedDeviceToken)
+	require.Equal(t, 403, w.Code, "product session cannot bypass paired credential by claiming the same device UUID")
+	w = edgeHTTP(t, f, "POST", "/edge/agent-tasks/"+uuid.NewString()+"/ack", map[string]string{"run_id": "run-1"}, token)
+	require.Equal(t, 200, w.Code, "unpaired Desktop callback route remains available")
 	require.NoError(t, f.db.Model(&epoch).Where("issuer = ? AND subject = ?", epoch.Issuer, epoch.Subject).Update("generation", epoch.Generation+1).Error)
 	w = edgeHTTP(t, f, "GET", "/edge/device/poll?wait_seconds=0", nil, exchanged.Credential)
 	require.Equal(t, 401, w.Code)

@@ -28,7 +28,7 @@ UI Workbench（chat timeline + command center）
 - 所有能力流量经受控面：Desktop 走 Local Edge 的 typed Tauri/Host contract，Web/Mobile 走 Hub relay，禁止 UI 或 agent 绕过 typed port 直连能力面。
 - 双平面不是把两套服务再切一层微服务；单仓库、窄接口、事件中介仍优先于进程拆分。
 
-独立 Edge 的首个用户路径采用短期 enrollment + Web 确认 + 专用设备凭据。Edge 以出站 HTTPS long-poll 领取绑定本设备的任务与取消命令，Web 仍是 Hub-only，Edge API 保持 loopback。设备注册为 `edge`，ExecutionTarget 复用 `cloud_edge` 类型并要求 `pairedDevice` 能力；runtime 固定 `openai-sdk`、workspace 固定在用户确认与本地 allowlist 的交集。首版验收只包含持久化多轮文本、流式回传与真实取消，不宣称工具执行或 coding task。字段与投递细节统一在 [dispatch.md](../../api/dispatch.md)。
+独立 Edge 的首个用户路径采用短期 enrollment + Web 确认 + 专用设备凭据。Edge 以出站 HTTPS long-poll 领取绑定本设备的任务与取消命令，Web 仍是 Hub-only，Edge API 保持 loopback。设备注册为 `cloud_edge` 并共享云设备配额，ExecutionTarget 复用 `cloud_edge` 类型并要求 `pairedDevice` 能力；runtime 固定 `openai-sdk`、workspace 固定在用户确认与本地 allowlist 的交集。首版验收只包含持久化多轮文本、流式回传与真实取消，不宣称工具执行或 coding task。字段与投递细节统一在 [dispatch.md](../../api/dispatch.md)。
 
 ## 3. 协议分层与能力映射
 

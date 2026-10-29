@@ -191,7 +191,7 @@ export function createHubClient(opts: HubClientOptions = {}) {
       ),
 
     previewEdgeEnrollment: (userCode: string) =>
-      request<HubEdgeEnrollmentPreview>(`/web/edge-enrollments/${encodeURIComponent(userCode)}`),
+      request<HubEdgeEnrollmentPreview>('/web/edge-enrollments/preview', hubPayload.buildJsonPostInit({ user_code: userCode })),
     confirmEdgeEnrollment: (userCode: string) =>
       request<HubEdgeEnrollmentConfirmation>('/web/edge-enrollments/confirm', hubPayload.buildJsonPostInit({ user_code: userCode })),
     revokeEdgeDevice: (deviceId: string) =>

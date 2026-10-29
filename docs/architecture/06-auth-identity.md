@@ -55,7 +55,7 @@ Desktop / CLI / Mobile
 用户会话只用于确认设备归属；独立 Edge 通过 enrollment 获得设备专用 opaque credential，不借用 Desktop access/refresh token，也不持有 Hub JWT 签名密钥。`/cloud/edge/register` 返回的 `aud=agenthub-edge / purpose=edge-api` JWT 仍只用于访问 Edge API，不能用于设备向 Hub 领取任务或提交回调。
 
 1. Edge 用稳定 UUID、设备名称、固定 `runtime_id: openai-sdk` 和本地 allowlist 中的绝对 `workspace_root` 调 `POST /edge/enrollments/start`。Hub 返回 `enrollment_id`、短 `user_code`、只交给 Edge 的高熵 `poll_secret` 和 10 分钟 `expires_at`。匿名 start/exchange 均限流；Hub 只持久化短码、poll secret 与设备 credential 的哈希，原值不进日志或审计 payload。
-2. 用户登录 Web，`GET /web/edge-enrollments/{code}` 预览设备名称、UUID、runtime、工作目录、有效期和状态，再以 `POST /web/edge-enrollments/confirm` 提交 `user_code`。确认原子绑定当前 Hub user、精确 identity、auth generation 和当前 OIDC client；cookie 请求须满足既有 Origin/CSRF 合同。浏览器不取得 poll secret 或设备 credential。
+2. 用户登录 Web，以 `POST /web/edge-enrollments/preview` 的 JSON body 提交 `user_code`，预览设备名称、UUID、runtime、工作目录、有效期和状态，再以 `POST /web/edge-enrollments/confirm` 确认。短码不进入 URL、代理 access log 或浏览器历史；部署日志仍须禁止记录请求体与 Authorization。确认原子绑定当前 Hub user、精确 identity、auth generation 和当前 OIDC client；两类 cookie 请求均须满足既有 Origin/CSRF 合同。浏览器不取得 poll secret 或设备 credential。
 3. Edge 调 `POST /edge/enrollments/exchange` 提交 enrollment ID 和 poll secret。待确认返回 202；确认后一次性交换返回 device/target ID、credential、runtime、workspace 和 7 天凭据到期时间。过期、错误 proof 或确认/交换重放拒绝。交换响应丢失不能再次取回原 credential，应重新配对。
 4. Edge 将 credential 保存在权限受限的本机运行 secret store；凭据无 refresh grant，到期需要用户重新配对。产品会话响应与配对响应均 `Cache-Control: no-store`。模型 API key 独立通过 scoped secret 配置，只由 Edge adapter 使用。
 
@@ -63,7 +63,7 @@ Desktop / CLI / Mobile
 
 `POST /web/edge-devices/{device_id}/revoke` 由设备 owner 显式撤销。Account 全局退出推进精确 identity generation，或切换 OIDC client，同样使该 identity/client 下的设备凭据失效，后续 heartbeat/poll/callback/control ACK 全部拒绝。当前 Hub browser session 的本地 logout 不推进 identity generation。撤销通道访问权不自动 kill 本机已运行的模型请求；UI 不得把未确认的取消当作执行器已停止。
 
-配对后使用 `cloud_edge` target 和 `pairedDevice` capability，设备类型为 `edge`。runtime 与 workspace 以确认内容为授权上限，并在 Edge 本地再次校验；不得由普通 target 更新或浏览器参数扩权。设备仅发起出站 HTTPS，Web 不直连 Edge。执行、admission 去重和取消回执见 [dispatch.md](../../api/dispatch.md)。
+配对后使用 `cloud_edge` target 和 `pairedDevice` capability，设备类型为 `cloud_edge`，与旧云设备注册共享每用户配额及 owner 事务锁。runtime 与 workspace 以确认内容为授权上限，并在 Edge 本地再次校验；不得由普通 target 更新或浏览器参数扩权。设备仅发起出站 HTTPS，Web 不直连 Edge。执行、admission 去重和取消回执见 [dispatch.md](../../api/dispatch.md)。
 
 ## Client Storage
 

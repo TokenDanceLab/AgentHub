@@ -13,9 +13,12 @@ describe('Edge enrollment browser API', () => {
     await client.cancelAgentTask('task-1');
     const calls = fetch.mock.calls as unknown as [string, RequestInit][];
     expect(calls.map(([url]) => new URL(url).pathname)).toEqual([
-      '/web/edge-enrollments/ABCDE-FG234', '/web/edge-enrollments/confirm', '/web/edge-devices/device%2Fid/revoke',
+      '/web/edge-enrollments/preview', '/web/edge-enrollments/confirm', '/web/edge-devices/device%2Fid/revoke',
       '/web/agent-tasks/task-1:cancel',
     ]);
+    expect(calls[0]![1].method).toBe('POST');
+    expect(JSON.parse(calls[0]![1].body as string)).toEqual({ user_code: 'ABCDE-FG234' });
+    expect(calls.every(([url]) => !url.includes('ABCDE-FG234'))).toBe(true);
     expect(JSON.parse(calls[1]![1].body as string)).toEqual({ user_code: 'ABCDE-FG234' });
     expect(calls[2]![1].method).toBe('POST');
     for (const [, init] of calls) {

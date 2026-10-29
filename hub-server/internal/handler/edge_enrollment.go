@@ -27,6 +27,7 @@ type EdgeEnrollmentService interface {
 }
 
 type EdgeDeviceChannel interface {
+	IsPairedDevice(context.Context, string) (bool, error)
 	Poll(context.Context, *edgeenrollment.Principal) (*edgedevice.PollResult, error)
 	AuthorizeTask(context.Context, *edgeenrollment.Principal, string) error
 	AckControl(context.Context, *edgeenrollment.Principal, string, edgedevice.ControlAck) error
@@ -80,7 +81,13 @@ func (h *EdgeEnrollmentHandler) Start(c *gin.Context) {
 
 func (h *EdgeEnrollmentHandler) Preview(c *gin.Context) {
 	c.Header("Cache-Control", "no-store")
-	result, err := h.enrollment.Preview(c.Request.Context(), c.Param("code"))
+	var input struct {
+		UserCode string `json:"user_code"`
+	}
+	if !edgeBody(c, &input) {
+		return
+	}
+	result, err := h.enrollment.Preview(c.Request.Context(), input.UserCode)
 	if err != nil {
 		edgeFailure(c, err)
 		return
@@ -181,6 +188,22 @@ func edgePrincipal(c *gin.Context) *edgeenrollment.Principal {
 	value, _ := c.Get("edge_device_principal")
 	p, _ := value.(*edgeenrollment.Principal)
 	return p
+}
+
+// LegacyCallback rejects paired devices on the Desktop product-session route.
+// A newly minted native session with the same device UUID must not bypass the
+// dedicated credential, its generation, or its task grant after re-pairing.
+func (h *EdgeEnrollmentHandler) LegacyCallback(c *gin.Context) {
+	paired, err := h.channel.IsPairedDevice(c.Request.Context(), c.GetString("device_id"))
+	if err != nil {
+		edgeFailure(c, err)
+		return
+	}
+	if paired {
+		Fail(c, errcode.AuthDeviceMismatch)
+		return
+	}
+	c.Next()
 }
 
 func (h *EdgeEnrollmentHandler) Heartbeat(c *gin.Context) {

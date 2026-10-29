@@ -149,7 +149,7 @@ func TestIsAuthPath(t *testing.T) {
 		{"/edge/enrollments/start", true},
 		{"/edge/enrollments/exchange", true},
 		{"/web/edge-enrollments/confirm", true},
-		{"/web/edge-enrollments/ABCDE-FGHIJ", true},
+		{"/web/edge-enrollments/preview", true},
 		{"/edge/device/poll", false},
 		{"/api/test", false},
 		{"/client/ws", false},
