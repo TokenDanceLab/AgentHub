@@ -1,11 +1,11 @@
 """Execute the real-lane preflight against the browser wire contract."""
 import io
 import json
-from pathlib import Path
 import unittest
-from unittest.mock import patch
 import urllib.error
 import urllib.parse
+from pathlib import Path
+from unittest.mock import patch
 
 
 class BrowserSessionPreflightTests(unittest.TestCase):
