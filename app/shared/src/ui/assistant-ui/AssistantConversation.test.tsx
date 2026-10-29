@@ -48,11 +48,13 @@ describe('AssistantConversation with the real assistant-ui runtime', () => {
 
   it('keeps human author identity and renders agent Markdown without fake edit/reload actions', async () => {
     render(<AssistantConversation {...props({ transcript: [
-      { id: 'human-1', kind: 'text', author: { id: 'user-2', name: 'Mira', role: 'human' }, text: 'A human reply' },
+      { id: 'human-1', kind: 'text', author: { id: 'user-2', name: 'Mira', role: 'human' }, text: 'A **human** reply\n```python\nprint(42)\n```' },
       { id: 'agent-1', kind: 'text', author: { id: 'agent-2', name: 'Builder', role: 'agent' }, text: '**Finished** the task' },
     ] })} />);
     expect(await screen.findByText('Mira')).toHaveAttribute('data-author-role', 'human');
     expect(await screen.findByText('Finished', { selector: 'strong' })).toBeInTheDocument();
+    expect(await screen.findByText('human', { selector: 'strong' })).toBeInTheDocument();
+    expect(document.querySelector('pre code')).toHaveTextContent('print(42)');
     expect(screen.queryByRole('button', { name: 'Edit' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Refresh' })).not.toBeInTheDocument();
   });

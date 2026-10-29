@@ -53,10 +53,10 @@ test.describe('Web split view (stubbed hub)', () => {
     await expect(activeLog).toContainText('Alpha runtime event landed.');
     await expect(page.locator('[data-split-pane]')).toHaveCount(1);
 
-    // Streaming-interruption probe: pin the exact transcript DOM node. A
-    // remount (forbidden by the layout contract) replaces this node.
+    // Pin the conversation host region across layout changes. Its inner
+    // assistant-ui runtime is keyed by conversation to isolate drafts.
     await page.evaluate(() => {
-      const node = document.querySelector('[data-split-active="true"] [role="log"]');
+      const node = document.querySelector('[data-split-active="true"] [role="region"][aria-label="Transcript"]');
       const probeTarget = window as unknown as { __splitProbeLog?: Element };
       if (node) {
         probeTarget.__splitProbeLog = node;
@@ -81,14 +81,14 @@ test.describe('Web split view (stubbed hub)', () => {
     await expect(activeLog).toContainText('Alpha runtime event landed.');
 
     // ── Sidebar click drops session B into the inactive pane ───────────────
-    await page.locator('li[role="option"]', { hasText: 'Split Beta' }).first().click();
+    await page.getByRole('button', { name: 'Split Beta', exact: true }).click();
 
     await expect(page.getByRole('heading', { name: 'Split Beta' })).toBeVisible();
     // Parallel review: both transcripts visible at the same time.
     await expect(page.locator('[data-split-pane][data-split-active="true"]')).toContainText('Hello from split beta.');
     await expect(page.locator('[data-split-pane][data-split-active="false"]')).toContainText('Alpha runtime event landed.');
     // Single-active contract: exactly one composer receives input.
-    await expect(page.locator('textarea')).toHaveCount(1);
+    await expect(page.getByRole('textbox', { name: 'Message input' })).toHaveCount(1);
     // Still no remount of the live host across split + conversation switch.
     await expect.poll(() => probeStillMounted(page)).toBe(true);
 

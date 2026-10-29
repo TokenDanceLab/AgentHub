@@ -48,9 +48,10 @@ test.describe('Web stubbed Hub replay smoke', () => {
     const requests = await startAuthenticatedHubSmoke(page, 'no-target');
 
     await expect(page.getByRole('heading', { name: 'Stubbed Hub replay smoke' })).toBeVisible();
-    await expect(page.getByText('目标：no-target')).toBeVisible();
-    await expect(page.getByText('No online local_edge execution target is available.')).toBeVisible();
-    await expect(page.getByRole('status').filter({ hasText: 'Hub replay: task task-web-smoke' })).toBeVisible();
+    await page.getByLabel('@Agent', { exact: true }).selectOption('agent-profile-web-smoke');
+    await expect(page.getByRole('status').filter({ hasText: 'No execution device is available.' })).toBeVisible();
+    await expect(page.getByLabel('Execution device')).toHaveValue('');
+    await expect.poll(() => requests.endpoints.has('GET /web/agent-tasks/task-web-smoke/events')).toBe(true);
     await expect(page.getByText('reports/web-stubbed-replay-smoke.md').first()).toBeVisible();
 
     await page.getByRole('button', { name: 'Projects' }).click();
@@ -68,9 +69,8 @@ test.describe('Web stubbed Hub replay smoke', () => {
   test('renders healthy Hub target, transcript, Projects, Agents, Tasks, and Inspector evidence from a stubbed Hub replay', async ({ page }) => {
     const requests = await startAuthenticatedHubSmoke(page, 'healthy-target');
 
-    await expect(page.getByText('目标：就绪 · Smoke Desktop Edge (target-web-smoke)')).toBeVisible();
-    await expect(page.getByText('Selected local_edge execution target: Smoke Desktop Edge')).toBeVisible();
-    await expect(page.getByLabel('Desktop/Edge target')).toContainText('Smoke Desktop Edge (target-web-smoke)');
+    await page.getByLabel('@Agent', { exact: true }).selectOption('agent-profile-web-smoke');
+    await expect(page.getByLabel('Execution device')).toContainText('Smoke Desktop Edge (target-web-smoke)');
     await expect(page.getByText('Review the Web -> Hub stubbed replay boundary.')).toBeVisible();
     // Approval requests render auto-expanded in the current workbench UI,
     // so the block content is asserted directly instead of toggling Expand.
@@ -113,15 +113,12 @@ test.describe('Web stubbed Hub replay smoke', () => {
     const requests = await startAuthenticatedHubSmoke(page, 'healthy-target', { activeTask: false });
     const dispatch = hubDispatchCapture(page);
 
-    await expect(page.getByText('目标：就绪 · Smoke Desktop Edge (target-web-smoke)')).toBeVisible();
-    await expect(page.getByRole('status').filter({ hasText: 'Hub replay: 0 runtime events observed' })).toBeVisible();
-
     await page.getByLabel('@Agent', { exact: true }).selectOption('agent-profile-web-smoke');
-    await page.getByLabel('Desktop/Edge target').selectOption('target-web-smoke');
-    await page.getByLabel('Composer input').fill('Create a Hub-routed remote control task.');
-    await page.getByRole('button', { name: 'Start agent task' }).click();
+    await page.getByLabel('Execution device').selectOption('target-web-smoke');
+    await page.getByLabel('Message input').fill('Create a Hub-routed remote control task.');
+    await page.getByRole('button', { name: 'Send message' }).click();
 
-    await expect(page.getByText('Hub replay: task task-web-created')).toBeVisible();
+    await expect.poll(() => requests.endpoints.has('GET /web/agent-tasks/task-web-created/events')).toBe(true);
     const transcript = page.getByRole('log');
     await expect(transcript).toContainText('Create a Hub-routed remote control task.');
     await expect(transcript).toContainText('Created task replay hydrated from Hub.');
@@ -155,17 +152,12 @@ test.describe('Web stubbed Hub replay smoke', () => {
   test('surfaces Hub target inventory errors without contacting Local Edge', async ({ page }) => {
     const requests = await startAuthenticatedHubSmoke(page, 'target-error', { activeTask: false });
 
-    // useHubExecutionTargets refetches every 10s, so the error state
-    // alternates with the loading state across refetch cycles; poll until
-    // an error window is visible instead of asserting at a fixed moment.
-    // Only the stable error prefix is asserted — the tail repeats the
-    // stubbed Hub message verbatim and would couple the lane to copy.
-    await expect
-      .poll(() => page.getByText('Hub execution targets unavailable').count(), {
-        timeout: 25_000,
-      })
-      .toBeGreaterThan(0);
-    await expect(page.getByRole('status').filter({ hasText: 'Hub replay: 0 runtime events observed' })).toBeVisible();
+    await page.getByLabel('@Agent', { exact: true }).selectOption('agent-profile-web-smoke');
+    await page.getByLabel('Message input').fill('Do not dispatch without a device.');
+    await expect(page.getByRole('button', { name: 'Send message' })).toBeDisabled();
+    await expect(page.getByRole('status').filter({ hasText: 'No execution device is available.' })).toBeVisible();
+    await page.getByRole('button', { name: 'Devices', exact: true }).click();
+    await expect(page.getByRole('region', { name: 'Workbench page' })).toContainText('unavailable');
     await expect.poll(() => requests.endpoints.has('GET /web/execution-targets')).toBe(true);
     await expect.poll(() => requests.requests.some((request) => request.url.includes('3210'))).toBe(false);
 

@@ -9,6 +9,11 @@ const conversations = [
 ];
 
 describe('official assistant-ui thread list', () => {
+  it('offers no mutations for an empty workspace placeholder', () => {
+    render(<AssistantThreadList conversations={[{ id: 'empty', title: 'Empty workspace', kind: 'group', canRename: false, canDelete: false, canArchive: false }]}
+      currentId="empty" actions={{ rename: vi.fn(), delete: vi.fn(), archive: vi.fn() }} />);
+    expect(screen.queryByRole('button', { name: 'More options' })).not.toBeInTheDocument();
+  });
   it('switches threads, filters titles and opens the create flow', async () => {
     const onSelect = vi.fn();
     const onNew = vi.fn();

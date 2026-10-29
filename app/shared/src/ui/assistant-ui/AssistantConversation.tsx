@@ -206,18 +206,22 @@ function MessageFrame({ children }: PropsWithChildren) {
 }
 
 function MessageAuthor() {
+  const t = useAssistantText();
   const props = useContext(ConversationContext);
   const author = useAuiState((state) => state.message.metadata.custom.author) as { id: string; name: string; role: string } | undefined;
+  const badge = useAuiState((state) => state.message.metadata.custom.badgeLabel) as string | undefined;
   const id = useAuiState((state) => state.message.id);
   if (author && props?.onAuthorClick) return <div id={id} data-agent-profile={author.name}>
     <button type="button" className="text-muted-foreground mb-1 rounded px-2 text-xs hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
-      data-author-role={author.role} aria-label={`${author.name} 资料卡`}
+      data-author-role={author.role} aria-label={`${author.name} ${t('Profile')}`}
       onClick={(event) => props.onAuthorClick?.(author, event.currentTarget)}>{author.name}</button>
+    {badge && <span className="text-muted-foreground text-xs">{badge}</span>}
   </div>;
-  return <div id={id} className="text-muted-foreground mb-1 px-2 text-xs" data-author-role={author?.role}>{author?.name}</div>;
+  return <div id={id} className="text-muted-foreground mb-1 px-2 text-xs" data-author-role={author?.role}>{author?.name}{badge && <span className="ms-2">{badge}</span>}</div>;
 }
 
 function EvidenceUI() {
+  const t = useAssistantText();
   const props = useContext(ConversationContext);
   const onAction = props?.onEvidenceAction;
   const render = useMemo<DataMessagePartComponent>(() => ({ data }) => {
@@ -226,8 +230,8 @@ function EvidenceUI() {
       return <div className="rounded-lg border p-3">
         <p className="font-medium">{block.title}</p><p>{block.reason}</p>
         {onAction && <div className="mt-2 flex gap-2">
-          <Button size="sm" onClick={() => onAction('approve', block.id)}>允许 / Allow</Button>
-          <Button size="sm" variant="outline" onClick={() => onAction('deny', block.id)}>拒绝 / Deny</Button>
+          <Button size="sm" onClick={() => onAction('approve', block.id)}>{t('Approve')}</Button>
+          <Button size="sm" variant="outline" onClick={() => onAction('deny', block.id)}>{t('Deny')}</Button>
         </div>}
       </div>;
     }
@@ -238,7 +242,7 @@ function EvidenceUI() {
     const title = 'title' in block ? block.title : 'toolName' in block ? block.toolName : block.kind;
     const detail = 'reason' in block ? block.reason : 'summary' in block ? block.summary : 'path' in block ? block.path : undefined;
     return <div className="rounded-lg border p-3 text-sm"><p className="font-medium">{title}</p>{detail && <p>{detail}</p>}</div>;
-  }, [onAction, props]);
+  }, [onAction, props, t]);
   useAssistantDataUI({ name: 'agenthub-evidence', render });
   return null;
 }

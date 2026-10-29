@@ -14,6 +14,9 @@ export const webTranscript: TranscriptBlock[] = resolveDemoWorkbenchTranscript('
 
 export const webHubEmptyConversation: WorkbenchConversation = {
   id: 'hub-empty-workspace',
+  canRename: false,
+  canDelete: false,
+  canArchive: false,
   title: 'Hub 工作台',
   kind: 'group',
   subtitle: '暂无 Hub 会话',

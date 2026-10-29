@@ -26,7 +26,7 @@ export function AssistantThreadList({ conversations, currentId, onSelect, onNew,
   const threads = useMemo(() => conversations.filter((item) => Boolean(item.archived) === showArchived)
     .sort((a, b) => Number(Boolean(b.pinned)) - Number(Boolean(a.pinned)))
     .map((item) => ({ id: item.id, title: item.title, status: 'regular' as const,
-      custom: { canRename: item.canRename, unreadCount: item.unreadCount } })), [conversations, showArchived]);
+      custom: { canRename: item.canRename, canDelete: item.canDelete, canArchive: item.canArchive, unreadCount: item.unreadCount } })), [conversations, showArchived]);
   const perform = async (action: () => Promise<void>) => {
     setError(undefined);
     try { await action(); } catch (cause) {
