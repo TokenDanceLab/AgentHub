@@ -28,6 +28,7 @@ const hubClientStub = vi.hoisted(() => ({
   listPublicSkills: vi.fn(async () => ({ items: [] })),
   listPublicMCPServers: vi.fn(async () => ({ items: [] })),
   createPrivateSession: vi.fn(async () => ({ session_id: 'session-1' })),
+  createGroupSession: vi.fn(async () => ({ session_id: 'agent-session-1' })),
   regenerateAgentTask: vi.fn(async () => undefined),
 }));
 const authPageSuccessUser = vi.hoisted(() => ({
@@ -503,7 +504,7 @@ describe('Web app root', () => {
       withContacts();
       render(<App />);
 
-      const newButton = await screen.findByRole('button', { name: /newConversation/ });
+      const newButton = await screen.findByRole('button', { name: /New Thread|新建对话/ });
       fireEvent.click(newButton);
 
       const dialog = await screen.findByRole('dialog', { name: /newConversation.title/ });
@@ -514,12 +515,22 @@ describe('Web app root', () => {
       });
     });
 
+    it('creates an owner-only agent conversation without requiring a contact', async () => {
+      withContacts();
+      render(<App />);
+      fireEvent.click(await screen.findByRole('button', { name: /New Thread|新建对话/ }));
+      const dialog = await screen.findByRole('dialog', { name: /newConversation.title/ });
+      fireEvent.click(within(dialog).getByRole('button', { name: /New agent conversation|newConversation.agent/ }));
+      await waitFor(() => expect(hubClientStub.createGroupSession).toHaveBeenCalledWith({ name: expect.any(String), member_ids: [] }));
+      await waitFor(() => expect(screen.queryByRole('dialog', { name: /newConversation.title/ })).not.toBeInTheDocument());
+    });
+
     it('keeps the create failure visible in the modal instead of swallowing it', async () => {
       hubClientStub.createPrivateSession.mockRejectedValueOnce(new Error('server down'));
       withContacts();
       render(<App />);
 
-      const newButton = await screen.findByRole('button', { name: /newConversation/ });
+      const newButton = await screen.findByRole('button', { name: /New Thread|新建对话/ });
       fireEvent.click(newButton);
 
       const dialog = await screen.findByRole('dialog', { name: /newConversation.title/ });

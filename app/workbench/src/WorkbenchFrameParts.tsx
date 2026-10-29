@@ -6,7 +6,9 @@ import type {
   WorkbenchRoutesFrameProps,
 } from './workbenchFrameTypes';
 import { ConversationHost } from './transcript/ConversationHost';
-import { ConversationSidebar } from './transcript/ConversationSidebar';
+import { AssistantThreadList } from '@shared/ui/assistant-ui/AssistantThreadList';
+import { useTranslation } from 'react-i18next';
+import { CHATVIEW_I18N_NAMESPACE } from '@shared/chatview/i18n/resources';
 import { RightInspector } from './inspector/RightInspector';
 import { ChatEngineeringColumn } from './transcript/ChatEngineeringColumn';
 import { WorkbenchRoutes } from './WorkbenchRoutes';
@@ -16,7 +18,6 @@ import {
 } from './WorkbenchFrameChromeParts';
 import {
   buildChatInspectorProps,
-  buildConversationSidebarProps,
   buildWorkbenchRoutesProps,
   useBuildChatConversationHostProps,
 } from './workbenchFramePartsHelpers';
@@ -36,51 +37,16 @@ export {
    ========================================================================== */
 
 /** Conversation list + vertical sidebar resizer for chat page. */
-export function ChatSidebarFrame({
-  conversations,
-  currentConversationId,
-  onSelectConversation,
-  onAvatarClick,
-  onConversationPin,
-  onConversationArchive,
-  onStartNewConversation,
-  liveStatusByConversation,
-  sidebarWidth,
-  sidebarCollapsed,
-  resizeSidebarBy,
-  beginSidebarResize,
-}: ChatSidebarFrameProps): React.ReactElement {
-  const sidebarProps = buildConversationSidebarProps({
-    conversations,
-    currentConversationId,
-    onSelectConversation,
-    onAvatarClick,
-    onConversationPin,
-    onConversationArchive,
-    onStartNewConversation,
-    liveStatusByConversation,
-  });
-
-  return (
-    <div
-      aria-hidden={sidebarCollapsed}
-      className={styles.sidebarFrame}
-      data-sidebar-frame
-      /* #1823: collapsing only clipped the column, so the search box, sort
-         select and conversation buttons stayed in the Tab order. `inert`
-         removes the whole subtree from focus + AT, matching the CSS
-         visibility gate on .sidebarFrame. */
-      inert={sidebarCollapsed}
-    >
-      <ConversationSidebar {...sidebarProps} />
-      <SidebarResizer
-        beginSidebarResize={beginSidebarResize}
-        resizeSidebarBy={resizeSidebarBy}
-        sidebarCollapsed={sidebarCollapsed}
-        sidebarWidth={sidebarWidth}
-      />
-    </div>
-  );
+export function ChatSidebarFrame(props: ChatSidebarFrameProps): React.ReactElement {
+  const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE);
+  return <div aria-hidden={props.sidebarCollapsed} className={styles.sidebarFrame} data-sidebar-frame inert={props.sidebarCollapsed}>
+    <aside aria-label={t('aria.conversationSidebar')} className="h-full min-h-0 overflow-hidden">
+      <AssistantThreadList conversations={props.conversations} currentId={props.currentConversationId}
+        onSelect={props.onSelectConversation} onNew={props.onStartNewConversation} actions={props.conversationActions} />
+    </aside>
+    <SidebarResizer beginSidebarResize={props.beginSidebarResize} resizeSidebarBy={props.resizeSidebarBy}
+      sidebarCollapsed={props.sidebarCollapsed} sidebarWidth={props.sidebarWidth} />
+  </div>;
 }
 
 /** ConversationHost wiring for chat page -- pure prop mapping. */

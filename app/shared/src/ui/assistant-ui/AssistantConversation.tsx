@@ -21,26 +21,29 @@ export interface AssistantConversationProps {
   transcript: TranscriptBlock[];
   platform: AgentHubPlatform;
   intent: Omit<ComposerIntent, 'text' | 'attachments'> & { executionTargetId?: string };
-  isLoading?: boolean;
-  isDisabled?: boolean;
-  isSendDisabled?: boolean;
-  isRunning?: boolean;
-  onCancel?: () => Promise<void> | void;
-  onRuntime?: (runtime: AssistantRuntime | null) => void;
-  onSubmitted?: (result: ComposerSubmitResult) => void;
-  onEvidenceAction?: (action: string, blockId: string) => void;
-  onArtifactClick?: (item: RowItem) => void;
-  onCheckpointClick?: (item: RowItem) => void;
-  onContextMenu?: (id: string, event: MouseEvent) => void;
-  onSelect?: (id: string, shiftKey?: boolean) => void;
-  selectedIds?: Set<string>;
-  selectionMode?: boolean;
-  currentUserId?: string;
-  onEdit?: (id: string, text: string) => Promise<void> | void;
-  inputRef?: React.RefObject<HTMLTextAreaElement | null>;
-  submitMode?: 'enter' | 'ctrlEnter';
-  controls?: ReactNode;
-  welcome?: ReactNode;
+  isLoading?: boolean | undefined;
+  hasEarlier?: boolean | undefined;
+  onLoadEarlier?: (() => Promise<void>) | undefined;
+  isDisabled?: boolean | undefined;
+  isSendDisabled?: boolean | undefined;
+  isRunning?: boolean | undefined;
+  onCancel?: (() => Promise<void> | void) | undefined;
+  onRuntime?: ((runtime: AssistantRuntime | null) => void) | undefined;
+  onSubmitted?: ((result: ComposerSubmitResult) => void) | undefined;
+  onEvidenceAction?: ((action: string, blockId: string) => void) | undefined;
+  onArtifactClick?: ((item: RowItem) => void) | undefined;
+  onCheckpointClick?: ((item: RowItem) => void) | undefined;
+  onContextMenu?: ((id: string, event: MouseEvent) => void) | undefined;
+  onAuthorClick?: ((author: { id: string; name: string; role: string }, anchor: HTMLElement) => void) | undefined;
+  onSelect?: ((id: string, shiftKey?: boolean) => void) | undefined;
+  selectedIds?: Set<string> | undefined;
+  selectionMode?: boolean | undefined;
+  currentUserId?: string | undefined;
+  onEdit?: ((id: string, text: string) => Promise<void> | void) | undefined;
+  inputRef?: React.RefObject<HTMLTextAreaElement | null> | undefined;
+  submitMode?: 'enter' | 'ctrlEnter' | undefined;
+  controls?: ReactNode | undefined;
+  welcome?: ReactNode | undefined;
 }
 
 function hubAttachment(attachment: CompleteAttachment): ComposerAttachment {
@@ -74,7 +77,7 @@ export function AssistantConversation(props: AssistantConversationProps) {
   const { transcript, platform, intent, onRuntime } = props;
   const [error, setError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
-  const [pendingDispatch, setPendingDispatch] = useState<{ messageId: string; intent: ComposerIntent; error?: string } | null>(null);
+  const [pendingDispatch, setPendingDispatch] = useState<{ messageId: string; intent: ComposerIntent; error?: string | undefined } | null>(null);
   const [retrying, setRetrying] = useState(false);
   const messages = useMemo(() => transcriptMessages(transcript), [transcript]);
   const attachments = useMemo(() => createAttachmentAdapter(platform), [platform]);
@@ -82,6 +85,13 @@ export function AssistantConversation(props: AssistantConversationProps) {
     messages,
     convertMessage: (message) => message,
     isLoading: props.isLoading ?? false,
+    hasEarlier: props.hasEarlier,
+    onLoadEarlier: props.onLoadEarlier ? async () => {
+      try { await props.onLoadEarlier?.(); } catch (cause) {
+        setError(cause instanceof Error ? cause.message : 'Unable to load history');
+        throw cause;
+      }
+    } : undefined,
     isDisabled: props.isDisabled ?? false,
     isRunning: props.isRunning ?? false,
     isSendDisabled: props.isSendDisabled || props.isLoading || props.isRunning || sending,
@@ -196,8 +206,14 @@ function MessageFrame({ children }: PropsWithChildren) {
 }
 
 function MessageAuthor() {
-  const author = useAuiState((state) => state.message.metadata.custom.author) as { name: string; role: string } | undefined;
+  const props = useContext(ConversationContext);
+  const author = useAuiState((state) => state.message.metadata.custom.author) as { id: string; name: string; role: string } | undefined;
   const id = useAuiState((state) => state.message.id);
+  if (author && props?.onAuthorClick) return <div id={id} data-agent-profile={author.name}>
+    <button type="button" className="text-muted-foreground mb-1 rounded px-2 text-xs hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+      data-author-role={author.role} aria-label={`${author.name} 资料卡`}
+      onClick={(event) => props.onAuthorClick?.(author, event.currentTarget)}>{author.name}</button>
+  </div>;
   return <div id={id} className="text-muted-foreground mb-1 px-2 text-xs" data-author-role={author?.role}>{author?.name}</div>;
 }
 

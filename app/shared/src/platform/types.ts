@@ -76,6 +76,7 @@ export interface WorkbenchPinnedAnnouncement {
 }
 
 export interface WorkbenchConversation {
+  canRename?: boolean;
   id: string;
   title: string;
   kind: ConversationKind;

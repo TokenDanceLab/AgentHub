@@ -109,6 +109,7 @@ describe('webPlatform workbench agent mapping', () => {
     })).toEqual({
       id: 'hub-session-1',
       title: '真实 Hub 会话',
+      canRename: false, pinned: false, archived: false,
       kind: 'group',
       subtitle: 'Hub group · 3 members',
       unreadCount: 2,
@@ -123,6 +124,7 @@ describe('webPlatform workbench agent mapping', () => {
     const conversation = {
       id: 'hub-session-1',
       title: '真实 Hub 会话',
+      canRename: false, pinned: false, archived: false,
       kind: 'group' as const,
       pinnedAnnouncement: {
         title: 'stale',

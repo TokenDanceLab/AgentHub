@@ -28,6 +28,7 @@ interface StartConversationModalProps {
   error?: string | undefined;
   /** Called with the picked peer; the shell creates the session and selects it. */
   onStart: (member: ContactMember) => void;
+  onStartAgent?: () => void;
   onClose: () => void;
 }
 
@@ -37,6 +38,7 @@ export function StartConversationModal({
   busy,
   error,
   onStart,
+  onStartAgent,
   onClose,
 }: StartConversationModalProps): React.ReactElement {
   const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE);
@@ -51,6 +53,9 @@ export function StartConversationModal({
   return (
     <Modal onClose={onClose} open={open} title={t('newConversation.title')}>
       <div className={styles.body}>
+        {onStartAgent && <button type="button" className={styles.contactRow} disabled={busy} onClick={onStartAgent}>
+          {t('newConversation.agent', { defaultValue: 'New agent conversation' })}
+        </button>}
         <input
           aria-label={t('newConversation.searchPlaceholder')}
           className={styles.search}

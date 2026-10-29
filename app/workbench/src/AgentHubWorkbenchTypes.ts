@@ -70,6 +70,7 @@ export interface AgentHubWorkbenchProps {
   /** Called when the user toggles pin on a session. Parent should call Hub API and refresh. */
   onConversationPin?: ((conversationId: string, pinned: boolean) => void) | undefined;
   /** Called when the user toggles archive on a session. Parent should call Hub API and refresh. */
+  conversationActions?: import('@shared/ui/assistant-ui/AssistantThreadList').ConversationActions | undefined;
   onConversationArchive?: ((conversationId: string, archived: boolean) => void) | undefined;
   onActiveProjectChange?: ((projectId: string) => void) | undefined;
   onAgentCreate?: ((agent: AgentConfig) => Promise<void> | void) | undefined;
@@ -195,6 +196,8 @@ export interface AgentHubWorkbenchProps {
    * of the misleading "no messages" empty state.
    */
   transcriptLoading?: boolean | undefined;
+  hasEarlierMessages?: boolean | undefined;
+  loadEarlierMessages?: (() => Promise<void>) | undefined;
   /* ── Devices / execution-target management page (#1819) ──
      Real data from the Hub execution-target inventory + ping mutation.
      `devicesTargets === undefined` means the shell is not Hub-connected and

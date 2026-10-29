@@ -17,6 +17,7 @@ export type Locale = 'zh' | 'en'
  *  Keys are dot-separated (e.g. `'card.think.running'`). */
 export const chatviewResources = {
   zh: {
+    'newConversation.agent': '新建 Agent 对话',
     // ═══ App shell ═══
     'app.dm.title': '单聊模式',
     'app.dm.desc': '你 ↔ Builder · 仅头像 · 所有卡片类型',
@@ -926,6 +927,7 @@ export const chatviewResources = {
   },
 
   en: {
+    'newConversation.agent': 'New agent conversation',
     // ═══ App shell ═══
     'app.dm.title': 'DM Mode',
     'app.dm.desc': '1-on-1 chat · avatar only · all card types',
