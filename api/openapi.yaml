@@ -2478,7 +2478,7 @@ paths:
                 target_id:
                   type: string
                   format: uuid
-                  description: Optional owner-scoped local_edge ExecutionTarget id. Hub validates owner, local_edge target type, and bound desktop device, persists target_id and edge_device_id on the pending task, routes agent.dispatch only to that device, and queues offline work in a target/device queue without falling back to another desktop. Remote/cloud/relay targets are rejected on this Web dispatch route until their relay/provisioning paths are product-complete.
+                  description: Optional owner-scoped ExecutionTarget id. local_edge targets bind a Desktop device. Paired cloud_edge targets require pairedDevice capability and an enrolled edge device, with runtime openai-sdk and the confirmed workspace fixed by enrollment. Hub persists target_id and edge_device_id before dispatch, uses the device-specific transport and never falls back to another executor. Unpaired cloud, remote and relay targets remain unsupported on this route.
       responses:
         "200":
           description: Task dispatched.
@@ -4319,6 +4319,453 @@ paths:
         "429":
           $ref: "#/components/responses/Error"
 
+  /edge/enrollments/start:
+    post:
+      tags: [HubSyncRelay]
+      operationId: hubStartEdgeEnrollment
+      summary: Start a short-lived enrollment from an independent Edge.
+      description: >
+        Anonymous and rate limited. Enrollment expires after ten minutes.
+        Only hashes of user_code and poll_secret are persisted; return values
+        must not enter logs. The Edge keeps poll_secret private and displays
+        user_code for the owner to confirm in Web. Responses use no-store.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EdgeEnrollmentStartRequest"
+      responses:
+        "200":
+          description: Enrollment started; proof is returned only to the Edge.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [code, data]
+                properties:
+                  code: { type: string, enum: [ok] }
+                  data:
+                    type: object
+                    required: [enrollment_id, user_code, poll_secret, expires_at]
+                    properties:
+                      enrollment_id: { type: string, format: uuid }
+                      user_code: { type: string }
+                      poll_secret:
+                        type: string
+                        description: High-entropy exchange proof; never sent to the browser.
+                      expires_at: { type: string, format: date-time }
+        "400":
+          $ref: "#/components/responses/Error"
+        "429":
+          $ref: "#/components/responses/Error"
+        "503":
+          $ref: "#/components/responses/Error"
+
+  /web/edge-enrollments/{code}:
+    get:
+      tags: [HubSyncRelay]
+      operationId: hubPreviewEdgeEnrollment
+      summary: Preview the device, runtime and workspace before confirming.
+      description: Requires a current Hub product session and bounded code lookup attempts. Never returns a poll secret or credential. Responses use no-store.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ browserSession: [] }, { bearerAuth: [] }]
+      parameters:
+        - name: code
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Enrollment preview.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [code, data]
+                properties:
+                  code: { type: string, enum: [ok] }
+                  data:
+                    $ref: "#/components/schemas/EdgeEnrollmentPreview"
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "429":
+          $ref: "#/components/responses/Error"
+
+  /web/edge-enrollments/confirm:
+    post:
+      tags: [HubSyncRelay]
+      operationId: hubConfirmEdgeEnrollment
+      summary: Confirm device ownership and its fixed runtime and workspace.
+      description: >
+        Atomically consumes the short code and binds the enrollment to the
+        current Hub user, exact identity, auth generation and OIDC client.
+        Expired codes and repeated confirmation are rejected. Cookie-authenticated
+        requests require exact Origin and X-Hub-CSRF. No credential is returned
+        to Web. Responses use no-store.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ browserSession: [] }, { bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [user_code]
+              properties:
+                user_code: { type: string }
+      responses:
+        "200":
+          description: Confirmation summary; status is confirmed.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [code, data]
+                properties:
+                  code: { type: string, enum: [ok] }
+                  data:
+                    $ref: "#/components/schemas/EdgeEnrollmentPreview"
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+        "429":
+          $ref: "#/components/responses/Error"
+
+  /edge/enrollments/exchange:
+    post:
+      tags: [HubSyncRelay]
+      operationId: hubExchangeEdgeEnrollment
+      summary: Exchange a confirmed enrollment once for a device credential.
+      description: >
+        Anonymous and rate limited; possession of poll_secret is required.
+        Returns 202 while awaiting confirmation. Successful exchange consumes
+        the proof atomically, creates the paired target and returns a credential
+        valid for seven days. There is no refresh grant; expiry or a lost
+        successful response requires re-pairing. Invalid, expired and replayed
+        proofs are rejected. Only credential hashes are stored. Responses use no-store.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [enrollment_id, poll_secret]
+              properties:
+                enrollment_id: { type: string, format: uuid }
+                poll_secret: { type: string }
+      responses:
+        "200":
+          description: One-time device credential and its fixed execution scope.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [code, data]
+                properties:
+                  code: { type: string, enum: [ok] }
+                  data:
+                    $ref: "#/components/schemas/EdgeEnrollmentExchange"
+        "202":
+          description: Still awaiting user confirmation; no credential issued.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [code, data]
+                properties:
+                  code: { type: string, enum: [ok] }
+                  data:
+                    type: object
+                    required: [status]
+                    properties:
+                      status: { type: string, enum: [pending] }
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+        "429":
+          $ref: "#/components/responses/Error"
+
+  /web/edge-devices/{device_id}/revoke:
+    post:
+      tags: [HubSyncRelay]
+      operationId: hubRevokePairedEdgeDevice
+      summary: Revoke an owned paired Edge credential.
+      description: >
+        Owner-scoped product session action. Cookie authentication requires exact
+        Origin and X-Hub-CSRF. Revocation rejects subsequent device heartbeat,
+        poll, callbacks and control acknowledgements; it does not implicitly
+        kill a process already running on the Edge.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ browserSession: [] }, { bearerAuth: [] }]
+      parameters:
+        - name: device_id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Owned device credential revoked.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [code, data]
+                properties:
+                  code: { type: string, enum: [ok] }
+                  data:
+                    type: object
+                    required: [revoked]
+                    properties:
+                      revoked: { type: boolean, const: true }
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+
+  /edge/device/heartbeat:
+    post:
+      tags: [HubSyncRelay]
+      operationId: hubPairedEdgeHeartbeat
+      summary: Update authenticated paired-device health.
+      description: >
+        Device identity and fixed execution scope come from the credential.
+        Product sessions and Edge API JWTs are rejected. Expiry, revocation,
+        identity generation and current OIDC client are revalidated.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ edgeDeviceCredential: [] }]
+      responses:
+        "200":
+          description: Health updated; credential expiry is unchanged.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [code, data]
+                properties:
+                  code: { type: string, enum: [ok] }
+                  data:
+                    type: object
+                    required: [expires_at]
+                    properties:
+                      expires_at: { type: string, format: date-time }
+        "401":
+          $ref: "#/components/responses/Error"
+        "503":
+          $ref: "#/components/responses/Error"
+
+  /edge/device/poll:
+    get:
+      tags: [HubSyncRelay]
+      operationId: hubPollPairedEdge
+      summary: Long-poll this device's existing outbox deliveries and controls.
+      description: >
+        Outbound HTTPS only; no inbound Edge listener is required. Uses the
+        existing delivery_outbox pull transport, not a second task queue.
+        Returned deliveries are not admission ACKs. Retry preserves delivery_id,
+        task_id and original run identity. A timed-out poll returns empty arrays.
+        Credential validity is checked before returning device work.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ edgeDeviceCredential: [] }]
+      parameters:
+        - name: wait_seconds
+          in: query
+          required: false
+          schema: { type: integer, minimum: 0, maximum: 20, default: 20 }
+      responses:
+        "200":
+          description: Device-specific deliveries and cancellation controls.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [code, data]
+                properties:
+                  code: { type: string, enum: [ok] }
+                  data:
+                    $ref: "#/components/schemas/PairedEdgePoll"
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "503":
+          $ref: "#/components/responses/Error"
+
+  /edge/device/tasks/{id}/ack:
+    post:
+      tags: [HubSyncRelay]
+      operationId: hubPairedEdgeTaskAck
+      summary: Acknowledge admission of a task assigned to this paired Edge.
+      description: Reuses task ACK semantics; verifies credential, owner, bound device and run identity on every call.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ edgeDeviceCredential: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/HubTaskAckRequest"
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        default:
+          $ref: "#/components/responses/Error"
+
+  /edge/device/tasks/{id}/stream:
+    post:
+      tags: [HubSyncRelay]
+      operationId: hubPairedEdgeTaskStream
+      summary: Persist an assigned paired Edge task's output.
+      description: Reuses typed callback payload limits, client_msg_id deduplication and chat projection. Revoked or expired credentials cannot publish.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ edgeDeviceCredential: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/HubTaskStreamRequest"
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        default:
+          $ref: "#/components/responses/Error"
+
+  /edge/device/tasks/{id}/done:
+    post:
+      tags: [HubSyncRelay]
+      operationId: hubPairedEdgeTaskDone
+      summary: Report completion of a task assigned to this paired Edge.
+      description: Reuses final callback projection and checks exact device/task/run ownership under the current credential.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ edgeDeviceCredential: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/HubTaskDoneRequest"
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        default:
+          $ref: "#/components/responses/Error"
+
+  /edge/device/tasks/{id}/fail:
+    post:
+      tags: [HubSyncRelay]
+      operationId: hubPairedEdgeTaskFail
+      summary: Report failure of a task assigned to this paired Edge.
+      description: Reuses failure callback semantics and payload limits; wrong owner, device, task or run is rejected.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ edgeDeviceCredential: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/HubTaskFailRequest"
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        default:
+          $ref: "#/components/responses/Error"
+
+  /edge/device/controls/{control_id}/ack:
+    post:
+      tags: [HubSyncRelay]
+      operationId: hubPairedEdgeControlAck
+      summary: Record whether the assigned Edge actually applied a cancellation.
+      description: >
+        applied means the original run has stopped, not merely that the command
+        arrived. failed records an unapplied control without inventing a cancelled
+        task. Binds control, task, run and device; repeated matching receipts are
+        idempotent, conflicting receipts are rejected. Credential expiry and
+        revocation are checked even for a previously assigned control.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{ edgeDeviceCredential: [] }]
+      parameters:
+        - name: control_id
+          in: path
+          required: true
+          description: The existing task UUID; must equal body task_id.
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [task_id, run_id, status]
+              properties:
+                task_id: { type: string, format: uuid }
+                run_id: { type: string, maxLength: 128 }
+                status: { type: string, enum: [applied, failed] }
+                error:
+                  type: string
+                  description: Sanitized reason when cancellation could not be applied.
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+
   /cloud/edge/register:
     post:
       tags: [HubSyncRelay]
@@ -4335,7 +4782,9 @@ paths:
         user owns AGENTHUB_MAX_CLOUD_EDGE_DEVICES (default 50) cloud_edge
         devices, registering a brand-new device_id fails with 403
         `device_limit_exceeded`; re-registering an already-owned device_id
-        (upsert refresh) is not blocked.
+        (upsert refresh) is not blocked. This JWT is not an Edge-to-Hub device
+        credential and does not enable pairedDevice polling or task callbacks;
+        use the enrollment endpoints for an independent outbound Edge.
       x-agenthub-status: implemented
       x-agenthub-owner: Hub
       security: [{ bearerAuth: [] }]
@@ -4397,6 +4846,12 @@ paths:
       tags: [HubSyncRelay]
       operationId: hubCancelTask
       summary: Cancel an agent task.
+      description: >
+        For a paired Edge task, records cancellation intent and queues a control
+        for the assigned device. HTTP success does not prove the model request
+        stopped. The task remains non-cancelled until the Edge confirms the
+        terminal result; disconnected or revoked devices leave cancellation
+        unconfirmed. Existing Desktop cancellation uses its bridge transport.
       x-agenthub-status: implemented
       x-agenthub-owner: Hub
       security: [{ bearerAuth: [] }]
@@ -8026,6 +8481,17 @@ components:
         Optional Local Edge token configured by AGENTHUB_EDGE_AUTH_TOKEN or
         --local-auth-token. This is only the loopback Edge process boundary and
         is not a Hub session, TokenDance Account OIDC token, or Relay API key.
+    edgeDeviceCredential:
+      type: http
+      scheme: bearer
+      bearerFormat: Opaque paired Edge credential
+      description: >
+        Returned once by /edge/enrollments/exchange, valid for seven days without
+        refresh. Only /edge/device/* accepts it. Hub stores its hash and checks
+        device ownership, exact identity auth generation, current OIDC client,
+        expiry and revocation on every request, including task callbacks. It is
+        not a product session, Account token or Edge API JWT. The Edge never
+        receives the Hub signing secret; the browser never receives this token.
     edgeLocalToken:
       type: apiKey
       in: header
@@ -9298,7 +9764,7 @@ components:
           format: date-time
         capabilities:
           type: string
-          description: JSON object encoded by the current Hub model.
+          description: JSON object encoded by the current Hub model. pairedDevice identifies a cloud_edge target created by user-confirmed Edge enrollment; generic cloud registration does not grant this capability.
         metadata:
           type: string
           description: JSON object encoded by the current Hub model.
@@ -10104,6 +10570,84 @@ components:
         client_ip: { type: string }
         created_at: { type: string, format: date-time }
 
+    EdgeEnrollmentStartRequest:
+      type: object
+      required: [device_id, name, runtime_id, workspace_root]
+      properties:
+        device_id:
+          type: string
+          format: uuid
+          description: Stable identity generated by the independent Edge.
+        name: { type: string }
+        runtime_id: { type: string, enum: [openai-sdk] }
+        workspace_root:
+          type: string
+          description: Absolute directory allowed by the Edge's local workspace policy and shown to the confirming owner. Browser dispatch cannot override it.
+
+    EdgeEnrollmentPreview:
+      type: object
+      required: [enrollment_id, device_id, name, runtime_id, workspace_root, expires_at, status]
+      properties:
+        enrollment_id: { type: string, format: uuid }
+        device_id: { type: string, format: uuid }
+        name: { type: string }
+        runtime_id: { type: string, enum: [openai-sdk] }
+        workspace_root: { type: string }
+        expires_at:
+          type: string
+          format: date-time
+          description: Enrollment expiry, ten minutes after start.
+        status:
+          type: string
+          description: Enrollment state; confirmation returns confirmed.
+
+    EdgeEnrollmentExchange:
+      type: object
+      required: [status, device_id, target_id, credential, expires_at, runtime_id, workspace_root]
+      properties:
+        status: { type: string, enum: [enrolled] }
+        device_id: { type: string, format: uuid }
+        target_id: { type: string, format: uuid }
+        credential:
+          type: string
+          description: Opaque device bearer returned once to Edge. Never log or expose to Web or an agent context.
+        expires_at:
+          type: string
+          format: date-time
+          description: Absolute credential expiry, seven days after exchange. No sliding refresh.
+        runtime_id: { type: string, enum: [openai-sdk] }
+        workspace_root: { type: string }
+
+    PairedEdgePoll:
+      type: object
+      required: [deliveries, controls]
+      properties:
+        deliveries:
+          type: array
+          items:
+            type: object
+            required: [delivery_id, task_id, run_request]
+            properties:
+              delivery_id: { type: string }
+              task_id: { type: string, format: uuid }
+              run_request:
+                allOf:
+                  - $ref: "#/components/schemas/StartRunRequest"
+                description: Existing Edge run body with matching deliveryId/hubTaskId and callbackOwner edge. Runtime and workDir are fixed by enrollment; local allowlist still applies. SDK history supports multi-turn text, not a tool execution loop.
+        controls:
+          type: array
+          items:
+            type: object
+            required: [control_id, task_id, run_id, kind]
+            properties:
+              control_id:
+                type: string
+                format: uuid
+                description: Equal to task_id; cancellation uses the existing task record.
+              task_id: { type: string, format: uuid }
+              run_id: { type: string, maxLength: 128 }
+              kind: { type: string, enum: [cancel] }
+
     HubPendingAgentTask:
       type: object
       required: [id, agent_instance_id, triggered_by_user_id, trigger_message_id, status, created_at, expire_at]
@@ -10116,6 +10660,19 @@ components:
         status: { type: string }
         edge_run_id: { type: string }
         edge_device_id: { type: string, format: uuid }
+        cancel_requested_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: Paired-device cancellation intent recorded; does not prove the executor stopped.
+        cancel_applied_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: Executor confirmed cancellation applied to the bound run.
+        cancel_error:
+          type: string
+          description: Sanitized failure to apply cancellation; never treated as successful termination.
         error_message: { type: string }
         created_at: { type: string, format: date-time }
         dispatched_at: { type: string, format: date-time, nullable: true }

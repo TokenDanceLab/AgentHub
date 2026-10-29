@@ -2,7 +2,7 @@
 
 > 子文档 | 主索引：[architecture.md](../architecture.md)
 >
-> 最后更新：2026-10-23（Account OIDC 身份边界）
+> 最后更新：2026-10-29（已配对 Edge 出站设备通道）
 >
 > 状态：设计基线（Accepted）。本文描述目标架构、协议分层、可靠性/安全/可观测合同与设计差距；实现状态以源码为准。
 
@@ -27,6 +27,8 @@ UI Workbench（chat timeline + command center）
 - 证据与执行同侧：`runtimeEvidence / artifact / real_tested` 由 Data Plane 产生并签名，Hub 只校验与审计，UI 不得代替证据源。
 - 所有能力流量经受控面：Desktop 走 Local Edge 的 typed Tauri/Host contract，Web/Mobile 走 Hub relay，禁止 UI 或 agent 绕过 typed port 直连能力面。
 - 双平面不是把两套服务再切一层微服务；单仓库、窄接口、事件中介仍优先于进程拆分。
+
+独立 Edge 的首个用户路径采用短期 enrollment + Web 确认 + 专用设备凭据。Edge 以出站 HTTPS long-poll 领取绑定本设备的任务与取消命令，Web 仍是 Hub-only，Edge API 保持 loopback。设备注册为 `edge`，ExecutionTarget 复用 `cloud_edge` 类型并要求 `pairedDevice` 能力；runtime 固定 `openai-sdk`、workspace 固定在用户确认与本地 allowlist 的交集。首版验收只包含持久化多轮文本、流式回传与真实取消，不宣称工具执行或 coding task。字段与投递细节统一在 [dispatch.md](../../api/dispatch.md)。
 
 ## 3. 协议分层与能力映射
 
@@ -73,6 +75,8 @@ Edge MCP server 暴露 8 个 canonical `agenthub_*` 工具；它们都是 REST �
 
 已有资产：`hub-server/internal/service/deliveryoutbox/`（Record/MarkSent/Ack、CAS claim、指数退避、dead-letter、7 天 purge）；`agent_edge_callback.go` 的 `client_msg_id` 幂等去重与 stream+seq 事务；`api/events.md` 的 at-least-once、`EventEnvelope.seq/id`、UPSERT/idempotent/watermark/ephemeral 标签、`agent.dispatch` 的 `task_id + delivery_id`。
 
+已配对 Edge 任务继续使用上述 `delivery_outbox` 的 pull transport 与现有 admission，不增加第二份任务队列。领取和网络送达均不等于执行器接受；重复 delivery/task 保留原 run 与 callback owner。取消请求、送达与执行器应用分别留证：Hub 在 Edge 确认原 run 已停止前不宣称任务 `cancelled`，断线或凭据撤销也不能构造成功终态。这个有界设备通道没有补齐下面的全局事务 outbox/inbox/version 目标。
+
 目标合同（设计目标，尚未实现）：
 
 1. 业务变更与 outbox 写入**同一本地事务**；先产生稳定 `event_id/delivery_id`，再落 outbox row。
@@ -86,7 +90,9 @@ Edge MCP server 暴露 8 个 canonical `agenthub_*` 工具；它们都是 REST �
 
 ## 6. 安全与最小代理权
 
-已有资产：Hub 只消费 TokenDance Account 公开 OIDC endpoint，以 `issuer + subject` 绑定外部身份；Account token 仅停留在 Hub OIDC service，Hub REST/WS 只接受 Hub HS256 session。Hub-local 授权分离；Web/Mobile Hub-only；Desktop renderer 无 raw process；`env_sanitizer` / `tool_allowlist` / `security_hooks` / 出站 egress；JWT rotation/revoke/jti blacklist/`auditPermission`。
+已有资产：Hub 只消费 TokenDance Account 公开 OIDC endpoint，以 `issuer + subject` 绑定外部身份；Account token 仅停留在 Hub OIDC service，Hub 产品 REST/WS 接受 Hub native session 或同源 HttpOnly browser session。Hub-local 授权分离；Web/Mobile Hub-only；Desktop renderer 无 raw process；`env_sanitizer` / `tool_allowlist` / `security_hooks` / 出站 egress；JWT rotation/revoke/jti blacklist/`auditPermission`。
+
+已配对 Edge credential 是独立的设备通道身份：Hub 只存哈希，绑定精确 user/identity/auth generation/OIDC client/device，7 天到期后重新配对。专用 `/edge/device/*` middleware 逐请求验证设备与 task/run 归属，产品会话和 Edge API JWT 不可互换。全局 Account logout、client 变更或设备撤销会拒绝所有通道请求，但不隐式 kill 本地进程。它不是通用 task capability，也不等于下面计划中的 per-tool policy engine；更多边界见 [身份设计](06-auth-identity.md)。
 
 演进合同：
 

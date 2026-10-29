@@ -50,6 +50,21 @@ Desktop / CLI / Mobile
 - Hub access token 的 `sub` 是 Hub user ID，不是 Account subject；`user_id`、`device_id` 和 `device_type` 由 Hub session 写入。
 - 浏览器、Desktop renderer 和 agent context 不接收 Account token、Account client secret 或 provider credential。
 
+## 配对 Edge 设备身份
+
+用户会话只用于确认设备归属；独立 Edge 通过 enrollment 获得设备专用 opaque credential，不借用 Desktop access/refresh token，也不持有 Hub JWT 签名密钥。`/cloud/edge/register` 返回的 `aud=agenthub-edge / purpose=edge-api` JWT 仍只用于访问 Edge API，不能用于设备向 Hub 领取任务或提交回调。
+
+1. Edge 用稳定 UUID、设备名称、固定 `runtime_id: openai-sdk` 和本地 allowlist 中的绝对 `workspace_root` 调 `POST /edge/enrollments/start`。Hub 返回 `enrollment_id`、短 `user_code`、只交给 Edge 的高熵 `poll_secret` 和 10 分钟 `expires_at`。匿名 start/exchange 均限流；Hub 只持久化短码、poll secret 与设备 credential 的哈希，原值不进日志或审计 payload。
+2. 用户登录 Web，`GET /web/edge-enrollments/{code}` 预览设备名称、UUID、runtime、工作目录、有效期和状态，再以 `POST /web/edge-enrollments/confirm` 提交 `user_code`。确认原子绑定当前 Hub user、精确 identity、auth generation 和当前 OIDC client；cookie 请求须满足既有 Origin/CSRF 合同。浏览器不取得 poll secret 或设备 credential。
+3. Edge 调 `POST /edge/enrollments/exchange` 提交 enrollment ID 和 poll secret。待确认返回 202；确认后一次性交换返回 device/target ID、credential、runtime、workspace 和 7 天凭据到期时间。过期、错误 proof 或确认/交换重放拒绝。交换响应丢失不能再次取回原 credential，应重新配对。
+4. Edge 将 credential 保存在权限受限的本机运行 secret store；凭据无 refresh grant，到期需要用户重新配对。产品会话响应与配对响应均 `Cache-Control: no-store`。模型 API key 独立通过 scoped secret 配置，只由 Edge adapter 使用。
+
+新 credential 只在 `/edge/device/*` 专用 Authorization bearer middleware 中解析，不能进入产品 session parser；Hub session、Account token 与 Edge API JWT 也不能替代它。权限限本设备 heartbeat、领取已分配 delivery/control、提交本设备 task 回调及控制应用回执。每次操作都复验 owner/device/task/run 归属、expiry、revoked、identity auth generation 与当前 OIDC client，不能仅依赖签发时的授权。
+
+`POST /web/edge-devices/{device_id}/revoke` 由设备 owner 显式撤销。Account 全局退出推进精确 identity generation，或切换 OIDC client，同样使该 identity/client 下的设备凭据失效，后续 heartbeat/poll/callback/control ACK 全部拒绝。当前 Hub browser session 的本地 logout 不推进 identity generation。撤销通道访问权不自动 kill 本机已运行的模型请求；UI 不得把未确认的取消当作执行器已停止。
+
+配对后使用 `cloud_edge` target 和 `pairedDevice` capability，设备类型为 `edge`。runtime 与 workspace 以确认内容为授权上限，并在 Edge 本地再次校验；不得由普通 target 更新或浏览器参数扩权。设备仅发起出站 HTTPS，Web 不直连 Edge。执行、admission 去重和取消回执见 [dispatch.md](../../api/dispatch.md)。
+
 ## Client Storage
 
 Desktop 由 Tauri keyring 或当前进程 session 保存 Hub access token，后续请求通过 `getAccessToken()` 注入。
@@ -90,7 +105,7 @@ Web cookie lane 额外配置 `AGENTHUB_BROWSER_SESSION_ORIGIN`、`AGENTHUB_BROWS
 
 新 native JWT 内含 `identity_id/auth_generation/oidc_client_id`；REST、WS upgrade、inbound frame、实际 outbound write 和 heartbeat 都复验持久 generation、过期和当前 Account client。browser session 和 native refresh 也绑定签发时的 `oidc_client_id`；替换 Account client 后，旧 client 或未绑定 client 的会话一律重新登录，不通过 refresh 迁移，避免会话落在新 client 的 logout grant 范围之外。重新登录仍复用同一 `(issuer, subject)` 的 Hub user 与授权。仅 identity claim 缺失、但 refresh 已绑定当前 client 的 native JWT 可以通过 refresh 升级；浏览器旧 bearer 则重新登录。纯 unit fixtures 可注入无 checker 的 middleware，生产 composition root 总是配置 checker。
 
-本实例在撤销提交后立即重验该 identity 的全部 socket，发送 `auth.revoked` payload `{reason:"session_revoked"}` 并关闭；已排队的业务帧在实际写出前再次检查。其他 Hub 实例通过每次读写检查拒绝旧 epoch，空闲连接最迟下一 heartbeat 关闭。依赖故障只关闭 socket，不能发送代表账户撤销的事件。客户端收到撤销事件停止自动重连并清除会话缓存。已经获批准的 Edge task 按原 task-scoped 授权运行；此会话变更不隐式取消既有 delegation。
+本实例在撤销提交后立即重验该 identity 的全部 socket，发送 `auth.revoked` payload `{reason:"session_revoked"}` 并关闭；已排队的业务帧在实际写出前再次检查。其他 Hub 实例通过每次读写检查拒绝旧 epoch，空闲连接最迟下一 heartbeat 关闭。依赖故障只关闭 socket，不能发送代表账户撤销的事件。客户端收到撤销事件停止自动重连并清除会话缓存。已经获批准的 Edge task 不因会话变更被隐式 kill；已配对 Edge 的通道 credential 同时受 generation 约束，失效后不能继续领取、回调或确认控制，因此 Hub 必须保留尚未核实的执行状态。
 
 迁移 0079 增加 browser sessions、持久 subject epochs、logout JTI 记录和 refresh 的 client 绑定列。历史 refresh 的 client 为空，不猜测或回填，部署后要求重新登录。回滚仅删除 browser sessions（迫使重登），保留 client 列、epochs/JTI 防止丢失撤销事实；回退到不检查 generation/client 的旧应用代码不是安全兼容降级。每小时有界清理已过期 browser session 和过期 JTI，epoch 不过期。真实 Account logout/client 注册和 packaged Desktop 验收仍需部署 lane 单独取证，代码测试不能替代。
 

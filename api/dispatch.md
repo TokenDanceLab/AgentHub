@@ -1,12 +1,12 @@
 # Hub→Edge 任务投递契约
 
-> 最后更新：2026-10-18。事件索引见 [events.md](events.md)，REST 字段见 [openapi.yaml](openapi.yaml)。
+> 最后更新：2026-10-29。事件索引见 [events.md](events.md)，REST 字段见 [openapi.yaml](openapi.yaml)。
 
 本页定义跨通道执行输入、admission 回执和结果回传方。
 
 ### Hub→Edge `delivery_id` admission 契约
 
-Hub 的 WS `agent.dispatch` 与 outbox HTTP POST `/v1/runs` 共享同一 `delivery_id`。Desktop 将事件中的 `delivery_id` / `deliveryId` 转交为 Edge 请求的 `deliveryId`；空值保留既有无去重路径。
+Hub 的 WS `agent.dispatch`、outbox HTTP POST `/v1/runs` 与已配对 Edge 的出站 poll 共享同一 `delivery_id`。Desktop 将事件中的 `delivery_id` / `deliveryId` 转交为 Edge 请求的 `deliveryId`；配对设备将 poll 的 `run_request` 交给同一 Edge admission 入口。空值仅保留既有无去重路径，新设备通道必须带稳定 delivery/task 身份。
 
 - **原子接收**：先保留 pending claim；仅在 run 接收成功后提交含原 `runId` 的回执，失败或放弃则释放 claim，允许同 ID 重试。
 - **容量与有效期**：进程内缓存默认共容纳 4096 个 pending claim / accepted receipt。成功回执从提交起保留 5 分钟，也可因 LRU 容量压力被淘汰；重放不续期。pending claim 不因 TTL/LRU 被移除，避免首个请求未完成时重复执行。
@@ -33,3 +33,16 @@ Hub 的 WS `agent.dispatch` 与 outbox HTTP POST `/v1/runs` 共享同一 `delive
 - **Team 控制边界**：typed route/result stream 是事件记录，不等同于调用 Team 的权威 route-decision 接口。带 Team 上下文的任务继续走 Desktop callback owner 与现有控制流程；Hub direct 在 POST 前退出，不把事件透传宣称为 Team 自动调度。
 - **direct 路由保留**：只有执行前能力检查失败、且尚未绑定设备的任务可以走普通 fallback。Hub 在 run POST 前持久化真实设备绑定；POST 超时、连接中断、错误或未知 owner 响应不证明未执行，现有 outbox 只能向原设备核对，不改投另一执行器。成功回执补记原 run ID；迟到回执不得回退已经 running/done/failed 的任务。
 - **旧回执与恢复**：现代请求碰到无法确定 owner 的旧 run，或收到缺失/非法 owner 的接收响应时，按未决结果处理：不猜测、不自动重启。Desktop 的 run POST 网络失败、5xx 或缺失 run ID 同样只保持待核对、不发 FAIL；只有明确的执行前客户端拒绝才失败收口。恢复边界：本契约不迁移正在执行的旧进程、不转交已接受任务的 owner，也不宣称跨重启恢复已完成。
+
+### 已配对 Edge 的出站设备通道
+
+独立 Edge 通过用户确认的 enrollment 获得专用 opaque credential，向 Hub 发起 HTTPS 请求；浏览器仍只访问 Hub，Edge API 保持 loopback。凭据、短码与身份撤销边界见 [身份设计](../docs/architecture/06-auth-identity.md)，字段与错误响应以 [OpenAPI](openapi.yaml) 为准。
+
+- **目标绑定**：确认后建立 owner-scoped `cloud_edge` ExecutionTarget，绑定 `device_type=edge` 的设备及 `pairedDevice` 能力。普通 cloud 注册不产生此能力。运行时固定为 `openai-sdk`，工作目录固定为用户确认且 Edge 本地 allowlist 允许的目录；浏览器不能覆写 runtime、workspace 或把任务改投另一设备。健康状态由专用凭据保护的 heartbeat 更新。
+- **领取**：`GET /edge/device/poll?wait_seconds=20` 返回 `deliveries` 与 `controls`。delivery 包含 `delivery_id`、`task_id` 和复用现有 Edge run body 的 `run_request`。任务接受及重试复用既有 `delivery_outbox` 的 pull transport，不创建第二份任务队列。poll 超时返回空数组；收到 delivery 只表示送达，仍须由 admission 成功后的 task ACK 确认。重复领取必须返回原 run，不得启动第二次模型请求。
+- **执行与回传**：Edge 以 `callbackOwner: edge` 接收；ACK/stream/done/fail 使用 `/edge/device/tasks/{id}/...`，复用既有 callback schema、稳定 `client_msg_id` 和 typed event/聊天持久化投影。Hub 每次校验凭据、owner、分配设备、task 与 run 绑定。设备凭据不能调用旧 Desktop callback、产品 REST/WS 或另一设备的任务。
+- **取消**：控制项包含 `control_id`、`task_id`、`run_id`、`kind: cancel`；`control_id` 就是已有 task ID，ACK 的 `task_id` 必须相同。Hub 在 pending task 上记录 `cancel_requested_at`；运行中的任务在收到执行器终态确认前保持非 `cancelled`，发送成功或 poll 返回不算停止成功。Edge 将命令应用到原 run，并在真实停止后向 `/edge/device/controls/{control_id}/ack` 报告 `status: applied`，Hub 记录 `cancel_applied_at`；无法应用时报告 `failed`，错误记录在 `cancel_error`。重复命令/回执按 control/task/run 绑定幂等；错误 run、错误设备或已改变的决策拒绝。断线或撤销导致未送达时，UI 必须保留未确认状态。
+- **凭据失效**：过期、设备撤销、精确 Account identity 的 auth generation 推进或 OIDC client 变更，均拒绝 heartbeat、poll、控制 ACK 与任务回调。全局退出不自动终止本机已执行的进程；凭据失效后 Hub 不能把无法取得的终态当作已停止。重新配对恢复的是设备访问权，不是重新执行旧 task 的授权。
+- **首版能力**：`openai-sdk` 用 Hub 持久历史支持多轮文本与流式输出，取消必须结束真实模型请求。此路径不承诺工具执行、coding task、任意 runtime、Team 控制或 permission broker。解析到 tool-call delta 不能证明拥有工具执行循环。
+
+验收覆盖：用户配对、真实文本输出落库、刷新后第二轮上下文、取消请求到真实停止回执、重复 poll/重连不重复执行、错误 owner/device/task/run、过期与重放 enrollment、撤销后所有设备端点拒绝，以及模型认证失败。fixture 只能证明协议与状态机；真实 Account/模型证据另行记录。
