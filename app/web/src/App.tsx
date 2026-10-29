@@ -58,7 +58,7 @@ function WebWorkbenchRoot() {
   const [savingAgentId, setSavingAgentId] = useState<string | undefined>();
   const [deletingAgentId, setDeletingAgentId] = useState<string | undefined>();
   const { ensureAuth, authReady } = useWebAuth();
-  const { logout } = useAuth();
+  const { logout, user } = useAuth();
   const sessionQueryClient = useQueryClient();
   const showAuthModal = useHubStore((state) => state.showAuthModal);
   const setShowAuthModal = useHubStore((state) => state.setShowAuthModal);
@@ -75,10 +75,9 @@ function WebWorkbenchRoot() {
     getWorkbenchDataModeOverrideSnapshot,
     getWorkbenchDataModeOverrideSnapshot,
   );
-  const dataMode = resolveWorkbenchDataMode(
-    import.meta.env.VITE_AGENTHUB_DATA_MODE || (import.meta.env.PROD ? 'approved-real' : 'auto'),
-    dataModeOverride || undefined,
-  );
+  const dataMode = import.meta.env.PROD
+    ? 'approved-real'
+    : resolveWorkbenchDataMode(import.meta.env.VITE_AGENTHUB_DATA_MODE, dataModeOverride || undefined);
   const dataModeContract = getWorkbenchDataModeContract(dataMode);
   const realMode = dataModeContract.isRealDataMode;
   const webPlatform = useMemo(
@@ -98,17 +97,10 @@ function WebWorkbenchRoot() {
   const createAgentProfile = useCreateAgentProfile();
   const updateAgentProfile = useUpdateAgentProfile();
   const deleteAgentProfile = useDeleteAgentProfile();
-  const workbench = useWebWorkbenchModel(selectedConversationId, selectedProjectId);
+  const workbench = useWebWorkbenchModel(dataMode, selectedConversationId, selectedProjectId);
   const chatActions = workbench.chatActions;
   const agents = resolveWebWorkbenchAgents(agentList.data?.items, dataMode);
 
-  // Fetch real user profile from Hub (originates from TokenDance Account OIDC)
-  const userProfile = useQuery({
-    queryKey: webQueryKeys.authMe,
-    queryFn: () => createHubClient({ getToken: getAccessToken }).me(),
-    enabled: Boolean(getAccessToken()),
-    staleTime: 60_000,
-  });
   const agentLoadError = realMode && agentList.error
     ? errorMessage(agentList.error, t('error.agentProfile.load'))
     : undefined;
@@ -153,15 +145,15 @@ function WebWorkbenchRoot() {
   const handleNavigateToConversation = useCallback(async (target: { name: string; id: string; kind: 'dm' | 'group' }) => {
     try {
       const result = await hubClientForConversations.createPrivateSession({ target_user_id: target.id });
+      await sessionQueryClient.invalidateQueries({ queryKey: webQueryKeys.sessions.root });
       setSelectedConversationId(result.session_id);
     } catch (error) {
       console.warn('[AgentHub Web] createPrivateSession failed', error);
       setSelectedConversationId(undefined);
     }
-  }, [hubClientForConversations]);
+  }, [hubClientForConversations, sessionQueryClient]);
 
-  // Sidebar "新建会话" — the Hub has no blank-session API (sessions
-  // are always peer-bounded), so the direct entry opens the contact picker
+  // Sidebar "新建会话" opens the contact / owner-only agent group picker
   // and creates through the same real createPrivateSession chain the
   // Contacts page uses. Errors stay visible in the modal (never swallowed;
   // the legacy onNavigateToConversation catch → undefined is NOT copied).
@@ -179,6 +171,7 @@ function WebWorkbenchRoot() {
     setStartConversationError(undefined);
     try {
       const result = await hubClientForConversations.createPrivateSession({ target_user_id: member.id });
+      await sessionQueryClient.invalidateQueries({ queryKey: webQueryKeys.sessions.root });
       setStartConversationOpen(false);
       setSelectedConversationId(result.session_id);
     } catch (error) {
@@ -188,7 +181,37 @@ function WebWorkbenchRoot() {
     } finally {
       setStartConversationBusy(false);
     }
-  }, [hubClientForConversations, t]);
+  }, [hubClientForConversations, sessionQueryClient, t]);
+
+  const handleStartAgentConversation = useCallback(async () => {
+    setStartConversationBusy(true);
+    setStartConversationError(undefined);
+    try {
+      // An owner-only group is already a supported Hub session; an Agent can be added on first dispatch.
+      const result = await hubClientForConversations.createGroupSession({ name: t('newConversation.agent', { defaultValue: 'New agent conversation' }), member_ids: [] });
+      await sessionQueryClient.invalidateQueries({ queryKey: webQueryKeys.sessions.root });
+      setSelectedConversationId(result.session_id);
+      setStartConversationOpen(false);
+    } catch (error) {
+      setStartConversationError(errorMessage(error, t('error.startConversation')));
+    } finally { setStartConversationBusy(false); }
+  }, [hubClientForConversations, sessionQueryClient, t]);
+
+  const conversationActions = useMemo(() => ({
+    async rename(id: string, title: string) {
+      await hubClientForConversations.updateSessionInfo(id, { name: title });
+      await sessionQueryClient.invalidateQueries({ queryKey: webQueryKeys.sessions.root });
+    },
+    async delete(id: string) {
+      await hubClientForConversations.deleteSession(id);
+      await sessionQueryClient.invalidateQueries({ queryKey: webQueryKeys.sessions.root });
+      setSelectedConversationId((current) => current === id ? undefined : current);
+    },
+    async archive(id: string, archived: boolean) {
+      await hubClientForConversations.updateSessionSettings(id, { archived });
+      await sessionQueryClient.invalidateQueries({ queryKey: webQueryKeys.sessions.root });
+    },
+  }), [hubClientForConversations, sessionQueryClient]);
 
   async function handleAgentCreate(agent: AgentConfig): Promise<void> {
     setAgentActionError(undefined);
@@ -326,6 +349,7 @@ function WebWorkbenchRoot() {
         onApprovalDecision={workbench.onApprovalDecision}
         onNavigateToConversation={handleNavigateToConversation}
         onStartNewConversation={handleStartNewConversation}
+        conversationActions={hubReady ? conversationActions : undefined}
         // #2274: regenerate is a real Hub mutation, so it rides the same
         // fail-closed gate as the other five chat actions — outside hubReady
         // (demo / unauthenticated) the port is undefined and the shared menu
@@ -397,10 +421,12 @@ function WebWorkbenchRoot() {
         showMainchainStatus={false}
         workbenchStatus={workbench.workbenchStatus}
         transcript={workbench.transcript}
+        hasEarlierMessages={workbench.hasEarlierMessages}
+        loadEarlierMessages={workbench.loadEarlierMessages}
         transcriptLoading={workbench.transcriptLoading}
-        userDisplayName={userProfile.data?.nickname || userProfile.data?.username}
-        userAvatarUrl={userProfile.data?.avatar_url}
-        currentUserId={userProfile.data?.id}
+        userDisplayName={user?.nickname || user?.username}
+        userAvatarUrl={user?.avatar_url}
+        currentUserId={user?.id}
         skillMarketItems={skillMarketItems}
         skillMarketLoading={hubReady && skillMarketQuery.isFetching}
         {...(hubReady && skillMarketQuery.error
@@ -427,6 +453,7 @@ function WebWorkbenchRoot() {
         open={startConversationOpen}
         onClose={() => setStartConversationOpen(false)}
         onStart={(member) => { void handleStartConversation(member); }}
+        onStartAgent={() => { void handleStartAgentConversation(); }}
       />
     </>
   );

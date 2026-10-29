@@ -32,6 +32,23 @@ interface BackendRequestLog {
 }
 
 test.describe('Web shared chat flow contract', () => {
+  test('keeps the assistant-ui composer usable in both themes and compact viewports', async ({ page }, testInfo) => {
+    await installChatFlowHubStub(page, { taskStatus: 'done' });
+    await enterApprovedRealHubSession(page, { activeTaskStatus: 'done' });
+    for (const theme of ['light', 'dark']) {
+      await page.evaluate((value) => document.documentElement.setAttribute('data-theme', value), theme);
+      for (const width of [1440, 1024, 390, 320]) {
+        await page.setViewportSize({ width, height: 900 });
+        const composer = page.getByRole('textbox', { name: /^(Message input|输入框)$/ });
+        await expect(composer).toBeVisible();
+        await composer.fill('A draft remains editable.');
+        await expect(composer).toHaveValue('A draft remains editable.');
+        await expect.poll(() => horizontalOverflow(page)).toBeLessThanOrEqual(1);
+        await page.screenshot({ path: testInfo.outputPath(`assistant-ui-${theme}-${width}.png`) });
+      }
+    }
+  });
+
   test('renders Hub messages and runtime events as one ordered shared transcript', async ({ page }) => {
     collectPageDiagnostics(page);
     const backendRequests = await installChatFlowHubStub(page);
@@ -49,12 +66,14 @@ test.describe('Web shared chat flow contract', () => {
     await expect(transcript.locator('table')).toContainText('ordered');
     await expectTranscriptWithoutModeDebug(transcript);
 
-    await expect(transcript.locator('[data-block-id="call-read-a"]')).toBeVisible();
-    await expect(transcript.locator('[data-block-id="call-read-b"]')).toBeVisible();
-    await transcript.locator('[data-block-id="call-read-a"] .row-hd').click();
-    await transcript.locator('[data-block-id="call-read-b"] .row-hd').click();
-    await expect(transcript.locator('[data-block-id="call-read-a"]')).toContainText('A result belongs to src/a.ts');
-    await expect(transcript.locator('[data-block-id="call-read-b"]')).toContainText('B result belongs to src/b.ts');
+    await expect(transcript.locator('[data-block-id="edge-event-hub-runtime-evt-call-read-a"]')).toBeVisible();
+    await expect(transcript.locator('[data-block-id="edge-event-hub-runtime-evt-call-read-b"]')).toBeVisible();
+    await transcript.locator('[data-block-id="edge-event-hub-runtime-evt-call-read-a"] [data-slot=tool-group-trigger]').click();
+    await transcript.locator('[data-block-id="edge-event-hub-runtime-evt-call-read-b"] [data-slot=tool-group-trigger]').click();
+    await transcript.locator('[data-block-id="edge-event-hub-runtime-evt-call-read-a"] .aui-tool-fallback-trigger').click();
+    await transcript.locator('[data-block-id="edge-event-hub-runtime-evt-call-read-b"] .aui-tool-fallback-trigger').click();
+    await expect(transcript.locator('[data-block-id="edge-event-hub-runtime-evt-call-read-a"]')).toContainText('A result belongs to src/a.ts');
+    await expect(transcript.locator('[data-block-id="edge-event-hub-runtime-evt-call-read-b"]')).toContainText('B result belongs to src/b.ts');
 
     await expect(transcript).not.toContainText('Deep report should stay in inspector');
     await expect(transcript).not.toContainText('Reviewer QA');
@@ -96,7 +115,7 @@ test.describe('Web shared chat flow contract', () => {
     await installMessagePresenceProbe(page, submittedText);
     await submitComposerMessage(page, submittedText);
 
-    await expect(transcript.locator('.user-bubble').filter({ hasText: submittedText })).toHaveCount(1);
+    await expect(transcript.locator('[data-slot=aui_user-message-root]').filter({ hasText: submittedText })).toHaveCount(1);
     await expect.poll(() => backendRequests.endpoints.has(`POST /client/sessions/${SESSION_ID}/messages`)).toBe(true);
     await expect.poll(() => messagePresenceProbe(page)).toMatchObject({
       sawVisible: true,
@@ -146,7 +165,7 @@ async function horizontalOverflow(page: Page): Promise<number> {
 }
 
 async function transcriptScrollGap(page: Page): Promise<number> {
-  return page.getByRole('log').evaluate((node) => {
+  return page.locator('[data-slot=aui_thread-viewport]').evaluate((node) => {
     const element = node as HTMLElement;
     return Math.max(0, element.scrollHeight - element.scrollTop - element.clientHeight);
   });
@@ -412,7 +431,7 @@ async function fulfillHubRoute(
 }
 
 async function submitComposerMessage(page: Page, message: string): Promise<void> {
-  const composer = page.getByLabel('Composer input');
+  const composer = page.getByRole('textbox', { name: /^(Message input|输入框)$/ });
   const sendButton = page.getByRole('button', { name: /^(Send message|发送消息)$/ });
   await composer.fill(message);
   await expect(sendButton).toBeEnabled();
@@ -428,7 +447,7 @@ async function installMessagePresenceProbe(page: Page, message: string): Promise
       disappearedAfterVisible: false,
     };
     const sample = () => {
-      const visible = Array.from(document.querySelectorAll('.user-bubble'))
+      const visible = Array.from(document.querySelectorAll('[data-slot=aui_user-message-root]'))
         .some((node) => node.textContent?.includes(text));
       if (visible) state.sawVisible = true;
       if (state.sawVisible && !visible) state.disappearedAfterVisible = true;

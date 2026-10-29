@@ -1,103 +1,40 @@
-import React, { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { WORKBENCH_APPROVAL_JUMP_EVENT } from '../workbenchApprovalEvents';
-import type { TFunction } from 'i18next';
-import type { TranscriptBlock, TextTranscriptBlock } from '@shared/transcript';
-import {
-  isSidebarOnlyTranscriptBlock,
-  orderTranscriptBlocks,
-  selectRunReview,
-  summarizeRunReviewFiles,
-} from '@shared/transcript';
+import { orderTranscriptBlocks, selectRunReview, summarizeRunReviewFiles } from '@shared/transcript';
 import { RunReviewOverlay, CheckpointPreviewOverlay, type DiffHunkDecision } from '@shared/ui';
-import type { ComposerIntent, ComposerMention } from '@shared/composer';
-import {
-  buildComposerIntent,
-  captureComposerDraft,
-  composerReducer,
-  createInitialComposerState,
-} from '@shared/composer';
-import {
-  handleDocumentDragLeave,
-  handleDocumentDragOver,
-  handleDocumentDrop,
-  type ComposerDocumentFileDropCallbacks,
-} from '../composer/composerDocumentFileDrop';
-import {
-  describePendingIntent,
-  enqueuePendingIntent,
-  markPendingIntentDispatching,
-  markPendingIntentFailed,
-  MAX_PENDING_DISPATCH_RETRIES,
-  markPendingIntentRetried,
-  movePendingIntent,
-  peekDispatchablePendingIntent,
-  PENDING_DISPATCH_RETRY_DELAY_MS,
-  removePendingIntent,
-  retargetPendingIntent,
-  retryPendingIntent,
-  type PendingDispatchIntent,
-  type PendingIntentMove,
-} from '../composer/pendingIntents';
-import type { AgentHubPlatform, WorkbenchConversation } from '@shared/platform';
-import { AppError } from '@shared/errors';
-import { resolveFailedToastKey } from '@shared/chatview/failedToastKey';
-import { CHATVIEW_I18N_NAMESPACE } from '@shared/chatview/i18n/resources';
-import type { AttachmentUploadState } from '../composer/UnifiedComposer';
-import type { FileItem } from '../inspector/index';
-import type { ConnectionStatusKind } from '../GlobalRail';
-import { ChatViewBridge } from './ChatViewBridge';
-import { ComposerDispatchQueue } from '../composer/ComposerDispatchQueue';
-import {
-  countPendingApprovals,
-  firstPendingApprovalBlockId,
-} from '../workbenchApprovalSummary';
-import { UnifiedComposer } from '../composer/UnifiedComposer';
-import { WorkspaceHeader } from '../WorkspaceHeader';
-import type { WorkbenchSplitControls } from '../workbenchFrameTypes';
+import type { RowItem } from '@shared/chatview/types';
+import { WORKBENCH_APPROVAL_JUMP_EVENT } from '../workbenchApprovalEvents';
+import { WORKBENCH_ENGINEERING_PREVIEW_FOCUS_EVENT } from '../workbenchPreviewEvents';
+import { countPendingApprovals, firstPendingApprovalBlockId } from '../workbenchApprovalSummary';
 import { WorkbenchGoalBanner } from './WorkbenchGoalBanner';
 import { deriveGoalSummary } from './workbenchGoalSummary';
+import type { TranscriptBlock } from '@shared/transcript';
+import type { ComposerMention } from '@shared/composer';
+import type { ComposerAction, ComposerState } from '@shared/composer';
+import type { ConversationRuntime } from '@shared/ui/assistant-ui/AssistantConversation';
+import type { AgentHubPlatform, WorkbenchConversation } from '@shared/platform';
+import type { FileItem } from '../inspector';
+import type { ConnectionStatusKind } from '../GlobalRail';
+import type { WorkbenchSplitControls } from '../workbenchFrameTypes';
 import type { UnreadDividerDescriptor } from '@shared/chatview';
-import type { RowItem } from '@shared/chatview/types';
-import { WORKBENCH_ENGINEERING_PREVIEW_FOCUS_EVENT } from '../workbenchPreviewEvents';
+import { AssistantConversation } from '@shared/ui/assistant-ui/AssistantConversation';
+import { WorkspaceHeader } from '../WorkspaceHeader';
 import MessageSearchPanel from '../MessageSearchPanel';
-import { PageErrorBoundary } from '../PageErrorBoundary';
-import { useComposerSubmitBehavior } from '../workbenchPreferences';
+import { CHATVIEW_I18N_NAMESPACE } from '@shared/chatview/i18n/resources';
 import styles from '../AgentHubWorkbench.module.css';
+import { useComposerSubmitBehavior } from '../workbenchPreferences';
 
-export type { MainchainSummary } from '../mainchain/index';
-
-/**
- * Map a platform/API failure to user-facing toast copy (#1826).
- *
- * REST errors carry a machine code (api/conventions.md §5, surfaced as
- * `AppError.code`); the code with dedicated account copy maps to a chatview
- * toast key. Every other error falls back to the caller's fallback key so
- * English dev copy / raw server messages never reach the user; full detail
- * stays in the console for diagnosis.
- */
-function toastErrorCopy(
-  t: TFunction,
-  error: unknown,
-  fallbackKey: string,
-): string {
-  if (error instanceof AppError && error.code === 'turn_in_progress') {
-    return t('toast.turnInProgress');
-  }
-  if (error instanceof Error) {
-    console.error('[ConversationHost] action failed:', error.message);
-  }
-  // #2072: resolve errcode-specific i18n key when available.
-  return t(resolveFailedToastKey(error, fallbackKey));
-}
+export type { MainchainSummary } from '../mainchain';
 
 export interface ConversationHostProps {
   transcript: TranscriptBlock[];
+  currentUserId?: string | undefined;
   activeConversation?: WorkbenchConversation | undefined;
   connectionStatus?: ConnectionStatusKind | undefined;
   inspectorCollapsed: boolean; onToggleInspector: () => void;
   workbenchStatus?: { dataMode?: string; replayLabel?: string; targetLabel?: string; initialLoading?: boolean; loadError?: string } | undefined;
   onAgentClick: (agentName: string, anchor: HTMLElement) => void;
+  onConversationAvatar?: ((conversation: WorkbenchConversation, anchor: HTMLElement) => void) | undefined;
   onBlockContextMenu: (blockId: string, event: React.MouseEvent) => void;
   onBlockSelect: (blockId: string, shiftKey?: boolean) => void;
   onBlockAction: (action: string, blockId: string, metadata?: Record<string, unknown>) => void;
@@ -114,8 +51,9 @@ export interface ConversationHostProps {
   showComposerAgentPicker: boolean; showComposerStatus: boolean;
   composerTargetLabel: string; currentConversationId: string; platform: AgentHubPlatform;
   /** External composer state + dispatch (owned by shell for context-menu wire). */
-  composer: ReturnType<typeof createInitialComposerState>;
-  dispatchComposer: React.Dispatch<Parameters<typeof composerReducer>[1]>;
+  composer: Pick<ComposerState, 'mode' | 'approvalMode' | 'workDir' | 'mentions'>;
+  bindConversationRuntime?: (runtime: ConversationRuntime | null) => void;
+  dispatchComposer: React.Dispatch<ComposerAction>;
   composerInputRef: React.RefObject<HTMLTextAreaElement | null>;
   /** Search panel open/close control (owned by shell for Ctrl+F handler). */
   searchOpen: boolean;
@@ -140,77 +78,18 @@ export interface ConversationHostProps {
    * shows an honest loading state instead of the "no messages" empty state.
    */
   transcriptLoading?: boolean | undefined;
+  hasEarlierMessages?: boolean | undefined;
+  loadEarlierMessages?: (() => Promise<void>) | undefined;
   /** Split-view header controls (#1997); absent hides the split entry. */
   splitControls?: WorkbenchSplitControls | undefined;
 }
 
-type PendingUserBlock = TextTranscriptBlock & {
-  ackBaselineCount: number;
-  ackOrdinal: number;
-};
-
-/** Stable empty mention list — avoids busting the memoized UnifiedComposer
- *  with a fresh `[]` on every render when the agent picker is hidden. */
-const EMPTY_MENTIONS: ComposerMention[] = [];
-
-/**
- * Pending dispatch entry stored in the client queue. The Hub message
- * is already sent & confirmed — only task dispatch (triggerAgentTask) is
- * retried, never the message itself.
- */
-type PendingDispatchIntentEntry = PendingDispatchIntent<ComposerIntent & { executionTargetId?: string }>;
-
-export const ConversationHost = React.memo(function ConversationHost({
-  transcript, activeConversation, connectionStatus, inspectorCollapsed, onToggleInspector,
-  workbenchStatus,
-  onAgentClick, onBlockContextMenu, onBlockSelect, onBlockAction, onReviewFile, onDeploySubmit,
-  selectedBlockIds, selectionMode, softHiddenBlockIds, actionedBlockIds,
-  highlightedBlockId, onHighlightEnd, dismissedPinnedIds, onToast,
-  composerExecutionTargets, selectedExecutionTargetId, onExecutionTargetChange,
-  mentionableAgents, showComposerAgentPicker, showComposerStatus, composerTargetLabel,
-  currentConversationId, platform,
-  composer, dispatchComposer, composerInputRef,
-  searchOpen, onSearchOpenChange,
-  isAgentRunning, onCancelRun, onEditMessage,
-  transcriptUnreadDivider,
-  transcriptLoading,
-  splitControls,
-}: ConversationHostProps): React.ReactElement {
+export const ConversationHost = React.memo(function ConversationHost(props: ConversationHostProps) {
   const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE);
-  const [uploadProgresses, setUploadProgresses] = useState<Record<string, AttachmentUploadState>>({});
-  const [pendingUserBlocks, setPendingUserBlocks] = useState<PendingUserBlock[]>([]);
+  const submitBehavior = useComposerSubmitBehavior();
   const [searchHighlightId, setSearchHighlightId] = useState<string | null>(null);
-  const isSubmittingRef = useRef(false);
-  const composerSubmitBehavior = useComposerSubmitBehavior();
-
-  // ── Pinned banner dismissal ───────────────────────────────────
-  // The shell owns the initial dismissed set; the host adds local dismissals
-  // and keeps them even if the shell re-renders with the old set.
-  const [dismissedPinnedLocal, setDismissedPinnedLocal] = useState<Set<string>>(
-    () => new Set(dismissedPinnedIds),
-  );
-  useEffect(() => {
-    setDismissedPinnedLocal((current) => {
-      let changed = false;
-      const next = new Set(current);
-      for (const id of dismissedPinnedIds) {
-        if (!next.has(id)) {
-          next.add(id);
-          changed = true;
-        }
-      }
-      return changed ? next : current;
-    });
-  }, [dismissedPinnedIds]);
-  const handleDismissPinned = useCallback((conversationId: string): void => {
-    setDismissedPinnedLocal((current) => {
-      if (current.has(conversationId)) return current;
-      const next = new Set(current);
-      next.add(conversationId);
-      return next;
-    });
-  }, []);
-
+  const { transcript, currentConversationId, onToast, onSearchOpenChange, platform, onCancelRun, selectionMode } = props;
+  const goalSummary = useMemo(() => deriveGoalSummary(transcript), [transcript]);
   // ── #1819 pending-approval reminder (badge + count + arrival toast) ────
   // Honest surface boundary: there is no Hub endpoint that aggregates pending
   // approvals across sessions. The badge covers the ACTIVE conversation's
@@ -354,398 +233,26 @@ export const ConversationHost = React.memo(function ConversationHost({
     setRunReviewOpen(false);
   }, [onToast, t]);
 
-  // ── Pending dispatch queue (#1965) ───────────────────────────────────
-  // Ref-authoritative queues are isolated by conversation. The active
-  // conversation's run signal can only flush its own queue; an inactive
-  // conversation can neither block nor accidentally dispatch another one.
-  const [pendingIntentsVersion, bumpPendingIntentsVersion] = useState(0);
-  const pendingIntentsByConversationRef = useRef<Record<string, PendingDispatchIntentEntry[]>>({});
-  const runningByConversationRef = useRef<Record<string, boolean>>({});
-  const flushInFlightConversationsRef = useRef<Set<string>>(new Set());
-  const retryTimersRef = useRef<Map<string, number>>(new Map());
-  const mountedRef = useRef(true);
-  const currentConversationIdRef = useRef(currentConversationId);
-  const flushPendingIntentsRef = useRef<(conversationId: string) => Promise<void>>(async () => {});
-  currentConversationIdRef.current = currentConversationId;
 
-  useEffect(() => {
-    mountedRef.current = true;
-    return () => {
-      mountedRef.current = false;
-      for (const timer of retryTimersRef.current.values()) window.clearTimeout(timer);
-      retryTimersRef.current.clear();
-      // Dispatch requests already handed to the platform cannot be recalled;
-      // cleanup only prevents hidden retries or state writes after unmount.
-      flushInFlightConversationsRef.current.clear();
-    };
-  }, []);
-
-  const mutatePendingIntents = useCallback((
-    conversationId: string,
-    mutate: (current: PendingDispatchIntentEntry[]) => PendingDispatchIntentEntry[],
-  ): void => {
-    if (!mountedRef.current) return;
-    const current = pendingIntentsByConversationRef.current[conversationId] ?? [];
-    const next = mutate(current);
-    if (next === current) return;
-    if (next.length === 0) Reflect.deleteProperty(pendingIntentsByConversationRef.current, conversationId);
-    else pendingIntentsByConversationRef.current[conversationId] = next;
-    bumpPendingIntentsVersion((version) => version + 1);
-  }, []);
-
-  const schedulePendingFlush = useCallback((
-    conversationId: string,
-    delay = PENDING_DISPATCH_RETRY_DELAY_MS,
-  ): void => {
-    const existing = retryTimersRef.current.get(conversationId);
-    if (existing !== undefined) window.clearTimeout(existing);
-    const timer = window.setTimeout(() => {
-      retryTimersRef.current.delete(conversationId);
-      if (!mountedRef.current || currentConversationIdRef.current !== conversationId) return;
-      void flushPendingIntentsRef.current(conversationId);
-    }, delay);
-    retryTimersRef.current.set(conversationId, timer);
-  }, []);
-
-  /** Dispatch one eligible row for the active conversation. */
-  const flushPendingIntents = useCallback(async (conversationId: string): Promise<void> => {
-    if (!mountedRef.current || currentConversationIdRef.current !== conversationId) return;
-    if (flushInFlightConversationsRef.current.has(conversationId)) return;
-    const redispatchTask = platform.runs.redispatchTask;
-    if (!redispatchTask || runningByConversationRef.current[conversationId]) return;
-    const queue = pendingIntentsByConversationRef.current[conversationId] ?? [];
-    const nextIntent = peekDispatchablePendingIntent(queue);
-    if (!nextIntent) return;
-
-    flushInFlightConversationsRef.current.add(conversationId);
-    mutatePendingIntents(conversationId, (current) =>
-      markPendingIntentDispatching(current, nextIntent));
-    try {
-      const result = await redispatchTask(nextIntent.intent, nextIntent.messageId);
-      if (!mountedRef.current) return;
-      if (result.turnInProgress) {
-        let retryOutcome: 'requeued' | 'abandoned' | undefined;
-        mutatePendingIntents(conversationId, (current) => {
-          const currentEntry = current.find((item) => item.messageId === nextIntent.messageId);
-          if (!currentEntry) return current;
-          const resultState = markPendingIntentRetried(current, currentEntry);
-          retryOutcome = resultState.outcome;
-          return resultState.queue;
-        });
-        if (retryOutcome === 'abandoned') {
-          onToast(t('toast.dispatchRetryExhausted', { max: MAX_PENDING_DISPATCH_RETRIES }));
-        } else if (!runningByConversationRef.current[conversationId]) {
-          schedulePendingFlush(conversationId);
-        }
-        return;
-      }
-      mutatePendingIntents(conversationId, (current) => {
-        const currentEntry = current.find((item) => item.messageId === nextIntent.messageId);
-        return currentEntry ? removePendingIntent(current, currentEntry) : current;
-      });
-    } catch (err) {
-      mutatePendingIntents(conversationId, (current) => {
-        const currentEntry = current.find((item) => item.messageId === nextIntent.messageId);
-        return currentEntry ? markPendingIntentFailed(current, currentEntry) : current;
-      });
-      onToast(toastErrorCopy(t, err, 'toast.dispatchRetryFailed'));
-    } finally {
-      flushInFlightConversationsRef.current.delete(conversationId);
-    }
-  }, [mutatePendingIntents, onToast, platform, schedulePendingFlush, t]);
-  flushPendingIntentsRef.current = flushPendingIntents;
-
-  // A terminal run state only releases the ACTIVE conversation queue. When a
-  // conversation is revisited, its preserved queue is evaluated against that
-  // conversation's current run signal.
-  useEffect(() => {
-    runningByConversationRef.current[currentConversationId] = isAgentRunning ?? false;
-    if (!(isAgentRunning ?? false)) schedulePendingFlush(currentConversationId, 0);
-  }, [currentConversationId, isAgentRunning, schedulePendingFlush]);
-
-  const currentPendingIntents = pendingIntentsByConversationRef.current[currentConversationId] ?? [];
-  const pendingQueueItems = useMemo(
-    () => currentPendingIntents.map((entry) => describePendingIntent(entry)),
-    // The ref is authoritative; this version is the render invalidation token.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [currentConversationId, pendingIntentsVersion],
-  );
-  const retargetOptions = useMemo(
-    () => mentionableAgents.filter((agent) =>
-      agent.dispatchRole !== 'context' && agent.status !== 'unavailable'),
-    [mentionableAgents],
-  );
-
-  const handlePendingUndo = useCallback((messageId: string): void => {
-    mutatePendingIntents(currentConversationId, (current) => {
-      const entry = current.find((item) => item.messageId === messageId);
-      if (!entry || entry.status === 'dispatching') return current;
-      return removePendingIntent(current, entry);
-    });
-    onToast(t('composer.queue.undoConfirmed'));
-  }, [currentConversationId, mutatePendingIntents, onToast, t]);
-
-  const handlePendingMove = useCallback((messageId: string, move: PendingIntentMove): void => {
-    mutatePendingIntents(currentConversationId, (current) =>
-      movePendingIntent(current, messageId, move));
-  }, [currentConversationId, mutatePendingIntents]);
-
-  const handlePendingRetarget = useCallback((messageId: string, targetId: string): void => {
-    const target = retargetOptions.find((agent) => agent.id === targetId);
-    if (!target) return;
-    mutatePendingIntents(currentConversationId, (current) =>
-      retargetPendingIntent(current, messageId, target));
-  }, [currentConversationId, mutatePendingIntents, retargetOptions]);
-
-  const handlePendingRetry = useCallback((messageId: string): void => {
-    mutatePendingIntents(currentConversationId, (current) =>
-      retryPendingIntent(current, messageId));
-    if (!(isAgentRunning ?? false)) schedulePendingFlush(currentConversationId, 0);
-  }, [currentConversationId, isAgentRunning, mutatePendingIntents, schedulePendingFlush]);
-
-  const handlePendingClearAll = useCallback((): void => {
-    mutatePendingIntents(currentConversationId, (current) =>
-      current.filter((entry) => entry.status === 'dispatching'));
-    onToast(t('composer.queue.clearConfirmed'));
-  }, [currentConversationId, mutatePendingIntents, onToast, t]);
-
-  const displayTranscript = useMemo(() => {
-    const chat = transcript.filter((b) => !isSidebarOnlyTranscriptBlock(b));
-    const unacknowledged = unacknowledgedPendingUserBlocks(chat, pendingUserBlocks);
-    return orderTranscriptBlocks([
-      ...chat,
-      ...unacknowledged,
-    ]);
-  }, [transcript, pendingUserBlocks]);
-
-  /* Conversation goal banner (#1998): pure projection of goal tool
-     calls in the transcript; undefined hides the banner entirely. */
-  const goalSummary = useMemo(() => deriveGoalSummary(displayTranscript), [displayTranscript]);
-
-  useEffect(() => {
-    setPendingUserBlocks((current) => unacknowledgedPendingUserBlocks(transcript, current));
-  }, [transcript]);
-
-  /* #1822: file drag-and-drop beyond the composer form — dropping files on
-     the transcript/sidebar/headers used to let the browser open the file.
-     Route any Files drag anywhere outside the composer to the attachment
-     chips instead. The composer's own form handlers keep precedence
-     (events originating inside [data-composer-form] are skipped here). */
-  const [filesDragging, setFilesDragging] = useState(false);
-  // Live conversation id for the drop continuation — a ref keeps the
-  // listener effect stable while always reading the current value
-  // (#1853 review: switching mid-conversion must not leak attachments).
-  const composerConversationIdRef = useRef(composer.conversationId);
-  composerConversationIdRef.current = composer.conversationId;
-  useEffect(() => {
-    // Routing decisions live in composerDocumentFileDrop (unit-tested);
-    // ConversationHost only owns listener registration + the dragging flag.
-    const callbacks: ComposerDocumentFileDropCallbacks = {
-      dispatchComposer,
-      onToast,
-      onDraggingChange: setFilesDragging,
-      getCurrentConversationId: () => composerConversationIdRef.current,
-    };
-    const onDocumentDragOver = (event: DragEvent): void => handleDocumentDragOver(callbacks, event);
-    const onDocumentDragLeave = (event: DragEvent): void => handleDocumentDragLeave(callbacks, event);
-    const onDocumentDrop = (event: DragEvent): void => handleDocumentDrop(callbacks, event);
-    document.addEventListener('dragover', onDocumentDragOver);
-    document.addEventListener('dragleave', onDocumentDragLeave);
-    document.addEventListener('drop', onDocumentDrop);
-    return () => {
-      document.removeEventListener('dragover', onDocumentDragOver);
-      document.removeEventListener('dragleave', onDocumentDragLeave);
-      document.removeEventListener('drop', onDocumentDrop);
-    };
-  }, [dispatchComposer, onToast]);
-
-  const submitComposer = useCallback(async (event: FormEvent<HTMLFormElement>): Promise<void> => {
-    event.preventDefault();
-    if (isSubmittingRef.current) return;
-    const textarea = event.currentTarget.querySelector<HTMLTextAreaElement>('textarea[data-composer-input]');
-    const liveText = textarea?.value ?? composer.text;
-    if (liveText.trim().length === 0 && composer.attachments.length === 0) return;
-    const capturedConversationId = currentConversationId;
-    isSubmittingRef.current = true;
-    dispatchComposer({ type: 'setSubmitState', submitState: 'submitting' });
-
-    // Edit-mode branch (#1462): route submit to editMessage instead of
-    // sending a new message. No optimistic pending block — the server returns
-    // the updated HubMessage and the shell invalidates the messages query.
-    if (composer.editingMessageId && onEditMessage) {
-      const editingBlockId = composer.editingMessageId;
-      const editedText = liveText.trim();
-      try {
-        await onEditMessage(editingBlockId, editedText);
-        dispatchComposer({ type: 'resetAfterSubmit' });
-        dispatchComposer({ type: 'setSubmitState', submitState: 'idle' });
-      } catch (err) {
-        dispatchComposer({ type: 'setSubmitState', submitState: 'error' });
-        onToast(toastErrorCopy(t, err, 'toast.editFailed'));
-      } finally {
-        isSubmittingRef.current = false;
-      }
-      return;
-    }
-
-    let optimisticId: string | undefined;
-    // Snapshot the user's draft before the optimistic clear: when the submit
-    // fails the content is restored so nothing is silently dropped.
-    const draftSnapshot = captureComposerDraft(composer, { text: liveText.trim() });
-    // Tracks upload refs written so far — the catch restores the draft with
-    // them so a retry only re-uploads what actually failed.
-    let enrichedAttachments = composer.attachments;
-    try {
-      const intent = buildComposerIntent(composer);
-      const intentWithLiveText = { ...intent, text: liveText.trim(), conversationId: capturedConversationId };
-      const capturedAttachments = composer.attachments;
-      const pendingAttachments = capturedAttachments.filter((a) => !a.attachmentRef && a.file);
-      optimisticId = `pending-user-${Date.now()}`;
-      const pendingText = liveText.trim();
-      const pendingUserBlock: PendingUserBlock = {
-        id: optimisticId, kind: 'text', text: liveText.trim(),
-        author: { id: 'user', name: 'You', role: 'human' as const }, createdAt: new Date().toISOString(),
-        ackBaselineCount: countMatchingConfirmedUserBlocks(transcript, pendingText),
-        ackOrdinal: 1,
-        ...(composer.replyTo ? { replyToMessageId: composer.replyTo.messageId, replyPreview: composer.replyTo.preview, replyAuthor: composer.replyTo.author } : {}),
-        ...(composer.quote ? { quote: composer.quote.text } : {}),
-      };
-      setPendingUserBlocks((current) => {
-        const ackOrdinal = current.filter((pending) => pending.text.trim() === pendingText).length + 1;
-        return [...current, { ...pendingUserBlock, ackOrdinal }];
-      });
-      dispatchComposer({ type: 'resetAfterSubmit' });
-      dispatchComposer({ type: 'setSubmitState', submitState: 'submitting' });
-      setUploadProgresses({});
-      if (pendingAttachments.length > 0 && platform.attachments) {
-        const uploadPort = platform.attachments;
-        const uploadWithProgress = uploadPort.uploadAttachmentWithProgress ?? undefined;
-        for (const a of pendingAttachments) {
-          if (!a.file) continue;
-          try {
-            setUploadProgresses((prev) => ({ ...prev, [a.id]: { percent: 5, phase: 'hashing' } }));
-            const ref = uploadWithProgress
-              ? await uploadWithProgress(a.file, (progress) => {
-                  setUploadProgresses((prev) => ({
-                    ...prev,
-                    [a.id]: { percent: progress.percent, phase: progress.phase },
-                  }));
-                })
-              : await uploadPort.uploadAttachment(a.file);
-            setUploadProgresses((prev) => ({ ...prev, [a.id]: { percent: 100, phase: 'done' } }));
-            enrichedAttachments = enrichedAttachments.map((x) => x.id === a.id ? { ...x, attachmentRef: ref } : x);
-            // Keep the composer state in sync so a restored draft keeps the refs.
-            dispatchComposer({ type: 'setAttachmentRef', attachmentId: a.id, attachmentRef: ref });
-          } catch {
-            // Upload failed: mark the chip failed and abort the send — shipping
-            // the message without the file would silently lose it.
-            setUploadProgresses((prev) => ({ ...prev, [a.id]: { percent: 100, phase: 'failed' } }));
-            throw new Error(t('conversationHost.attachmentUploadFailedLong', { name: a.name }));
-          }
-        }
-      }
-      const finalIntent = enrichedAttachments.length > 0 ? { ...intentWithLiveText, attachments: enrichedAttachments } : intentWithLiveText;
-      const submitPayload = { ...finalIntent, ...(selectedExecutionTargetId ? { executionTargetId: selectedExecutionTargetId } : {}) };
-      const submitResult = await platform.runs.submitComposerIntent(submitPayload);
-      dispatchComposer({ type: 'setSubmitState', submitState: 'idle' });
-      // #1819: a send without a dispatch mention delivers the message but
-      // triggers no agent task — say so explicitly instead of failing silent.
-      const submittedDispatchMention = submitPayload.mentions.find(
-        (mention) => mention.dispatchRole !== 'context',
-      );
-      if (!submittedDispatchMention) {
-        onToast(t('toast.sentWithoutDispatch'));
-      }
-      // Recoverable 409 turn_in_progress: the Hub message was sent (SendMessage
-      // is independent) but task dispatch was rejected because the agent instance
-      // already has a non-terminal task (#1430). Keep the optimistic user block
-      // (the message is real), restore the composer to idle, and surface an
-      // info toast rather than a hard error (#1438). With a dispatch-only
-      // retry port available, also enqueue the dispatch intent so the
-      // agent dispatch is retried once the run ends instead of being dropped.
-      if (submitResult.turnInProgress) {
-        const dispatchMention = submitPayload.mentions.find((mention) => mention.dispatchRole !== 'context');
-        if (dispatchMention && platform.runs.redispatchTask) {
-          mutatePendingIntents(capturedConversationId, (current) => enqueuePendingIntent(current, {
-            agentId: dispatchMention.id,
-            messageId: submitResult.intentId,
-            attempt: 0,
-            status: 'queued',
-            intent: submitPayload,
-          }));
-          // If no run is reported active the busy window may already be over
-          // (no run-end transition will fire) — schedule a short-delayed flush.
-          if (!(isAgentRunning ?? false)) {
-            schedulePendingFlush(capturedConversationId);
-          }
-        }
-        onToast(t('toast.turnInProgress'));
-      }
-    } catch (err) {
-      if (optimisticId) {
-        setPendingUserBlocks((current) => current.filter((pending) => pending.id !== optimisticId));
-      }
-      // Restore the user's draft (failed attachments keep their refs so a
-      // retry only re-uploads what actually failed) and keep the failed
-      // progress entries so the chips show the failure + retry state.
-      dispatchComposer({
-        type: 'restoreDraft',
-        draft: {
-          ...draftSnapshot,
-          attachments: draftSnapshot.attachments.map((attachment) => {
-            const ref = enrichedAttachments.find((enriched) => enriched.id === attachment.id)?.attachmentRef;
-            return ref ? { ...attachment, attachmentRef: ref } : attachment;
-          }),
-        },
-      });
-      dispatchComposer({ type: 'setSubmitState', submitState: 'error' });
-      onToast(toastErrorCopy(t, err, 'toast.submitFailed'));
-    } finally { isSubmittingRef.current = false; }
-  }, [composer, currentConversationId, platform, selectedExecutionTargetId, isAgentRunning,
-    onToast, dispatchComposer, t, transcript, onEditMessage, mutatePendingIntents, schedulePendingFlush]);
-
-  /**
-   * Retry a failed attachment upload from its chip. The attachment
-   * keeps its transient `file` after the failed submit, so the retry can
-   * re-upload in place and write the ref back into the composer.
-   */
-  const retryAttachmentUpload = useCallback(async (attachmentId: string): Promise<void> => {
-    const uploadPort = platform.attachments;
-    const attachment = composer.attachments.find((a) => a.id === attachmentId);
-    if (!uploadPort || !attachment?.file) return;
-    const uploadWithProgress = uploadPort.uploadAttachmentWithProgress ?? undefined;
-    setUploadProgresses((prev) => ({ ...prev, [attachmentId]: { percent: 5, phase: 'hashing' } }));
-    try {
-      const ref = uploadWithProgress
-        ? await uploadWithProgress(attachment.file, (progress) => {
-            setUploadProgresses((prev) => ({
-              ...prev,
-              [attachmentId]: { percent: progress.percent, phase: progress.phase },
-            }));
-          })
-        : await uploadPort.uploadAttachment(attachment.file);
-      setUploadProgresses((prev) => ({ ...prev, [attachmentId]: { percent: 100, phase: 'done' } }));
-      dispatchComposer({ type: 'setAttachmentRef', attachmentId, attachmentRef: ref });
-    } catch {
-      setUploadProgresses((prev) => ({ ...prev, [attachmentId]: { percent: 100, phase: 'failed' } }));
-      onToast(t('conversationHost.attachmentUploadFailed', { name: attachment.name }));
-    }
-  }, [composer.attachments, platform, dispatchComposer, onToast]);
-
-  const handleSearchJump = useCallback((id: string) => { onSearchOpenChange(false); setSearchHighlightId(id); }, [onSearchOpenChange]);
-  const handleSearchHighlightEnd = useCallback(() => { setSearchHighlightId(null); onHighlightEnd?.(); }, [onHighlightEnd]);
-  const resolvedHighlight = searchHighlightId ?? highlightedBlockId ?? undefined;
-
-  return (
-    <>
-      {filesDragging && (
-        <div className={styles.transcriptDropOverlay} role="status" aria-live="polite">
-          {t('composer.dropToAttach', { defaultValue: '松开鼠标以添加附件' })}
-        </div>
-      )}
-      <WorkspaceHeader activeConversation={activeConversation}
-        inspectorCollapsed={inspectorCollapsed} onToggleInspector={onToggleInspector} onOpenSearch={() => onSearchOpenChange(true)}
-        {...(splitControls ? { splitControls } : {})} />
+  const selectedAgent = props.composer.mentions.find((mention) => mention.dispatchRole !== 'context');
+  const intent = useMemo(() => ({
+    conversationId: props.currentConversationId,
+    mode: props.composer.mode,
+    approvalMode: props.composer.approvalMode,
+    mentions: props.composer.mentions,
+    workDir: props.composer.workDir,
+    ...(props.selectedExecutionTargetId ? { executionTargetId: props.selectedExecutionTargetId } : {}),
+  }), [props.currentConversationId, props.composer.mode, props.composer.approvalMode,
+    props.composer.mentions, props.composer.workDir, props.selectedExecutionTargetId]);
+  const jumpToMessage = useCallback((id: string) => {
+    onSearchOpenChange(false);
+    setSearchHighlightId(id);
+    document.getElementById(id)?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  }, [onSearchOpenChange]);
+  return <>
+    <WorkspaceHeader activeConversation={props.activeConversation}
+      inspectorCollapsed={props.inspectorCollapsed} onToggleInspector={props.onToggleInspector}
+      onOpenSearch={() => props.onSearchOpenChange(true)} {...(props.splitControls ? { splitControls: props.splitControls } : {})} />
       {goalSummary && (
         <WorkbenchGoalBanner summary={goalSummary} onCancelRun={onCancelRun} />
       )}
@@ -788,26 +295,50 @@ export const ConversationHost = React.memo(function ConversationHost({
           )}
         </div>
       )}
-      <div className={styles.transcriptRegion} role="region" aria-label={t('aria.transcript')}>
-        <ChatViewBridge displayTranscript={displayTranscript} activeConversation={activeConversation}
-          unreadDivider={transcriptUnreadDivider}
-          previewExternalOpenEnabled={platform.capabilities.browserPreview}
-          onAgentClick={onAgentClick} onBlockContextMenu={onBlockContextMenu}
-          onBlockSelect={onBlockSelect} onBlockAction={onBlockAction}
-          onReviewFile={onReviewFile} onArtifactClick={handleArtifactClick}
-          onCheckpointClick={handleCheckpointClick} onDeploySubmit={onDeploySubmit}
-          selectedBlockIds={selectedBlockIds} selectionMode={selectionMode}
-          softHiddenBlockIds={softHiddenBlockIds} actionedBlockIds={actionedBlockIds}
-          highlightedBlockId={resolvedHighlight} onHighlightEnd={handleSearchHighlightEnd}
-          connectionStatus={connectionStatus} dismissedPinnedIds={dismissedPinnedLocal}
-          onDismissPinned={handleDismissPinned} onToast={onToast}
-          {...(transcriptLoading !== undefined ? { transcriptLoading } : {})} />
-      </div>
-      <MessageSearchPanel open={searchOpen} onClose={() => onSearchOpenChange(false)}
-        onJumpToMessage={handleSearchJump} highlightMessageId={searchHighlightId}
-        onHighlightEnd={handleSearchHighlightEnd} transcriptBlocks={displayTranscript}
-        searchLabel={t('searchPanel.label')} searchPlaceholder={t('searchPanel.placeholder')}
-        noResultsLabel={t('searchPanel.noResults')} />
+    <div className={styles.transcriptRegion} role="region" aria-label={t('aria.transcript')}>
+      {props.activeConversation?.pinnedAnnouncement && !props.dismissedPinnedIds.has(props.currentConversationId) &&
+        <div className="border-b px-4 py-2 text-sm" role="note">{props.activeConversation.pinnedAnnouncement.content}</div>}
+      <AssistantConversation key={props.currentConversationId}
+        conversationId={props.currentConversationId} transcript={props.transcript.filter((block) => !props.softHiddenBlockIds.has(block.id))}
+        platform={props.platform} intent={intent} onRuntime={props.bindConversationRuntime}
+        currentUserId={props.currentUserId} onEdit={props.onEditMessage} inputRef={props.composerInputRef}
+        submitMode={submitBehavior === 'ctrl-enter-send' ? 'ctrlEnter' : 'enter'}
+        onContextMenu={props.onBlockContextMenu} onSelect={props.onBlockSelect}
+        onAuthorClick={(author, anchor) => {
+          if (author.role === 'agent') props.onAgentClick(author.name, anchor);
+          else props.onConversationAvatar?.({ id: author.id, title: author.name, kind: 'direct' }, anchor);
+        }}
+        selectedIds={props.selectedBlockIds} selectionMode={props.selectionMode}
+        hasEarlier={props.hasEarlierMessages} onLoadEarlier={props.loadEarlierMessages}
+        isLoading={props.transcriptLoading} isDisabled={!props.activeConversation || props.currentConversationId === 'hub-empty-workspace'}
+        isSendDisabled={Boolean(selectedAgent && props.composerExecutionTargets && !props.selectedExecutionTargetId)}
+        isRunning={props.isAgentRunning} onCancel={props.onCancelRun}
+        onEvidenceAction={props.onBlockAction}
+        onArtifactClick={handleArtifactClick} onCheckpointClick={handleCheckpointClick}
+        welcome={t('conversationHost.startConversation', { defaultValue: '开始对话' })}
+        controls={<>
+          {props.showComposerAgentPicker && <div className="flex flex-wrap items-center gap-2 px-2 text-sm">
+            <select aria-label="@Agent" className="rounded-md border bg-background px-2 py-1"
+              value={selectedAgent?.id ?? ''} onChange={(event) => {
+                if (selectedAgent) props.dispatchComposer({ type: 'removeMention', mentionId: selectedAgent.id });
+                const agent = props.mentionableAgents.find((item) => item.id === event.target.value);
+                if (agent) props.dispatchComposer({ type: 'addMention', mention: agent });
+              }}>
+              <option value="">{t('composer.messageOnly', { defaultValue: '仅发送消息' })}</option>
+              {props.mentionableAgents.map((agent) => <option key={agent.id} value={agent.id} disabled={agent.status === 'unavailable'}>{agent.label}</option>)}
+            </select>
+            {selectedAgent && props.composerExecutionTargets && <select aria-label={t('composer.executionTarget', { defaultValue: '执行目标' })}
+              className="rounded-md border bg-background px-2 py-1" value={props.selectedExecutionTargetId}
+              onChange={(event) => props.onExecutionTargetChange(event.target.value)}>
+              <option value="">{t('composer.selectTarget', { defaultValue: '选择执行设备' })}</option>
+              {props.composerExecutionTargets.map((target) => <option key={target.id} value={target.id}>{target.label}</option>)}
+            </select>}
+            {selectedAgent && props.composerExecutionTargets?.length === 0 && <p role="status" className="text-muted-foreground text-xs">
+              {t('composer.noExecutionTarget')}
+            </p>}
+          </div>}
+        </>} />
+    </div>
       {/* #1967 run review: accept/reject is wired only with a trusted
           executor-reported workDir plus the platform apply port; every other
           combination stays honestly read-only with a reason-specific notice. */}
@@ -875,58 +406,10 @@ export const ConversationHost = React.memo(function ConversationHost({
         }}
         onClose={handleCloseCheckpointPreview}
       />
-      {!selectionMode && (
-        <>
-          <ComposerDispatchQueue
-            isRunning={isAgentRunning ?? false}
-            items={pendingQueueItems}
-            onClearAll={handlePendingClearAll}
-            onMove={handlePendingMove}
-            onRetarget={handlePendingRetarget}
-            onRetry={handlePendingRetry}
-            onUndo={handlePendingUndo}
-            retargetOptions={retargetOptions}
-          />
-          <PageErrorBoundary>
-            <UnifiedComposer composer={composer} dispatchComposer={dispatchComposer}
-              executionTargets={composerExecutionTargets} executionTargetId={selectedExecutionTargetId}
-              inputRef={composerInputRef} mentionableAgents={showComposerAgentPicker ? mentionableAgents : EMPTY_MENTIONS}
-              onExecutionTargetChange={onExecutionTargetChange} onPickLocalAttachments={platform.attachments?.pickFiles}
-              onSubmit={submitComposer} status={showComposerStatus ? workbenchStatus : undefined}
-              submitBehavior={composerSubmitBehavior} targetLabel={composerTargetLabel} uploadProgresses={uploadProgresses}
-              isRunning={isAgentRunning} onCancel={onCancelRun} onToast={onToast}
-              onRetryAttachmentUpload={retryAttachmentUpload} />
-          </PageErrorBoundary>
-        </>
-      )}
-    </>
-  );
+    <MessageSearchPanel open={props.searchOpen} onClose={() => props.onSearchOpenChange(false)}
+      onJumpToMessage={jumpToMessage} highlightMessageId={searchHighlightId}
+      onHighlightEnd={() => setSearchHighlightId(null)} transcriptBlocks={props.transcript}
+      searchLabel={t('searchPanel.label')} searchPlaceholder={t('searchPanel.placeholder')}
+      noResultsLabel={t('searchPanel.noResults')} />
+  </>;
 });
-
-function unacknowledgedPendingUserBlocks(
-  blocks: TranscriptBlock[],
-  pendingBlocks: PendingUserBlock[],
-): PendingUserBlock[] {
-  return pendingBlocks.filter((pending) => {
-    const pendingText = pending.text.trim();
-    const matchingConfirmedCount = countMatchingConfirmedUserBlocks(blocks, pendingText);
-    return !hasAcknowledgedPendingUserBlock(blocks, pending, matchingConfirmedCount);
-  });
-}
-
-function hasAcknowledgedPendingUserBlock(
-  blocks: TranscriptBlock[],
-  pending: PendingUserBlock,
-  matchingConfirmedCount: number,
-): boolean {
-  if (blocks.some((block) => block.id === pending.id)) return true;
-  return matchingConfirmedCount >= pending.ackBaselineCount + pending.ackOrdinal;
-}
-
-function countMatchingConfirmedUserBlocks(blocks: TranscriptBlock[], text: string): number {
-  return blocks.filter((block) => (
-    block.kind === 'text' &&
-    block.author.role === 'human' &&
-    block.text.trim() === text
-  )).length;
-}

@@ -76,6 +76,9 @@ export interface WorkbenchPinnedAnnouncement {
 }
 
 export interface WorkbenchConversation {
+  canRename?: boolean;
+  canDelete?: boolean;
+  canArchive?: boolean;
   id: string;
   title: string;
   kind: ConversationKind;

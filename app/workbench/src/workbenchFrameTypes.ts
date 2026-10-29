@@ -118,6 +118,7 @@ export interface ChatSidebarFrameProps {
   onSelectConversation: (conversationId: string) => void;
   onAvatarClick: (conversation: WorkbenchConversation, anchor: HTMLElement) => void;
   onConversationPin?: ((conversationId: string, pinned: boolean) => void) | undefined;
+  conversationActions?: import('@shared/ui/assistant-ui/AssistantThreadList').ConversationActions | undefined;
   onConversationArchive?: ((conversationId: string, archived: boolean) => void) | undefined;
   /** Started when the user clicks the sidebar "new conversation" entry (#1819). */
   onStartNewConversation?: (() => void) | undefined;
@@ -142,6 +143,7 @@ export interface WorkspaceLoadErrorStateProps {
 }
 
 export interface ChatConversationHostFrameProps {
+  currentUserId?: string | undefined;
   platform: AgentHubPlatform;
   session: WorkbenchSessionChrome;
   transcriptChrome: WorkbenchTranscriptChrome;
@@ -168,6 +170,8 @@ export interface ChatConversationHostFrameProps {
    * shows an honest loading state instead of the "no messages" empty state.
    */
   transcriptLoading?: boolean | undefined;
+  hasEarlierMessages?: boolean | undefined;
+  loadEarlierMessages?: (() => Promise<void>) | undefined;
   /** Split-view header controls (#1997); absent hides the split entry. */
   splitControls?: WorkbenchSplitControls | undefined;
 }

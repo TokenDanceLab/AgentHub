@@ -63,6 +63,7 @@ export function WorkbenchFrame({
   projectsStatus,
   onConversationPin,
   onConversationArchive,
+  conversationActions,
   onActiveProjectChange,
   onAgentCreate,
   onAgentUpdate,
@@ -103,6 +104,8 @@ export function WorkbenchFrame({
   onCancelRun,
   onEditMessage,
   transcriptLoading,
+  hasEarlierMessages,
+  loadEarlierMessages,
   devicesTargets,
   devicesLoading,
   devicesError,
@@ -289,6 +292,7 @@ export function WorkbenchFrame({
 
   const chatHostElement = (
     <ChatConversationHostFrame
+      currentUserId={currentUserId}
       platform={platform}
       session={session}
       transcriptChrome={transcriptChrome}
@@ -308,6 +312,7 @@ export function WorkbenchFrame({
       onCancelRun={onCancelRun}
       onEditMessage={onEditMessage}
       transcriptLoading={transcriptLoading}
+      hasEarlierMessages={hasEarlierMessages} loadEarlierMessages={loadEarlierMessages}
       {...(activeSplitControls ? { splitControls: activeSplitControls } : {})}
     />
   );
@@ -364,6 +369,7 @@ export function WorkbenchFrame({
           onAvatarClick={openConversationAvatar}
           onConversationPin={onConversationPin}
           onConversationArchive={onConversationArchive}
+          conversationActions={conversationActions}
           onStartNewConversation={onStartNewConversation}
           {...(attentionSummary
             ? { liveStatusByConversation: attentionSummary.liveStatusByConversation }

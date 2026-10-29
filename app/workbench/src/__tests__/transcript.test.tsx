@@ -9,7 +9,6 @@ import {
   fireEvent,
   render,
   screen,
-  waitFor,
   within,
 } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
@@ -78,11 +77,10 @@ describe('AgentHubWorkbench', () => {
     expect(within(transcriptRegion).getByText('我先检查浏览器中的聊天布局。')).toBeInTheDocument();
     expect(within(transcriptRegion).queryByText('2 agents active')).not.toBeInTheDocument();
     expect(within(transcriptRegion).queryByText('09:30')).not.toBeInTheDocument();
-    expect(container.querySelector('[data-agent-profile="Builder"]')).toBeInTheDocument();
-    expect(container.querySelector('[data-agent-profile="Agent"]')).not.toBeInTheDocument();
+    expect(container.querySelector('[data-author-role=agent]')).toHaveTextContent('Agent');
   });
 
-  it('hides repeated avatars for rapid consecutive user messages', () => {
+  it('keeps the human author on every message', () => {
     const platform = createMockPlatform({
       surface: 'desktop',
       capabilities: { browserPreview: true },
@@ -124,12 +122,12 @@ describe('AgentHubWorkbench', () => {
     expect(screen.getByText('第一条连续消息')).toBeInTheDocument();
     expect(screen.getByText('第二条连续消息')).toBeInTheDocument();
     expect(screen.getByText('超过分组窗口后的消息')).toBeInTheDocument();
-    const userAvatarCells = Array.from(container.querySelectorAll('.user-av'))
+    const userAvatarCells = Array.from(container.querySelectorAll('[data-author-role=human]'))
       .map((av) => av.textContent?.trim() ?? null);
-    expect(userAvatarCells).toEqual(['D', 'D', 'D']);
+    expect(userAvatarCells).toEqual(['Demo User', 'Demo User', 'Demo User']);
   });
 
-  it('renders v4 transcript detail blocks from the design system', () => {
+  it('renders reasoning through the official disclosure', async () => {
     const platform = createMockPlatform({
       surface: 'desktop',
       capabilities: { browserPreview: true },
@@ -145,10 +143,10 @@ describe('AgentHubWorkbench', () => {
       />,
     );
 
-    expect(screen.getByText('正在思考')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Reasoning/ })).toBeInTheDocument();
     // Current reasoning label rendering depends on thinking card state
     // Verify thinking card content is present
-    expect(screen.getByText('正在分析 Desktop/Web shared UI 与 design demo 的消息块差距。')).toBeInTheDocument();
+    expect(await screen.findByText('正在分析 Desktop/Web shared UI 与 design demo 的消息块差距。')).toBeInTheDocument();
     // Route card label depends on card.think.done/card.route.dag i18n
     // Context usage and child agent cards rendered differently in current components
     // run_session timeline items, agent_timeline and result cards are sidebar-only
@@ -227,14 +225,14 @@ describe('AgentHubWorkbench', () => {
     expect(within(toolbar).getByRole('button', { name: '删除' })).toBeInTheDocument();
     expect(within(toolbar).queryByRole('button', { name: '转发' })).not.toBeInTheDocument();
     expect(within(toolbar).queryByRole('button', { name: '添加任务' })).not.toBeInTheDocument();
-    expect(screen.queryByPlaceholderText('发消息给 Builder')).not.toBeInTheDocument();
+    expect(screen.queryByRole('textbox', { name: '输入框' })).not.toBeInTheDocument();
 
     fireEvent.click(within(toolbar).getByRole('button', { name: '清空' }));
     expect(toolbar).toHaveTextContent('0 框选模式 / 12');
 
     fireEvent.click(within(toolbar).getByRole('button', { name: '退出' }));
     expect(screen.queryByRole('toolbar', { name: '多选操作' })).not.toBeInTheDocument();
-    expect(screen.getByPlaceholderText('发消息给 Builder')).toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: '输入框' })).toBeInTheDocument();
   });
 
   it('pins a transcript card from the message action menu', () => {
@@ -383,127 +381,16 @@ describe('AgentHubWorkbench', () => {
     );
   });
 
-  it('keeps the optimistic user message visible until the transcript catches up', async () => {
-    const platform = createMockPlatform({
-      surface: 'desktop',
-      conversations: [{ id: 'team', title: 'Agent 协作群', kind: 'group' }],
-    });
-    platform.runs.submitComposerIntent = vi.fn().mockResolvedValue({ intentId: 'run-created' });
-
-    render(
-      <AgentHubWorkbench
-        agents={agents}
-        platform={platform}
-        conversations={platform.seed.conversations}
-        activeConversationId="team"
-        transcript={[]}
-      />,
-    );
-
-    fireEvent.change(screen.getByRole('textbox', { name: '输入框' }), {
-      target: { value: '研究一下AgentHub项目' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: '发送消息' }));
-
-    await waitFor(() => {
-      expect(platform.runs.submitComposerIntent).toHaveBeenCalledTimes(1);
-    });
-
-    expect(screen.getByText('研究一下AgentHub项目')).toBeInTheDocument();
-  });
-
-  it('replaces the optimistic user message when matching transcript text arrives with server clock skew', async () => {
-    const platform = createMockPlatform({
-      surface: 'desktop',
-      conversations: [{ id: 'team', title: 'Agent 协作群', kind: 'group' }],
-    });
-    platform.runs.submitComposerIntent = vi.fn().mockResolvedValue({ intentId: 'run-created' });
-
-    const { rerender } = render(
-      <AgentHubWorkbench
-        agents={agents}
-        platform={platform}
-        conversations={platform.seed.conversations}
-        activeConversationId="team"
-        transcript={[]}
-      />,
-    );
-
-    fireEvent.change(screen.getByRole('textbox', { name: '输入框' }), {
-      target: { value: '继续修复聊天流' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: '发送消息' }));
-
-    await waitFor(() => {
-      expect(platform.runs.submitComposerIntent).toHaveBeenCalledTimes(1);
-    });
-    expect(screen.getByText('继续修复聊天流')).toBeInTheDocument();
-
-    rerender(
-      <AgentHubWorkbench
-        agents={agents}
-        platform={platform}
-        conversations={platform.seed.conversations}
-        activeConversationId="team"
-        transcript={[{
-          id: 'hub-message-confirmed',
-          kind: 'text',
-          author: { id: 'user', name: 'You', role: 'human' },
-          text: '继续修复聊天流',
-          createdAt: '2020-01-01T00:00:00.000Z',
-        }]}
-      />,
-    );
-
-    expect(screen.getAllByText('继续修复聊天流')).toHaveLength(1);
-  });
-
-  it('only acknowledges one optimistic user message for each matching confirmed transcript message', async () => {
-    const platform = createMockPlatform({
-      surface: 'desktop',
-      conversations: [{ id: 'team', title: 'Agent 协作群', kind: 'group' }],
-    });
-    platform.runs.submitComposerIntent = vi.fn().mockResolvedValue({ intentId: 'run-created' });
-
-    const { rerender } = render(
-      <AgentHubWorkbench
-        agents={agents}
-        platform={platform}
-        conversations={platform.seed.conversations}
-        activeConversationId="team"
-        transcript={[]}
-      />,
-    );
-
-    for (let index = 0; index < 2; index += 1) {
-      fireEvent.change(screen.getByRole('textbox', { name: '输入框' }), {
-        target: { value: '继续修复聊天流' },
-      });
-      fireEvent.click(screen.getByRole('button', { name: '发送消息' }));
-
-      await waitFor(() => {
-        expect(platform.runs.submitComposerIntent).toHaveBeenCalledTimes(index + 1);
-      });
-    }
-
-    expect(screen.getAllByText('继续修复聊天流')).toHaveLength(2);
-
-    rerender(
-      <AgentHubWorkbench
-        agents={agents}
-        platform={platform}
-        conversations={platform.seed.conversations}
-        activeConversationId="team"
-        transcript={[{
-          id: 'hub-message-confirmed-once',
-          kind: 'text',
-          author: { id: 'user', name: 'You', role: 'human' },
-          text: '继续修复聊天流',
-          createdAt: '2020-01-01T00:00:00.000Z',
-        }]}
-      />,
-    );
-
-    expect(screen.getAllByText('继续修复聊天流')).toHaveLength(2);
+  it('reconciles snapshots by message ID, including repeated text and server clock skew', () => {
+    const platform = createMockPlatform({ surface: 'web', conversations: [{ id: 'team', title: 'Team', kind: 'group' }] });
+    const first: TranscriptBlock = { id: 'client-1', kind: 'text', author: { id: 'user', name: 'You', role: 'human' }, text: 'repeat', createdAt: '2026-01-01T00:00:00Z' };
+    const second: TranscriptBlock = { ...first, id: 'client-2' };
+    const base = { agents, platform, conversations: platform.seed.conversations, activeConversationId: 'team' };
+    const view = render(<AgentHubWorkbench {...base} transcript={[first, second]} />);
+    expect(screen.getAllByText('repeat')).toHaveLength(2);
+    view.rerender(<AgentHubWorkbench {...base} transcript={[{ ...first, id: 'server-1', createdAt: '2020-01-01T00:00:00Z' }, second]} />);
+    expect(screen.getAllByText('repeat')).toHaveLength(2);
+    expect(view.container.querySelector('[data-block-id="client-1"]')).toBeNull();
+    expect(view.container.querySelector('[data-block-id="server-1"]')).toBeInTheDocument();
   });
 });

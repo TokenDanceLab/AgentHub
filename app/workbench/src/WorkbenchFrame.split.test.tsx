@@ -190,7 +190,7 @@ function splitVia(holder: LayoutHolder, orientation: 'horizontal' | 'vertical'):
 
 /** Sidebar rows bind onClick to the inner .conversationRow div, not the li. */
 function clickConversationRow(title: string): void {
-  const option = screen.getAllByRole('option').find((item) => item.textContent?.includes(title));
+  const option = screen.getAllByRole('button').find((item) => item.textContent?.includes(title));
   expect(option, `sidebar option for ${title}`).toBeTruthy();
   const row = (option as HTMLElement).firstElementChild as HTMLElement | null;
   expect(row, `row element for ${title}`).toBeTruthy();

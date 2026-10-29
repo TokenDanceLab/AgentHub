@@ -196,7 +196,7 @@ const cancelRunMutateAsync = vi.fn();
 const decideEdgePermissionMutateAsync = vi.fn();
 const tryAutoLogin = vi.fn().mockResolvedValue(undefined);
 const refetchHealth = vi.fn();
-const composerInputLabel = /^(Composer input|aria\.composerInput)$/;
+const composerInputLabel = /^(Message input|消息输入框)$/;
 const conversationSidebarLabel = /^(Conversation sidebar|aria\.conversationSidebar)$/;
 const workspaceLabel = /^(Workspace|aria\.workspace)$/;
 const workspaceTabsLabel = /^(Workspace tabs|aria\.workspaceTabs)$/;
@@ -673,10 +673,7 @@ describe('Desktop App v4 root', () => {
 
     renderWithProviders(<DesktopWorkbenchApp />);
 
-    // Empty thread list renders both the header icon button and the
-    // empty-state CTA (same key-echo name); the header button is first.
-    const newButtons = await screen.findAllByRole('button', { name: /newConversation/ });
-    fireEvent.click(newButtons[0]!);
+    fireEvent.click(await screen.findByRole('button', { name: /^(New Thread|新建对话)$/ }));
     await waitFor(() => {
       expect(createThreadMutateAsync).toHaveBeenCalledWith({});
     });
@@ -693,8 +690,7 @@ describe('Desktop App v4 root', () => {
 
     renderWithProviders(<DesktopWorkbenchApp />);
 
-    const newButtons = await screen.findAllByRole('button', { name: /newConversation/ });
-    fireEvent.click(newButtons[0]!);
+    fireEvent.click(await screen.findByRole('button', { name: /^(New Thread|新建对话)$/ }));
     // DesktopWorkbenchApp renders without the outer App ToastContainer, so the
     // visible-failure contract is asserted at the shared toast store level:
     // an error toast was queued with the startConversation message.
@@ -799,7 +795,11 @@ describe('Desktop App v4 root', () => {
     } as ReturnType<typeof useThreadMessages>);
     rerender(<QueryClientProvider client={testQueryClient}><DesktopWorkbenchApp /></QueryClientProvider>);
 
-    expect(screen.getAllByText('持久化前的实时回答')).toHaveLength(1);
+    // assistant-ui applies external-store updates and renders Markdown after
+    // the platform snapshot, so wait for the visible deduplicated transcript.
+    await waitFor(() => {
+      expect(screen.getAllByText('持久化前的实时回答')).toHaveLength(1);
+    });
     expect(mockedCreateEventStream).toHaveBeenCalledTimes(1);
   });
 
@@ -903,7 +903,7 @@ describe('Desktop App v4 root', () => {
     renderWithProviders(<DesktopWorkbenchApp />);
 
     const stopButton = await screen.findByRole('button', {
-      name: /^(停止运行|Stop|action\.stopRun)$/,
+      name: /^(Stop generating|停止生成)$/,
     });
     fireEvent.click(stopButton);
 
@@ -954,29 +954,14 @@ describe('Desktop App v4 root', () => {
       });
     });
 
-    // #1821 contract: waiting approval cards auto-expand so the approve/deny
-    // actions are visible by default. The auto-expand effect races this
-    // lookup on scheduler timing (which differs between local and loaded CI
-    // runners), so the card may arrive either collapsed or already open.
-    // Probe aria-expanded instead of assuming "arrives collapsed": a blind
-    // click on an already-open toggle would collapse the card and lock
-    // re-expansion behind the manual-toggle flag, hiding the approve button.
-    // The generous timeout covers slow card arrival under load: the event
-    // reaches the transcript through a coalescing batch timer + React
-    // scheduler hops, which can be starved well past the 1s default on
-    // contended runners.
-    const approvalToggle = await screen.findByRole(
+    // Pending assistant-ui permissions expose their decision immediately.
+    // Keep the behavioral contract: no expansion is needed before approving.
+    const approveButton = await screen.findByRole(
       'button',
-      { name: /^(card\.expand|展开|Expand|card\.collapse|收起|Collapse)$/ },
+      { name: /^(批准|Approve)$/ },
       { timeout: 5000 },
     );
-    if (approvalToggle.getAttribute('aria-expanded') === 'false') {
-      fireEvent.click(approvalToggle);
-    }
-
-    const approveButton = await screen.findByRole('button', {
-      name: /^(批准|Approve|card\.approval\.approve)$/,
-    });
+    expect(approveButton).toBeVisible();
     fireEvent.click(approveButton);
 
     await waitFor(() => {

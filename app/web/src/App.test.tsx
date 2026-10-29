@@ -21,12 +21,14 @@ const useWebWorkbenchModelMock = vi.hoisted(() => vi.fn());
 const useWebAuthMock = vi.hoisted(() => vi.fn());
 const ensureAuthMock = vi.hoisted(() => vi.fn());
 const logoutMock = vi.hoisted(() => vi.fn(async () => undefined));
+const useAuthMock = vi.hoisted(() => vi.fn());
 const getAccessTokenMock = vi.hoisted(() => vi.fn<() => string | null>(() => null));
 const hubClientStub = vi.hoisted(() => ({
   me: vi.fn(async () => ({ id: 'web-user', username: 'web-user', nickname: 'Web User', avatar_url: '' })),
   listPublicSkills: vi.fn(async () => ({ items: [] })),
   listPublicMCPServers: vi.fn(async () => ({ items: [] })),
   createPrivateSession: vi.fn(async () => ({ session_id: 'session-1' })),
+  createGroupSession: vi.fn(async () => ({ session_id: 'agent-session-1' })),
   regenerateAgentTask: vi.fn(async () => undefined),
 }));
 const authPageSuccessUser = vi.hoisted(() => ({
@@ -41,7 +43,7 @@ const authPageSuccessUser = vi.hoisted(() => ({
 const workspaceLabel = /^(Workspace|aria\.workspace)$/;
 const workspaceTabsLabel = /^(Workspace tabs|aria\.workspaceTabs)$/;
 const conversationSidebarLabel = /^(Conversation sidebar|aria\.conversationSidebar)$/;
-const composerInputLabel = /^(Composer input|aria\.composerInput)$/;
+const composerInputLabel = /^(Message input|输入框)$/;
 const globalRailLabel = /^(Global rail|aria\.globalRail)$/;
 const mainChainStatusLabel = /^(Main chain status|aria\.mainChainStatus)$/;
 const sendMessageLabel = /^(发送消息|Send message|profile\.sendMessage)$/;
@@ -63,7 +65,7 @@ vi.mock('@/hooks/useWebAuth', () => ({
 }));
 
 vi.mock('@/hooks/useAuth', () => ({
-  useAuth: () => ({ logout: logoutMock }),
+  useAuth: useAuthMock,
   getAccessToken: getAccessTokenMock,
 }));
 
@@ -100,6 +102,7 @@ describe('Web app root', () => {
     sessionStorage.clear();
     queryClient.clear();
     getAccessTokenMock.mockReturnValue(null);
+    useAuthMock.mockReturnValue({ logout: logoutMock, user: null });
     ensureAuthMock.mockReturnValue(true);
     useWebAuthMock.mockReturnValue({ ensureAuth: ensureAuthMock, authReady: true });
     useHubStore.getState().clear();
@@ -156,6 +159,26 @@ describe('Web app root', () => {
     render(<App />);
     expect(screen.getByRole('status')).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'Agent 协作群' })).not.toBeInTheDocument();
+  });
+
+  it('uses one production mode despite a stale browser fixture preference', () => {
+    vi.stubEnv('PROD', true);
+    vi.stubEnv('VITE_AGENTHUB_DATA_MODE', '');
+    localStorage.setItem('agenthub.workbench.dataMode', 'fixture');
+    render(<App />);
+    expect(screen.getByRole('dialog', { name: 'TokenDance Account login' })).toBeInTheDocument();
+    expect(useWebWorkbenchModelMock).toHaveBeenCalledWith('approved-real', undefined, undefined);
+  });
+
+  it('reuses the authenticated profile without a second profile request', () => {
+    vi.stubEnv('PROD', true);
+    vi.stubEnv('VITE_AGENTHUB_DATA_MODE', '');
+    getAccessTokenMock.mockReturnValue('test-session');
+    useAuthMock.mockReturnValue({ logout: logoutMock, user: authPageSuccessUser });
+    useHubStore.getState().setAuthenticated(true, authPageSuccessUser.id, authPageSuccessUser.username);
+    render(<App />);
+    expect(screen.getByRole('button', { name: 'Web Auth User' })).toBeInTheDocument();
+    expect(hubClientStub.me).not.toHaveBeenCalled();
   });
 
   it('mounts the shared v4 workbench shell without legacy demo chrome', () => {
@@ -481,7 +504,7 @@ describe('Web app root', () => {
       withContacts();
       render(<App />);
 
-      const newButton = await screen.findByRole('button', { name: /newConversation/ });
+      const newButton = await screen.findByRole('button', { name: /New Thread|新建对话/ });
       fireEvent.click(newButton);
 
       const dialog = await screen.findByRole('dialog', { name: /newConversation.title/ });
@@ -492,12 +515,22 @@ describe('Web app root', () => {
       });
     });
 
+    it('creates an owner-only agent conversation without requiring a contact', async () => {
+      withContacts();
+      render(<App />);
+      fireEvent.click(await screen.findByRole('button', { name: /New Thread|新建对话/ }));
+      const dialog = await screen.findByRole('dialog', { name: /newConversation.title/ });
+      fireEvent.click(within(dialog).getByRole('button', { name: /New agent conversation|newConversation.agent/ }));
+      await waitFor(() => expect(hubClientStub.createGroupSession).toHaveBeenCalledWith({ name: expect.any(String), member_ids: [] }));
+      await waitFor(() => expect(screen.queryByRole('dialog', { name: /newConversation.title/ })).not.toBeInTheDocument());
+    });
+
     it('keeps the create failure visible in the modal instead of swallowing it', async () => {
       hubClientStub.createPrivateSession.mockRejectedValueOnce(new Error('server down'));
       withContacts();
       render(<App />);
 
-      const newButton = await screen.findByRole('button', { name: /newConversation/ });
+      const newButton = await screen.findByRole('button', { name: /New Thread|新建对话/ });
       fireEvent.click(newButton);
 
       const dialog = await screen.findByRole('dialog', { name: /newConversation.title/ });

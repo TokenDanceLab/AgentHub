@@ -254,6 +254,7 @@ export function buildWorkbenchFrameProps(
   assignDefined(frameProps, 'projectsStatus', props.projectsStatus);
   assignDefined(frameProps, 'onConversationPin', props.onConversationPin);
   assignDefined(frameProps, 'onConversationArchive', props.onConversationArchive);
+  assignDefined(frameProps, 'conversationActions', props.conversationActions);
   assignDefined(frameProps, 'onActiveProjectChange', props.onActiveProjectChange);
   assignDefined(frameProps, 'onAgentCreate', props.onAgentCreate);
   assignDefined(frameProps, 'onAgentUpdate', props.onAgentUpdate);
@@ -289,6 +290,8 @@ export function buildWorkbenchFrameProps(
   assignDefined(frameProps, 'onCancelRun', props.onCancelRun);
   assignDefined(frameProps, 'onEditMessage', props.onEditMessage);
   assignDefined(frameProps, 'transcriptLoading', props.transcriptLoading);
+  assignDefined(frameProps, 'hasEarlierMessages', props.hasEarlierMessages);
+  assignDefined(frameProps, 'loadEarlierMessages', props.loadEarlierMessages);
   assignDefined(frameProps, 'devicesTargets', props.devicesTargets);
   assignDefined(frameProps, 'devicesLoading', props.devicesLoading);
   assignDefined(frameProps, 'devicesError', props.devicesError);

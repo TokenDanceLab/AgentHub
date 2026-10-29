@@ -9,11 +9,10 @@ import styles from './StartConversationModal.module.css';
 /* ═══════════════════════════════════════════════════════════════════════
    StartConversationModal — web-side "新建会话" peer picker (#1819).
 
-   The Hub session model requires a peer target (`createPrivateSession` with
-   `target_user_id`); unlike the Desktop Edge thread model there is no
-   blank-session API. The sidebar button therefore opens this modal over the
-   real contact list (already loaded by the shell), and selecting a member
-   runs the existing createPrivateSession chain. The create call and its
+   Private conversations require a peer target. Agent conversations begin
+   with an owner-only group; an agent can then be invited on dispatch.
+   The sidebar opens this modal over the real contact list, and selecting a
+   member runs the existing createPrivateSession chain. The create call and its
    visible error state are owned by the shell (App.tsx); this component is
    presentational (filter + list + busy/error display).
    ═══════════════════════════════════════════════════════════════════════ */
@@ -28,6 +27,7 @@ interface StartConversationModalProps {
   error?: string | undefined;
   /** Called with the picked peer; the shell creates the session and selects it. */
   onStart: (member: ContactMember) => void;
+  onStartAgent?: () => void;
   onClose: () => void;
 }
 
@@ -37,6 +37,7 @@ export function StartConversationModal({
   busy,
   error,
   onStart,
+  onStartAgent,
   onClose,
 }: StartConversationModalProps): React.ReactElement {
   const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE);
@@ -51,6 +52,9 @@ export function StartConversationModal({
   return (
     <Modal onClose={onClose} open={open} title={t('newConversation.title')}>
       <div className={styles.body}>
+        {onStartAgent && <button type="button" className={styles.contactRow} disabled={busy} onClick={onStartAgent}>
+          {t('newConversation.agent', { defaultValue: 'New agent conversation' })}
+        </button>}
         <input
           aria-label={t('newConversation.searchPlaceholder')}
           className={styles.search}

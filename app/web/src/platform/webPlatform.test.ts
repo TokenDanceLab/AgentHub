@@ -109,6 +109,7 @@ describe('webPlatform workbench agent mapping', () => {
     })).toEqual({
       id: 'hub-session-1',
       title: '真实 Hub 会话',
+      canRename: false, pinned: false, archived: false,
       kind: 'group',
       subtitle: 'Hub group · 3 members',
       unreadCount: 2,
@@ -123,6 +124,7 @@ describe('webPlatform workbench agent mapping', () => {
     const conversation = {
       id: 'hub-session-1',
       title: '真实 Hub 会话',
+      canRename: false, pinned: false, archived: false,
       kind: 'group' as const,
       pinnedAnnouncement: {
         title: 'stale',
@@ -728,7 +730,9 @@ describe('webPlatform workbench agent mapping', () => {
       mentions: [{ id: 'profile-builder', label: 'Hub Builder', runtimeId: 'claude-code' }],
       attachments: [],
       approvalMode: 'suggest',
-    }, 'target-local-edge-dispatch-failed'))).rejects.toThrow('task dispatch failed');
+    }, 'target-local-edge-dispatch-failed'))).resolves.toEqual({
+      intentId: 'hub-message-dispatch-failed', dispatchError: 'task dispatch failed',
+    });
 
     expect(hubMessages(queryClient)).toEqual([
       expect.objectContaining({

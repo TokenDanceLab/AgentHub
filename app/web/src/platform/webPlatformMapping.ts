@@ -56,6 +56,9 @@ export function hubSessionToWorkbenchConversation(session: Session, t?: WebTrans
     id,
     title: session.name?.trim() || fallbackTitle,
     kind: isPrivate ? 'direct' : 'group',
+    canRename: !isPrivate && session.role === 'owner',
+    pinned: session.pinned ?? false,
+    archived: session.archived ?? false,
     subtitle: session.member_count != null
       ? `Hub ${session.type} · ${session.member_count} members`
       : `Hub ${session.type}`,
