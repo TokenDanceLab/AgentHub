@@ -106,7 +106,11 @@ Hub 是 TokenDance Account 的 confidential OIDC client，只消费 issuer disco
 | `http://127.0.0.1:5174/auth/account/callback` | Web 本地开发（根 base，IPv4） |
 | `https://<hub-host>/workbench/auth/account/callback` | 生产 Web |
 
-Hub 的机器侧入口是 `POST /client/auth/oidc/authorize` 和 `POST /client/auth/oidc/callback`。浏览器回跳地址不是 Hub callback；旧的 GET callback 不属于当前契约。
+Desktop/native 的机器侧入口是 `POST /client/auth/oidc/authorize` 和 `POST /client/auth/oidc/callback`；Web 使用 `/client/auth/browser/authorize`、`/callback` 和 `/session`。浏览器回跳地址不是 Hub code-exchange handler；旧的 GET callback 不属于当前契约。
+
+Web 与 API 必须联合启用浏览器会话：配置精确 public origin、登录 callback 和固定的 `/client/auth/browser/logout/account/callback`，代理保留 Host 并直接转发 `/client/auth/*`。Account client 还须登记 `/client/auth/oidc/backchannel-logout`，不需要浏览器 token endpoint CORS。更换 client 时保留所有仍支持的 native callback，旧 client 或未绑定 client 的 Hub 会话需要重新登录；稳定 `(issuer, subject)` 与产品数据不变。
+
+0079 是附加迁移，但撤销世代是持久安全事实。激活后不能用不检查 generation/client 的旧 API 作为安全回滚，不可用全库恢复覆盖新数据。恢复期间保留新 API 的撤销校验、schema 和浏览器 bearer 拒绝边界；Web 必要时只显示维护状态，不回退到浏览器 token 存储，Desktop 仍按 native 合同重新登录。正常恢复优先修复并前滚。生产镜像切换前要验证这条恢复路径，详见 [06-auth-identity.md](06-auth-identity.md)。
 
 `AGENTHUB_ACCOUNT_OIDC_REDIRECT_URI` 提供主 callback，`AGENTHUB_ACCOUNT_OIDC_ALLOWED_REDIRECT_URIS` 只列额外精确候选。token 和 JWKS endpoint 由 discovery 解析，不提供旧 provider 的 token URL、JWKS URI 或 issuer 启动步骤。
 
@@ -125,6 +129,10 @@ Hub 的机器侧入口是 `POST /client/auth/oidc/authorize` 和 `POST /client/a
 | `AGENTHUB_ACCOUNT_OIDC_CLIENT_SECRET` | production 是 | 同上 | 仅在 Hub 服务端 token exchange 使用；至少 32 字符且拒绝占位值。 |
 | `AGENTHUB_ACCOUNT_OIDC_REDIRECT_URI` | production 是 | 同上 | 主 callback；必须与 Account client 注册值精确一致。 |
 | `AGENTHUB_ACCOUNT_OIDC_ALLOWED_REDIRECT_URIS` | 否 | handler + config validation | 逗号分隔的额外精确 callback；只加真实客户端需要的地址。 |
+| `AGENTHUB_BROWSER_SESSION_ORIGIN` | Web cookie lane 是 | config validation | 精确公共 HTTPS origin；未设置时不注册 browser-session 路由。 |
+| `AGENTHUB_BROWSER_SESSION_REDIRECT_URI` | Web cookie lane 是 | config validation | 同源登录 callback，必须在 Account/Hub allowlist 中。 |
+| `AGENTHUB_BROWSER_SESSION_POST_LOGOUT_REDIRECT_URI` | Web cookie lane 是 | config validation | 固定同源 `/client/auth/browser/logout/account/callback`，在 Account 注册。 |
+| `AGENTHUB_BROWSER_SESSION_SECURE` / `_TTL` | 默认 `true` / `12h` | config validation | 生产不能关闭 Secure；绝对 TTL 大于零且不超过 24h，无滑动续期。 |
 | `AGENTHUB_AUTH_FAIL_CLOSED` | 生产必填（显式设置）；dev compose 默认 `true` | `validateProdGuard` 拒绝未设置的生产启动；`AuthFailClosed()` 决定 Redis 故障时的 jti 检查行为 | 见 §安全配置。 |
 | `AGENTHUB_RATE_LIMIT_FAIL_OPEN` | 否（生产建议 `false`） | `RateLimitFailOpen()` | 见 §安全配置。 |
 
