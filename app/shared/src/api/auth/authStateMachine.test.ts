@@ -317,6 +317,24 @@ describe('createHubAuthCore', () => {
     expect(sessionSync.clear).toHaveBeenCalled();
   });
 
+  it('invalidates a server-revoked session immediately without a second logout request', async () => {
+    const { ports, memory, sessionSync } = createFakePorts();
+    memory.access = 'revoked-access';
+    memory.refresh = 'revoked-refresh';
+    const client = createFakeClient();
+    const auth = createHubAuthCore(ports, { client, createClient: () => client });
+    await auth.tryAutoLogin();
+    expect(auth.getState().isAuthenticated).toBe(true);
+    const clearing = auth.invalidate();
+    expect(auth.getState().isAuthenticated).toBe(false);
+    expect(auth.getState().token).toBeNull();
+    await clearing;
+    expect(memory.access).toBeNull();
+    expect(memory.refresh).toBeNull();
+    expect(sessionSync.clear).toHaveBeenCalledOnce();
+    expect(client.request).not.toHaveBeenCalled();
+  });
+
   it('logs out locally without a server call when signed out', async () => {
     const { ports } = createFakePorts();
     const client = createFakeClient();

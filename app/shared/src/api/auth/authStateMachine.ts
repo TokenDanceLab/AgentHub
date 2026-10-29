@@ -59,7 +59,7 @@ export interface HubAuthCoreOptions {
   createClient: HubClientFactory;
 }
 
-export function createHubAuthCore(ports: HubAuthPorts, options: HubAuthCoreOptions): HubAuth {
+export function createHubAuthCore(ports: HubAuthPorts, options: HubAuthCoreOptions): HubAuth & { invalidate: () => Promise<void> } {
   const { createClient } = options;
   const { deviceIdentity, tokenStorage, pendingStorage, callbackChannel, redirectOpener, sessionSync } = ports;
 
@@ -138,10 +138,9 @@ export function createHubAuthCore(ports: HubAuthPorts, options: HubAuthCoreOptio
     state.isAuthenticated = false;
     state.tokenSource = null;
     tokenStorage.saveTokenSource(null);
-    await tokenStorage.clearAccessToken();
-    await tokenStorage.clearRefreshToken();
     sessionSync.clear();
     notify();
+    await Promise.all([tokenStorage.clearAccessToken(), tokenStorage.clearRefreshToken()]);
   }
 
   /**
@@ -236,6 +235,7 @@ export function createHubAuthCore(ports: HubAuthPorts, options: HubAuthCoreOptio
   }
 
   return {
+    invalidate: clearSession,
     getState: () => snapshot,
 
     subscribe(fn: (s: HubAuthState) => void) {

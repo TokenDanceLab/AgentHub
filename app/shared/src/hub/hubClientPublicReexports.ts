@@ -26,6 +26,7 @@ export type {
   HubFriendEventPayload,
   HubFrame,
   HubAuthOkFrame,
+  HubAuthRevokedFrame,
   HubMessageNewFrame,
   HubMessageRecallFrame,
   HubMessageReadFrame,

@@ -91,6 +91,10 @@ export interface HubFrame<TPayload = unknown, TType extends string = string> {
 }
 
 export type HubAuthOkFrame = HubFrame<unknown, typeof HUB_EVENTS.AUTH_OK>;
+export type HubAuthRevokedFrame = HubFrame<
+  { reason: 'session_revoked' },
+  typeof HUB_EVENTS.AUTH_REVOKED
+>;
 export type HubMessageNewFrame = HubFrame<
   HubMessage,
   typeof HUB_EVENTS.MESSAGE_NEW
@@ -221,6 +225,7 @@ export type HubSessionMemberLeftFrame = HubFrame<
 
 export type HubKnownFrame =
   | HubAuthOkFrame
+  | HubAuthRevokedFrame
   | HubMessageNewFrame
   | HubMessageRecallFrame
   | HubMessagePinFrame

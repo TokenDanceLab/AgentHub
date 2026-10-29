@@ -15,7 +15,7 @@ import type { HubClient } from './hubClient';
 export { OidcError } from '@shared/api/auth';
 export type { HubAuth, HubAuthState } from '@shared/api/auth';
 
-export function createHubAuth(client?: HubClient): HubAuth {
+export function createHubAuth(client?: HubClient): HubAuth & { invalidate: () => Promise<void> } {
   return createHubAuthCore(createDesktopHubAuthPorts(), {
     client,
     createClient: (opts) => createHubClient(opts),

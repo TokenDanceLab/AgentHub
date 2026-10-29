@@ -12,6 +12,7 @@ import type {
   HubAgentStreamFrame,
   HubAgentStreamPayload,
   HubAuthOkFrame,
+  HubAuthRevokedFrame,
   HubDeviceKickedFrame,
   HubDeviceKickedPayload,
   HubDeviceOfflineFrame,
@@ -130,6 +131,7 @@ describe('hubClientFrameTypes (#788)', () => {
 
   it('binds typed frames to HUB_EVENTS constants', () => {
     const authOk: HubAuthOkFrame = { type: HUB_EVENTS.AUTH_OK };
+    const authRevoked: HubAuthRevokedFrame = { type: HUB_EVENTS.AUTH_REVOKED, payload: { reason: 'session_revoked' } };
     const messageNew: HubMessageNewFrame = {
       type: HUB_EVENTS.MESSAGE_NEW,
       payload: {
@@ -272,6 +274,7 @@ describe('hubClientFrameTypes (#788)', () => {
 
     const known: HubKnownFrame[] = [
       authOk,
+      authRevoked,
       messageNew,
       messageRecall,
       messagePin,
@@ -300,6 +303,7 @@ describe('hubClientFrameTypes (#788)', () => {
 
     expect(known.map((frame) => frame.type)).toEqual([
       'auth.ok',
+      'auth.revoked',
       'message.new',
       'message.recall',
       'message.pin',

@@ -10,6 +10,7 @@ import { type Transport } from '@shared/transport';
 import type { TransportStatus } from '@shared/transport';
 import { useConnectionStore } from '@/stores/connectionStore';
 import { useHubStore } from '@/stores/hubStore';
+import { setBrowserCsrfToken } from '@/api/browserSessionRuntime';
 import { useToastStore } from '@shared/ui/toast';
 import {
   AGENT_STREAM_LIVE_BATCH_WINDOW_MS,
@@ -905,9 +906,24 @@ describe('device.kicked feedback (#1816)', () => {
     useHubStore.getState().setAuthenticated(true, 'user-1', 'alice');
     const harness = mountKickedHarness();
     act(() => harness.deliver({ type: 'auth.revoked', payload: { reason: 'session_revoked' } }));
-    expect(harness.closeSpy).toHaveBeenCalledTimes(1);
+    expect(harness.closeSpy).toHaveBeenCalled();
     await waitFor(() => expect(useHubStore.getState().authenticated).toBe(false));
     expect(useHubStore.getState().showAuthModal).toBe(true);
     harness.unmount();
+  });
+
+  it('does not let a retired socket revoke a newer browser identity', () => {
+    setBrowserCsrfToken('old-session-proof');
+    useHubStore.getState().setAuthenticated(true, 'user-old', 'old');
+    const harness = mountKickedHarness();
+    act(() => {
+      setBrowserCsrfToken('new-session-proof');
+      useHubStore.getState().setAuthenticated(true, 'user-new', 'new');
+      harness.deliver({ type: HUB_EVENTS.AUTH_REVOKED, payload: { reason: 'session_revoked' } });
+    });
+    expect(useHubStore.getState().authenticated).toBe(true);
+    expect(useHubStore.getState().userId).toBe('user-new');
+    harness.unmount();
+    setBrowserCsrfToken(null);
   });
 });

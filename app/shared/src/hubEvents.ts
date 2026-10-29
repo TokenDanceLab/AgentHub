@@ -18,6 +18,7 @@ export const HUB_EVENTS = {
   // ── Auth responses ────────────────────────────
   // idempotent handshake ack per connection
   AUTH_OK: 'auth.ok',
+  AUTH_REVOKED: 'auth.revoked',
 
   // ── Message events ────────────────────────────
   // UPSERT / idempotent by message id; MESSAGE_READ is last_read_seq watermark

@@ -42,3 +42,9 @@ export function useAuth() {
 export function getAccessToken(): string | null {
   return getAuth().getState().token;
 }
+
+/** Server already revoked this exact native session; never issue another logout. */
+export async function invalidateAccessSession(expectedToken: string | null): Promise<void> {
+  if (expectedToken !== getAccessToken()) return;
+  await getAuth().invalidate();
+}

@@ -1,6 +1,6 @@
 import { act, renderHook } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { getAccessToken, useAuth } from './useAuth';
+import { getAccessToken, invalidateAccessSession, useAuth } from './useAuth';
 
 const authState = {
   token: 'access-1',
@@ -15,6 +15,7 @@ const fakeAuth = {
   subscribe: vi.fn(() => () => {}),
   loginWithAccount: vi.fn(async () => {}),
   logout: vi.fn(async () => {}),
+  invalidate: vi.fn(async () => {}),
   tryAutoLogin: vi.fn(async () => true),
 };
 
@@ -24,6 +25,14 @@ vi.mock('@/api/hubAuth', () => ({
 
 describe('useAuth', () => {
   beforeEach(() => vi.clearAllMocks());
+
+  it('invalidates only the native session that received revocation', async () => {
+    await invalidateAccessSession('retired-access');
+    expect(fakeAuth.invalidate).not.toHaveBeenCalled();
+    await invalidateAccessSession('access-1');
+    expect(fakeAuth.invalidate).toHaveBeenCalledOnce();
+    expect(fakeAuth.logout).not.toHaveBeenCalled();
+  });
 
   it('exposes reactive state and delegates session actions to the singleton auth service', async () => {
     const { result } = renderHook(() => useAuth());
