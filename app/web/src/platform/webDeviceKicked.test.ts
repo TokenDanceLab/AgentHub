@@ -2,7 +2,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { HUB_EVENTS } from '@shared/hubEvents';
 import { useHubStore } from '@/stores/hubStore';
 import { useToastStore } from '@shared/ui/toast';
-import { saveStoredHubAccessToken, saveStoredHubRefreshToken } from '@/api/hubTokenStorage';
 import { isDeviceKickedFrame, respondToDeviceKick } from './webDeviceKicked';
 
 describe('isDeviceKickedFrame', () => {
@@ -25,8 +24,8 @@ describe('respondToDeviceKick (#1816)', () => {
   });
 
   it('fails the session closed, shows a persistent toast, and guides the user back to sign-in', async () => {
-    await saveStoredHubAccessToken('kicked-access');
-    await saveStoredHubRefreshToken('kicked-refresh');
+    sessionStorage.setItem('agenthub_hub_token', 'kicked-access');
+    sessionStorage.setItem('agenthub_hub_refresh_token', 'kicked-refresh');
     useHubStore.getState().setAuthenticated(true, 'user-1', 'alice');
 
     respondToDeviceKick((key) => key);

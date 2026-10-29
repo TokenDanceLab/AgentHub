@@ -50,6 +50,23 @@ describe('webHubRealtime', () => {
     });
   });
 
+  it('marks a loaded older page recalled in the same cache without touching other sessions', () => {
+    const queryClient = new QueryClient();
+    const older = { id: 'old-message', session_id: 'session-a', seq_id: 2, content: 'older text' };
+    const latest = { id: 'new-message', session_id: 'session-a', seq_id: 100, content: 'latest text' };
+    queryClient.setQueryData(['web-v4', 'hub-messages', 'session-a'], [older, latest]);
+    queryClient.setQueryData(['web-v4', 'hub-messages', 'session-b'], [older]);
+    invalidateWebWorkbenchHubQueries(queryClient, HUB_EVENTS.MESSAGE_RECALL, {
+      message: { session_id: 'session-a', message_id: 'old-message' },
+    });
+    expect(queryClient.getQueryData(['web-v4', 'hub-messages', 'session-a'])).toEqual([{ ...older, recalled: true }, latest]);
+    expect(queryClient.getQueryData(['web-v4', 'hub-messages', 'session-b'])).toEqual([older]);
+    invalidateWebWorkbenchHubQueries(queryClient, HUB_EVENTS.MESSAGE_RECALL, { session_id: 'missing', message_id: 'unknown' });
+    expect(queryClient.getQueryState(['web-v4', 'hub-messages', 'missing'])).toBeUndefined();
+    invalidateWebWorkbenchHubQueries(queryClient, HUB_EVENTS.MESSAGE_RECALL, { session_id: 'session-a', message_id: 'unknown' });
+    expect(queryClient.getQueryData(['web-v4', 'hub-messages', 'session-a'])).toEqual([{ ...older, recalled: true }, latest]);
+  });
+
   it('invalidates all Hub messages when agent task events omit a session id', () => {
     const queryClient = new QueryClient();
     const invalidateQueries = vi.spyOn(queryClient, 'invalidateQueries');
@@ -881,6 +898,16 @@ describe('device.kicked feedback (#1816)', () => {
     expect(useHubStore.getState().authenticated).toBe(true);
     expect(useHubStore.getState().showAuthModal).toBe(false);
 
+    harness.unmount();
+  });
+
+  it('closes the browser transport and clears session state on auth.revoked', async () => {
+    useHubStore.getState().setAuthenticated(true, 'user-1', 'alice');
+    const harness = mountKickedHarness();
+    act(() => harness.deliver({ type: 'auth.revoked', payload: { reason: 'session_revoked' } }));
+    expect(harness.closeSpy).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(useHubStore.getState().authenticated).toBe(false));
+    expect(useHubStore.getState().showAuthModal).toBe(true);
     harness.unmount();
   });
 });

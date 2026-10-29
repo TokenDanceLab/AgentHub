@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AppError } from '@shared/errors';
 import { createHubClient } from './hubClient';
+import { getBrowserCsrfToken, onBrowserSessionInvalidated, setBrowserCsrfToken } from './browserSessionRuntime';
 
 
 function getHeader(init: RequestInit | undefined, name: string): string | null {
@@ -24,6 +25,39 @@ function getCallInit(calls: readonly unknown[][], index: number): RequestInit {
 }
 
 describe('createHubClient', () => {
+  it('ignores an older session 401 while revoking a current-session 401', async () => {
+    let resolve!: (response: Response) => void;
+    const fetch = vi.fn(() => new Promise<Response>((done) => { resolve = done; }));
+    const invalidated = vi.fn();
+    const unsubscribe = onBrowserSessionInvalidated(invalidated);
+    setBrowserCsrfToken('session-a');
+    const client = createHubClient({ fetch });
+    const stale = client.me();
+    setBrowserCsrfToken('session-b');
+    resolve(Response.json({ code: 'auth_required' }, { status: 401 }));
+    await expect(stale).rejects.toBeInstanceOf(Error);
+    expect(invalidated).not.toHaveBeenCalled();
+    expect(getBrowserCsrfToken()).toBe('session-b');
+    const current = client.me();
+    resolve(Response.json({ code: 'auth_required' }, { status: 401 }));
+    await expect(current).rejects.toMatchObject({ status: 401 });
+    expect(invalidated).toHaveBeenCalledTimes(1);
+    expect(getBrowserCsrfToken()).toBeNull();
+    unsubscribe();
+  });
+
+  it('does not publish a body that completes after the session changed', async () => {
+    let controller!: ReadableStreamDefaultController<Uint8Array>;
+    const body = new ReadableStream<Uint8Array>({ start(value) { controller = value; } });
+    const client = createHubClient({ fetch: vi.fn(async () => new Response(body)) });
+    setBrowserCsrfToken('session-a');
+    const pending = client.me();
+    await Promise.resolve();
+    setBrowserCsrfToken('session-b');
+    controller.enqueue(new TextEncoder().encode(JSON.stringify({ code: 'ok', data: { id: 'private-a' } })));
+    controller.close();
+    await expect(pending).rejects.toBeInstanceOf(Error);
+  });
   beforeEach(() => {
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
@@ -43,7 +77,7 @@ describe('createHubClient', () => {
     ));
     vi.stubGlobal('fetch', fetchMock);
 
-    const client = createHubClient({ baseUrl: 'https://hub.example.test' });
+    const client = createHubClient({ baseUrl: `${window.location.origin}` });
     const res = await client.refresh('old-refresh-token');
 
     expect(res).toEqual({
@@ -64,7 +98,7 @@ describe('createHubClient', () => {
       { status: 200, headers: { 'Content-Type': 'application/json' } },
     )));
 
-    const client = createHubClient({ baseUrl: 'https://hub.example.test' });
+    const client = createHubClient({ baseUrl: `${window.location.origin}` });
     await expect(client.me()).resolves.toMatchObject({ username: 'alice' });
   });
 
@@ -74,7 +108,7 @@ describe('createHubClient', () => {
       { status: 401, statusText: 'Unauthorized', headers: { 'Content-Type': 'application/json' } },
     )));
 
-    const client = createHubClient({ baseUrl: 'https://hub.example.test' });
+    const client = createHubClient({ baseUrl: `${window.location.origin}` });
 
     await expect(client.me()).rejects.toMatchObject({
       code: 'unauthorized',
@@ -109,7 +143,7 @@ describe('createHubClient', () => {
     vi.stubGlobal('fetch', fetchMock);
 
     const client = createHubClient({
-      baseUrl: 'https://hub.example.test',
+      baseUrl: `${window.location.origin}`,
       getToken: () => 'hub-access',
     });
     const res = await client.listExecutionTargets({
@@ -119,10 +153,10 @@ describe('createHubClient', () => {
     });
 
     expect(fetchMock).toHaveBeenCalledWith(
-      'https://hub.example.test/web/execution-targets?target_type=local_edge&pageCursor=cursor-1&pageSize=20',
+      `${window.location.origin}/web/execution-targets?target_type=local_edge&pageCursor=cursor-1&pageSize=20`,
       expect.any(Object),
     );
-    expect(getHeader(getCallInit(fetchMock.mock.calls, 0), 'Authorization')).toBe('Bearer hub-access');
+    expect(getHeader(getCallInit(fetchMock.mock.calls, 0), 'Authorization')).toBeNull();
     expect(res.items[0]).toMatchObject({
       name: 'Workstation',
       target_type: 'local_edge',
@@ -139,18 +173,18 @@ describe('createHubClient', () => {
     vi.stubGlobal('fetch', fetchMock);
 
     const client = createHubClient({
-      baseUrl: 'https://hub.example.test',
+      baseUrl: `${window.location.origin}`,
       getToken: () => 'hub-access',
     });
     await client.pingExecutionTarget('target/id');
 
     expect(fetchMock).toHaveBeenCalledWith(
-      'https://hub.example.test/web/execution-targets/target%2Fid/ping',
+      `${window.location.origin}/web/execution-targets/target%2Fid/ping`,
       expect.objectContaining({
         method: 'POST',
       }),
     );
-    expect(getHeader(getCallInit(fetchMock.mock.calls, 0), 'Authorization')).toBe('Bearer hub-access');
+    expect(getHeader(getCallInit(fetchMock.mock.calls, 0), 'Authorization')).toBeNull();
   });
 
   it('lists, creates, gets, and updates Hub workspace projects through the Web-owned route', async () => {
@@ -217,7 +251,7 @@ describe('createHubClient', () => {
     vi.stubGlobal('fetch', fetchMock);
 
     const client = createHubClient({
-      baseUrl: 'https://hub.example.test',
+      baseUrl: `${window.location.origin}`,
       getToken: () => 'hub-access',
     });
 
@@ -227,17 +261,17 @@ describe('createHubClient', () => {
     const updated = await client.updateWorkspaceProject('project/id', { description: '' });
 
     expect(fetchMock.mock.calls[0]?.[0]).toBe(
-      'https://hub.example.test/web/projects?q=AgentHub&pageCursor=cursor-1&pageSize=20',
+      `${window.location.origin}/web/projects?q=AgentHub&pageCursor=cursor-1&pageSize=20`,
     );
-    expect(getHeader(getCallInit(fetchMock.mock.calls, 0), 'Authorization')).toBe('Bearer hub-access');
-    expect(fetchMock.mock.calls[1]?.[0]).toBe('https://hub.example.test/web/projects');
+    expect(getHeader(getCallInit(fetchMock.mock.calls, 0), 'Authorization')).toBeNull();
+    expect(fetchMock.mock.calls[1]?.[0]).toBe(`${window.location.origin}/web/projects`);
     expect(getCallInit(fetchMock.mock.calls, 1).method).toBe('POST');
     expect(getCallInit(fetchMock.mock.calls, 1).body).toBe(
       JSON.stringify({ name: 'New Project', description: 'Created from Web' }),
     );
-    expect(fetchMock.mock.calls[2]?.[0]).toBe('https://hub.example.test/web/projects/project%2Fid');
-    expect(getHeader(getCallInit(fetchMock.mock.calls, 2), 'Authorization')).toBe('Bearer hub-access');
-    expect(fetchMock.mock.calls[3]?.[0]).toBe('https://hub.example.test/web/projects/project%2Fid');
+    expect(fetchMock.mock.calls[2]?.[0]).toBe(`${window.location.origin}/web/projects/project%2Fid`);
+    expect(getHeader(getCallInit(fetchMock.mock.calls, 2), 'Authorization')).toBeNull();
+    expect(fetchMock.mock.calls[3]?.[0]).toBe(`${window.location.origin}/web/projects/project%2Fid`);
     expect(getCallInit(fetchMock.mock.calls, 3).method).toBe('PATCH');
     expect(getCallInit(fetchMock.mock.calls, 3).body).toBe(
       JSON.stringify({ description: '' }),
@@ -339,7 +373,7 @@ describe('createHubClient', () => {
     vi.stubGlobal('fetch', fetchMock);
 
     const client = createHubClient({
-      baseUrl: 'https://hub.example.test',
+      baseUrl: `${window.location.origin}`,
       getToken: () => 'hub-access',
     });
 
@@ -353,22 +387,22 @@ describe('createHubClient', () => {
     });
 
     expect(fetchMock.mock.calls[0]?.[0]).toBe(
-      'https://hub.example.test/web/projects/project%2Fid/threads',
+      `${window.location.origin}/web/projects/project%2Fid/threads`,
     );
-    expect(getHeader(getCallInit(fetchMock.mock.calls, 0), 'Authorization')).toBe('Bearer hub-access');
+    expect(getHeader(getCallInit(fetchMock.mock.calls, 0), 'Authorization')).toBeNull();
     expect(fetchMock.mock.calls[1]?.[0]).toBe(
-      'https://hub.example.test/web/projects/project%2Fid/threads',
+      `${window.location.origin}/web/projects/project%2Fid/threads`,
     );
     expect(getCallInit(fetchMock.mock.calls, 1).method).toBe('POST');
     expect(getCallInit(fetchMock.mock.calls, 1).body).toBe(
       JSON.stringify({ name: 'Follow-up Group' }),
     );
     expect(fetchMock.mock.calls[2]?.[0]).toBe(
-      'https://hub.example.test/web/projects/project%2Fid/threads/thread%2Fid/messages?limit=80',
+      `${window.location.origin}/web/projects/project%2Fid/threads/thread%2Fid/messages?limit=80`,
     );
-    expect(getHeader(getCallInit(fetchMock.mock.calls, 2), 'Authorization')).toBe('Bearer hub-access');
+    expect(getHeader(getCallInit(fetchMock.mock.calls, 2), 'Authorization')).toBeNull();
     expect(fetchMock.mock.calls[3]?.[0]).toBe(
-      'https://hub.example.test/web/projects/project%2Fid/threads/thread%2Fid/messages',
+      `${window.location.origin}/web/projects/project%2Fid/threads/thread%2Fid/messages`,
     );
     expect(getCallInit(fetchMock.mock.calls, 3).method).toBe('POST');
     expect(getCallInit(fetchMock.mock.calls, 3).body).toBe(
@@ -408,14 +442,14 @@ describe('createHubClient', () => {
     vi.stubGlobal('fetch', fetchMock);
 
     const client = createHubClient({
-      baseUrl: 'https://hub.example.test',
+      baseUrl: `${window.location.origin}`,
       getToken: () => 'hub-access',
     });
     const res = await client.triggerAgentTask('msg-1', { target_id: 'target-1' });
 
     expect(res.target_id).toBe('target-1');
     expect(fetchMock).toHaveBeenCalledWith(
-      'https://hub.example.test/web/agent-tasks',
+      `${window.location.origin}/web/agent-tasks`,
       expect.objectContaining({
         method: 'POST',
         body: JSON.stringify({ trigger_message_id: 'msg-1', target_id: 'target-1' }),
@@ -507,7 +541,7 @@ describe('createHubClient', () => {
     vi.stubGlobal('fetch', fetchMock);
 
     const client = createHubClient({
-      baseUrl: 'https://hub.example.test',
+      baseUrl: `${window.location.origin}`,
       getToken: () => 'hub-access',
     });
 
@@ -516,15 +550,15 @@ describe('createHubClient', () => {
     const decision = await client.decideTaskApproval('task/1', 'approval/1', { decision: 'allow' });
 
     expect(fetchMock.mock.calls[0]?.[0]).toBe(
-      'https://hub.example.test/web/agent-tasks/task%2F1/approvals',
+      `${window.location.origin}/web/agent-tasks/task%2F1/approvals`,
     );
-    expect(getHeader(getCallInit(fetchMock.mock.calls, 0), 'Authorization')).toBe('Bearer hub-access');
+    expect(getHeader(getCallInit(fetchMock.mock.calls, 0), 'Authorization')).toBeNull();
     expect(fetchMock.mock.calls[1]?.[0]).toBe(
-      'https://hub.example.test/web/agent-tasks/task%2F1/artifacts',
+      `${window.location.origin}/web/agent-tasks/task%2F1/artifacts`,
     );
-    expect(getHeader(getCallInit(fetchMock.mock.calls, 1), 'Authorization')).toBe('Bearer hub-access');
+    expect(getHeader(getCallInit(fetchMock.mock.calls, 1), 'Authorization')).toBeNull();
     expect(fetchMock.mock.calls[2]?.[0]).toBe(
-      'https://hub.example.test/web/agent-tasks/task%2F1/approvals/approval%2F1/decide',
+      `${window.location.origin}/web/agent-tasks/task%2F1/approvals/approval%2F1/decide`,
     );
     expect(getCallInit(fetchMock.mock.calls, 2).method).toBe('POST');
     expect(getCallInit(fetchMock.mock.calls, 2).body).toBe(
@@ -559,7 +593,7 @@ describe('createHubClient', () => {
     vi.stubGlobal('fetch', fetchMock);
 
     const client = createHubClient({
-      baseUrl: 'https://hub.example.test',
+      baseUrl: `${window.location.origin}`,
       getToken: () => 'hub-access',
     });
     const res = await client.startTeamRun('team/1', {
@@ -569,7 +603,7 @@ describe('createHubClient', () => {
 
     expect(res.target_id).toBe('target-local-edge-1');
     expect(fetchMock).toHaveBeenCalledWith(
-      'https://hub.example.test/web/agent-teams/team%2F1/runs',
+      `${window.location.origin}/web/agent-teams/team%2F1/runs`,
       expect.objectContaining({
         method: 'POST',
         body: JSON.stringify({
@@ -598,7 +632,7 @@ describe('createHubClient', () => {
     vi.stubGlobal('fetch', fetchMock);
 
     const client = createHubClient({
-      baseUrl: 'https://hub.example.test',
+      baseUrl: `${window.location.origin}`,
       getToken: () => 'hub-access',
     });
     const res = await client.addAgentToSession('session/1', {
@@ -613,7 +647,7 @@ describe('createHubClient', () => {
       display_name: 'Hub Builder',
     });
     expect(fetchMock).toHaveBeenCalledWith(
-      'https://hub.example.test/client/sessions/session%2F1/agents',
+      `${window.location.origin}/client/sessions/session%2F1/agents`,
       expect.objectContaining({
         method: 'POST',
         body: JSON.stringify({ agent_type: 'claude-code', display_name: 'Hub Builder' }),

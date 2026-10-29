@@ -12,7 +12,7 @@
 
 import type { SettingsPort } from '@shared/platform/types';
 import { createHubClient } from '@/api/hubClient';
-import { getAccessToken } from '@/hooks/useAuth';
+import { isHubAuthenticated } from '@/hooks/useAuth';
 
 const LS_PREFIX = 'agenthub.settings.';
 
@@ -46,9 +46,9 @@ export function createWebSettingsAdapter(): SettingsPort {
     async readSettings(): Promise<Record<string, string>> {
       // Tier 1: Hub API (primary backend)
       try {
-        const token = getAccessToken();
-        if (token) {
-          const hub = createHubClient({ getToken: getAccessToken });
+        const authenticated = isHubAuthenticated();
+        if (authenticated) {
+          const hub = createHubClient();
           const settings = await hub.fetchSettings();
           // Persist to localStorage as cache for offline access
           lsWrite(settings);
@@ -68,9 +68,9 @@ export function createWebSettingsAdapter(): SettingsPort {
 
       // 2. Write to Hub API (primary backend, fire-and-forget)
       try {
-        const token = getAccessToken();
-        if (token) {
-          const hub = createHubClient({ getToken: getAccessToken });
+        const authenticated = isHubAuthenticated();
+        if (authenticated) {
+          const hub = createHubClient();
           await hub.patchSettings(values);
         }
       } catch {

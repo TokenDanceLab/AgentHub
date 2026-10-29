@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AppError } from '@shared/errors';
-import { getAccessToken } from '@/hooks/useAuth';
+import { isHubAuthenticated } from '@/hooks/useAuth';
 import {
   acceptFriendRequest,
   listFriendRequests,
@@ -11,7 +11,7 @@ import {
 import { getAuthorization } from '@/__tests__/requestInitTestUtils';
 
 vi.mock('@/hooks/useAuth', () => ({
-  getAccessToken: vi.fn(),
+  isHubAuthenticated: vi.fn(),
 }));
 
 function jsonError(status: number, code: string, message: string): Response {
@@ -25,7 +25,7 @@ describe('web contact queries fail-closed branches', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
-    vi.mocked(getAccessToken).mockReturnValue(null);
+    vi.mocked(isHubAuthenticated).mockReturnValue(false);
   });
 
   it('returns empty friend requests without calling Hub when there is no token', async () => {
@@ -48,10 +48,10 @@ describe('web contact queries fail-closed branches', () => {
   });
 
   it('surfaces 401 unauthorized from friend-request list as AppError', async () => {
-    vi.mocked(getAccessToken).mockReturnValue('stale-token');
+    vi.mocked(isHubAuthenticated).mockReturnValue(true);
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-      expect(String(input)).toBe('http://localhost:8080/client/contacts/friend-requests');
-      expect(getAuthorization(init)).toBe('Bearer stale-token');
+      expect(String(input)).toBe('/client/contacts/friend-requests');
+      expect(getAuthorization(init)).toBeNull();
       return jsonError(401, 'unauthorized', 'bad token');
     });
     vi.stubGlobal('fetch', fetchMock);
@@ -65,7 +65,7 @@ describe('web contact queries fail-closed branches', () => {
   });
 
   it('surfaces 404 from user search as AppError', async () => {
-    vi.mocked(getAccessToken).mockReturnValue('hub-access');
+    vi.mocked(isHubAuthenticated).mockReturnValue(true);
     const fetchMock = vi.fn(async () => jsonError(404, 'NOT_FOUND', 'user missing'));
     vi.stubGlobal('fetch', fetchMock);
 
@@ -78,7 +78,7 @@ describe('web contact queries fail-closed branches', () => {
   });
 
   it('surfaces 500 from friend-request accept as AppError', async () => {
-    vi.mocked(getAccessToken).mockReturnValue('hub-access');
+    vi.mocked(isHubAuthenticated).mockReturnValue(true);
     const fetchMock = vi.fn(async () => jsonError(500, 'INTERNAL_ERROR', 'hub down'));
     vi.stubGlobal('fetch', fetchMock);
 
@@ -91,7 +91,7 @@ describe('web contact queries fail-closed branches', () => {
   });
 
   it('lists friend requests through Hub when a session token is available', async () => {
-    vi.mocked(getAccessToken).mockReturnValue('hub-access');
+    vi.mocked(isHubAuthenticated).mockReturnValue(true);
     const fetchMock = vi.fn(async () => new Response(
       JSON.stringify({
         code: 'ok',

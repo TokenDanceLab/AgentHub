@@ -22,15 +22,7 @@ export default function AuthPage({ onLoginSuccess, onClose }: Props) {
   // ThemeProvider (tests, isolated previews) simply omit the switcher.
   const themeContext = useThemeContext();
   const [showAdvanced, setShowAdvanced] = useState(false);
-  const [hubUrl, setHubUrl] = useState(() => {
-    try {
-      return typeof localStorage !== 'undefined'
-        ? localStorage.getItem('agenthub_hub_url') || HUB_URL
-        : HUB_URL;
-    } catch {
-      return HUB_URL;
-    }
-  });
+  const hubUrl = HUB_URL;
   const [hubStatus, setHubStatus] = useState<HubStatus>('checking');
   const checkRef = useRef<ReturnType<typeof setTimeout>>(null);
 
@@ -54,14 +46,6 @@ export default function AuthPage({ onLoginSuccess, onClose }: Props) {
       if (checkRef.current) clearTimeout(checkRef.current);
     };
   }, [hubUrl, checkHub]);
-
-  const handleHubUrlChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const url = e.target.value;
-    setHubUrl(url);
-    try {
-      localStorage.setItem('agenthub_hub_url', url);
-    } catch { /* ignore */ }
-  }, []);
 
   const handleLoginSuccess = useCallback(
     (user: UserProfile) => {
@@ -115,9 +99,8 @@ export default function AuthPage({ onLoginSuccess, onClose }: Props) {
             size="sm"
             mono
             type="url"
-            value={hubUrl}
-            onChange={handleHubUrlChange}
-            placeholder="http://localhost:8080"
+            value={window.location.origin}
+            readOnly
             aria-label={t('auth.hubUrl')}
           />
           <div className={styles.hubStatus}>

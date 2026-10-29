@@ -1,420 +1,68 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fetchExecutionTargets } from './executionTargetQueries';
-import { getAuthorization } from '@/__tests__/requestInitTestUtils';
+import { createHubAuth } from './hubAuth';
+import { getBrowserCsrfToken } from './browserSessionRuntime';
+import { useHubStore } from '@/stores/hubStore';
 
-const DEVICE_ID = '00000000-0000-0000-0000-00000000a101';
-const ACCOUNT_ISSUER = 'https://account.example';
+const user = { id: 'user-a', username: 'alice', nickname: 'Alice' };
+const session = { user, expires_at: '2099-01-01T00:00:00Z', csrf_token: 'csrf-proof' };
 
-async function loadAuthModule() {
-  vi.resetModules();
-  return import('./hubAuth');
-}
-
-describe('web Hub auth token auto-login', () => {
+describe('Web browser sessions', () => {
   beforeEach(() => {
-    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+    window.history.replaceState({}, '', '/');
     localStorage.clear();
     sessionStorage.clear();
-    localStorage.setItem('agenthub_device_id', DEVICE_ID);
+    useHubStore.getState().clear();
   });
 
-  it('restores session from stored access token', async () => {
-    // Simulate a stored access token from a previous session
-    sessionStorage.setItem('agenthub_hub_token', 'stored-access-token');
-
-    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-      const url = String(input);
-
-      if (url.endsWith('/client/auth/me')) {
-        expect(getAuthorization(init)).toBe('Bearer stored-access-token');
-        return new Response(
-          JSON.stringify({
-            id: '00000000-0000-0000-0000-00000000b101',
-            username: 'alice',
-            nickname: 'Alice',
-            avatar_url: '',
-          }),
-          { status: 200, headers: { 'Content-Type': 'application/json' } }
-        );
-      }
-
-      throw new Error(`Unexpected request: ${url}`);
-    });
+  it('restores only from Hub and removes legacy browser credentials', async () => {
+    sessionStorage.setItem('agenthub_hub_token', 'legacy-access');
+    localStorage.setItem('agenthub_hub_refresh_token', 'legacy-refresh');
+    const fetchMock = vi.fn(async () => Response.json({ code: 'ok', data: session }));
     vi.stubGlobal('fetch', fetchMock);
-
-    const { createHubAuth } = await loadAuthModule();
     const auth = createHubAuth();
-
-    const ok = await auth.tryAutoLogin();
-    expect(ok).toBe(true);
-    expect(auth.getState().isAuthenticated).toBe(true);
-    expect(auth.getState().user?.username).toBe('alice');
-  });
-
-  it('exchanges browser OIDC callback with web device type only', async () => {
-    Object.defineProperty(window, '__TAURI_INTERNALS__', {
-      configurable: true,
-      value: {},
-    });
-    window.history.pushState({}, '', `/auth/account/callback?code=oidc-code&state=state-1&iss=${encodeURIComponent(ACCOUNT_ISSUER)}`);
-    sessionStorage.setItem(
-      'agenthub_oidc_pkce_pending',
-      JSON.stringify({
-        state: 'state-1',
-        codeVerifier: 'verifier-1',
-        deviceId: DEVICE_ID,
-        redirectUri: `${window.location.origin}/auth/account/callback`,
-        issuer: ACCOUNT_ISSUER,
-        createdAt: Date.now(),
-      })
-    );
-
-    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-      const url = String(input);
-
-      if (url.endsWith('/client/auth/oidc/callback')) {
-        const body = JSON.parse(String(init?.body));
-        expect(body).toMatchObject({
-          code: 'oidc-code',
-          state: 'state-1',
-          iss: ACCOUNT_ISSUER,
-          code_verifier: 'verifier-1',
-          device_type: 'web',
-          device_id: DEVICE_ID,
-        });
-        return new Response(
-          JSON.stringify({
-            access_token: 'web-access-token',
-            refresh_token: 'web-refresh-token',
-            expires_in: 3600,
-            user: {
-              id: '00000000-0000-0000-0000-00000000b102',
-              username: 'web-user',
-              nickname: 'Web User',
-              avatar_url: '',
-            },
-          }),
-          { status: 200, headers: { 'Content-Type': 'application/json' } }
-        );
-      }
-
-      throw new Error(`Unexpected request: ${url}`);
-    });
-    vi.stubGlobal('fetch', fetchMock);
-
-    const { createHubAuth } = await loadAuthModule();
-    const auth = createHubAuth();
-
-    const ok = await auth.tryAutoLogin();
-    expect(ok).toBe(true);
-    expect(auth.getState().isAuthenticated).toBe(true);
-    expect(auth.getState().user?.username).toBe('web-user');
-  });
-
-  it('uses Hub-issued OIDC session to address a registered Desktop Edge target', async () => {
-    window.history.pushState(
-      {},
-      '',
-      `/auth/account/callback?code=web-code&state=state-web-fixture&iss=${encodeURIComponent(ACCOUNT_ISSUER)}`
-    );
-    sessionStorage.setItem(
-      'agenthub_oidc_pkce_pending',
-      JSON.stringify({
-        state: 'state-web-fixture',
-        codeVerifier: 'web-verifier-fixture',
-        deviceId: DEVICE_ID,
-        redirectUri: `${window.location.origin}/auth/account/callback`,
-        issuer: ACCOUNT_ISSUER,
-        createdAt: Date.now(),
-      })
-    );
-
-    const requestedUrls: string[] = [];
-    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-      const url = String(input);
-      requestedUrls.push(url);
-
-      if (url.endsWith('/client/auth/oidc/callback')) {
-        const body = JSON.parse(String(init?.body));
-        expect(body).toMatchObject({
-          code: 'web-code',
-          state: 'state-web-fixture',
-          iss: ACCOUNT_ISSUER,
-          code_verifier: 'web-verifier-fixture',
-          device_type: 'web',
-          device_id: DEVICE_ID,
-          redirect_uri: `${window.location.origin}/auth/account/callback`,
-        });
-        return new Response(
-          JSON.stringify({
-            access_token: 'web-fixture-access-token',
-            refresh_token: 'web-fixture-refresh-token',
-            expires_in: 900,
-            user: {
-              id: '00000000-0000-0000-0000-00000000b103',
-              username: 'fixture-web-user',
-              nickname: 'Fixture Web User',
-              avatar_url: '',
-            },
-          }),
-          { status: 200, headers: { 'Content-Type': 'application/json' } }
-        );
-      }
-
-      if (url.endsWith('/web/execution-targets?pageSize=50')) {
-        expect(getAuthorization(init)).toBe('Bearer web-fixture-access-token');
-        return new Response(
-          JSON.stringify({
-            code: 'OK',
-            data: {
-              items: [
-                {
-                  id: '00000000-0000-0000-0000-00000000e501',
-                  owner_id: '00000000-0000-0000-0000-00000000b103',
-                  name: 'Packaged Desktop Edge',
-                  target_type: 'local_edge',
-                  workspace_allowlist: '["/workspace"]',
-                  trust_level: 'local',
-                  health_state: 'healthy',
-                  is_online: true,
-                },
-              ],
-              page: { hasMore: false },
-            },
-          }),
-          { status: 200, headers: { 'Content-Type': 'application/json' } }
-        );
-      }
-
-      throw new Error(`Unexpected request: ${url}`);
-    });
-    vi.stubGlobal('fetch', fetchMock);
-
-    const { createHubAuth } = await loadAuthModule();
-    const auth = createHubAuth();
-
+    expect(auth.getState().isAuthenticated).toBe(false);
     await expect(auth.tryAutoLogin()).resolves.toBe(true);
-    expect(auth.getState()).toMatchObject({
-      isAuthenticated: true,
-      token: 'web-fixture-access-token',
-      refreshToken: 'web-fixture-refresh-token',
-      tokenSource: 'account',
-    });
-    expect(sessionStorage.getItem('agenthub_hub_token')).toBe('web-fixture-access-token');
-    expect(sessionStorage.getItem('agenthub_hub_refresh_token')).toBe('web-fixture-refresh-token');
-    expect(sessionStorage.getItem('agenthub_token_source')).toBe('account');
-    expect(localStorage.getItem('agenthub_hub_token')).toBeNull();
-    expect(localStorage.getItem('agenthub_hub_refresh_token')).toBeNull();
-    expect(localStorage.getItem('agenthub_token_source')).toBeNull();
-    const targets = await fetchExecutionTargets(true, () => auth.getState().token);
-    expect(targets.items).toHaveLength(1);
-    expect(targets.items[0]).toMatchObject({
-      name: 'Packaged Desktop Edge',
-      target_type: 'local_edge',
-      health_state: 'healthy',
-      is_online: true,
-      workspace_allowlist: ['/workspace'],
-    });
-
-    const requestedUrlText = requestedUrls.join('\n');
-    const localEdgeLoopback = ['localhost', '3210'].join(':');
-    const edgeRunApi = ['/v1', 'runs'].join('/');
-    const edgeEventsApi = ['/v1', 'events'].join('/');
-    expect(requestedUrls).toHaveLength(2);
-    expect(requestedUrlText).not.toContain(localEdgeLoopback);
-    expect(requestedUrlText).not.toContain(edgeRunApi);
-    expect(requestedUrlText).not.toContain(edgeEventsApi);
-  });
-
-  it('refreshes an expired session, notifies subscribers, and logs out cleanly', async () => {
-    sessionStorage.setItem('agenthub_hub_token', 'expired-token');
-    sessionStorage.setItem('agenthub_hub_refresh_token', 'refresh-token');
-    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-      const url = String(input);
-      if (url.endsWith('/client/auth/me')) {
-        const auth = getAuthorization(init);
-        if (auth === 'Bearer expired-token')
-          return new Response(
-            JSON.stringify({ error: { code: 'token_expired', message: 'expired' } }),
-            { status: 401 }
-          );
-        return new Response(
-          JSON.stringify({
-            id: 'user-refresh',
-            username: 'refreshed',
-            nickname: 'Refreshed',
-            avatar_url: '',
-          }),
-          { status: 200 }
-        );
-      }
-      if (url.endsWith('/client/auth/refresh')) {
-        return new Response(
-          JSON.stringify({
-            access_token: 'fresh-token',
-            refresh_token: 'fresh-refresh',
-            expires_in: 3600,
-          }),
-          { status: 200 }
-        );
-      }
-      if (url.endsWith('/client/auth/logout')) return new Response('{}', { status: 200 });
-      throw new Error(`Unexpected request: ${url}`);
-    });
-    vi.stubGlobal('fetch', fetchMock);
-
-    const { createHubAuth } = await loadAuthModule();
-    const auth = createHubAuth();
-    const seen: boolean[] = [];
-    const unsubscribe = auth.subscribe((state) => seen.push(state.isAuthenticated));
-
-    await expect(auth.tryAutoLogin()).resolves.toBe(true);
-    await auth.logout();
-    unsubscribe();
-
-    expect(auth.getState()).toMatchObject({
-      token: null,
-      refreshToken: null,
-      user: null,
-      isAuthenticated: false,
-      tokenSource: null,
-    });
-    expect(seen).toEqual([true, false]);
-    expect(fetchMock.mock.calls.some(([url]) => String(url).endsWith('/client/auth/refresh'))).toBe(
-      true
-    );
-  });
-
-  it('clears credentials when refresh fails after an unauthorized profile', async () => {
-    sessionStorage.setItem('agenthub_hub_token', 'bad-token');
-    sessionStorage.setItem('agenthub_hub_refresh_token', 'bad-refresh');
-    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
-      const url = String(input);
-      if (url.endsWith('/client/auth/me'))
-        return new Response(JSON.stringify({ error: { code: 'unauthorized', message: 'no' } }), {
-          status: 401,
-        });
-      if (url.endsWith('/client/auth/refresh'))
-        return new Response(JSON.stringify({ error: { code: 'refresh_failed', message: 'no' } }), {
-          status: 401,
-        });
-      throw new Error(`Unexpected request: ${url}`);
-    });
-    vi.stubGlobal('fetch', fetchMock);
-    const { createHubAuth } = await loadAuthModule();
-
-    await expect(createHubAuth().tryAutoLogin()).resolves.toBe(false);
+    expect(auth.getState()).toMatchObject({ user, token: null, refreshToken: null, isAuthenticated: true });
+    expect(fetchMock).toHaveBeenCalledWith('/client/auth/browser/session', expect.objectContaining({ credentials: 'same-origin' }));
     expect(sessionStorage.getItem('agenthub_hub_token')).toBeNull();
-    expect(sessionStorage.getItem('agenthub_hub_refresh_token')).toBeNull();
+    expect(localStorage.getItem('agenthub_hub_refresh_token')).toBeNull();
+    expect(getBrowserCsrfToken()).toBe('csrf-proof');
   });
 
-  it('rejects malformed, mismatched, and expired browser callbacks without exchanging tokens', async () => {
-    const { createHubAuth } = await loadAuthModule();
-    const auth = createHubAuth();
-
-    window.history.pushState({}, '', `/auth/account/callback?code=c&state=s&iss=${encodeURIComponent(ACCOUNT_ISSUER)}`);
-    sessionStorage.setItem('agenthub_oidc_pkce_pending', '{bad-json');
-    await expect(auth.tryAutoLogin()).resolves.toBe(false);
-
-    sessionStorage.setItem(
-      'agenthub_oidc_pkce_pending',
-      JSON.stringify({
-        state: 'expected',
-        codeVerifier: 'v',
-        deviceId: DEVICE_ID,
-        redirectUri: `${window.location.origin}/auth/account/callback`,
-        issuer: ACCOUNT_ISSUER,
-        createdAt: Date.now(),
-      })
-    );
-    window.history.pushState({}, '', `/auth/account/callback?code=c&state=other&iss=${encodeURIComponent(ACCOUNT_ISSUER)}`);
-    await expect(auth.tryAutoLogin()).rejects.toThrow(/state mismatch/i);
-
-    sessionStorage.setItem(
-      'agenthub_oidc_pkce_pending',
-      JSON.stringify({
-        state: 'old',
-        codeVerifier: 'v',
-        deviceId: DEVICE_ID,
-        redirectUri: `${window.location.origin}/auth/account/callback`,
-        issuer: ACCOUNT_ISSUER,
-        createdAt: Date.now() - 11 * 60 * 1000,
-      })
-    );
-    window.history.pushState({}, '', `/auth/account/callback?code=c&state=old&iss=${encodeURIComponent(ACCOUNT_ISSUER)}`);
-    await expect(auth.tryAutoLogin()).rejects.toThrow(/expired/i);
-  });
-
-  it('starts the OIDC PKCE login: authorize payload, sessionStorage pending state, and window redirect', async () => {
-    const assignSpy = vi.fn();
-    const realLocation = window.location;
-    Object.defineProperty(window, 'location', {
-      configurable: true,
-      value: {
-        href: 'http://localhost:5173/workbench/',
-        origin: 'http://localhost:5173',
-        pathname: '/workbench/',
-        assign: assignSpy,
-        replace: vi.fn(),
-        reload: vi.fn(),
-      },
-    });
-    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-      const url = String(input);
-
-      if (url.endsWith('/client/auth/oidc/authorize')) {
-        const body = JSON.parse(String(init?.body));
-        expect(body).toMatchObject({
-          code_challenge_method: 'S256',
-          device_type: 'web',
-          device_id: DEVICE_ID,
-          redirect_uri: 'http://localhost:5173/auth/account/callback',
-        });
-        expect(body.code_challenge).toMatch(/^[A-Za-z0-9_-]{43}$/);
-        return new Response(
-          JSON.stringify({
-            state: 'server-state-1',
-            authorization_url: 'https://id.example.com/authorize?state=server-state-1',
-            issuer: ACCOUNT_ISSUER,
-          }),
-          { status: 200, headers: { 'Content-Type': 'application/json' } }
-        );
-      }
-
-      throw new Error(`Unexpected request: ${url}`);
-    });
+  it('exchanges code, state and issuer without putting PKCE or tokens in JS storage', async () => {
+    window.history.replaceState({}, '', '/auth/account/callback?code=code&state=state&iss=https%3A%2F%2Faccount.example.test');
+    const fetchMock = vi.fn(async () => Response.json({ code: 'ok', data: session }));
     vi.stubGlobal('fetch', fetchMock);
+    const auth = createHubAuth();
+    await expect(auth.tryAutoLogin()).resolves.toBe(true);
+    expect(fetchMock).toHaveBeenCalledWith('/client/auth/browser/callback', expect.objectContaining({
+      method: 'POST', body: JSON.stringify({ code: 'code', state: 'state', iss: 'https://account.example.test' }),
+    }));
+    expect(window.location.search).toBe('');
+    expect(sessionStorage.getItem('agenthub_oidc_pkce_pending')).toBeNull();
+  });
 
-    try {
-      const { createHubAuth } = await loadAuthModule();
-      const auth = createHubAuth();
+  it('fails closed when the server reports no session', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => Response.json({ code: 'auth_required' }, { status: 401 })));
+    const auth = createHubAuth();
+    await expect(auth.tryAutoLogin()).resolves.toBe(false);
+    expect(auth.getState().isAuthenticated).toBe(false);
+  });
 
-      // Browser-redirect mode: the page unloads during the redirect, so the
-      // returned promise never settles — assert the pre-redirect side effects.
-      void auth.loginWithAccount();
-
-      await vi.waitFor(() => {
-        expect(assignSpy).toHaveBeenCalledWith(
-          'https://id.example.com/authorize?state=server-state-1'
-        );
-      });
-      const pending = JSON.parse(sessionStorage.getItem('agenthub_oidc_pkce_pending') ?? '{}');
-      expect(pending).toMatchObject({
-        state: 'server-state-1',
-        deviceId: DEVICE_ID,
-        redirectUri: 'http://localhost:5173/auth/account/callback',
-        issuer: ACCOUNT_ISSUER,
-      });
-      expect(pending.codeVerifier).toMatch(/^[A-Za-z0-9_-]{43}$/);
-      expect(pending.createdAt).toBeGreaterThan(0);
-      // No token material is persisted at login start.
-      expect(sessionStorage.getItem('agenthub_hub_token')).toBeNull();
-      expect(sessionStorage.getItem('agenthub_hub_refresh_token')).toBeNull();
-    } finally {
-      Object.defineProperty(window, 'location', {
-        configurable: true,
-        value: realLocation,
-      });
-    }
+  it('sends CSRF on logout and only clears state after successful server revocation', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(Response.json({ code: 'ok', data: session }))
+      .mockResolvedValueOnce(Response.json({ code: 'unavailable' }, { status: 503 }))
+      .mockResolvedValueOnce(Response.json({ code: 'ok', data: null }));
+    vi.stubGlobal('fetch', fetchMock);
+    const auth = createHubAuth();
+    await auth.tryAutoLogin();
+    await expect(auth.logout()).rejects.toMatchObject({ status: 503 });
+    expect(auth.getState().isAuthenticated).toBe(true);
+    await auth.logout();
+    expect(auth.getState().isAuthenticated).toBe(false);
+    expect(new Headers(fetchMock.mock.calls[2]?.[1]?.headers).get('X-Hub-CSRF')).toBe('csrf-proof');
+    expect(getBrowserCsrfToken()).toBeNull();
   });
 });

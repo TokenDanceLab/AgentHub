@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { getAccessToken } from '@/hooks/useAuth';
+import { isHubAuthenticated } from '@/hooks/useAuth';
 import { hubQueryKeys } from '@shared/stores/queryKeys';
 import { fetchAllPages } from '@shared/hub/paginate';
 import { createHubClient } from './hubClient';
@@ -37,12 +37,12 @@ const emptyWorkspaceProjects: WorkspaceProjectListResponse = {
 // hand-rolled copy of the same cursor loop in the front end.
 export async function fetchWorkspaceProjects(
   preferHub: boolean,
-  getToken: () => string | null = getAccessToken,
+  isAuthenticated: () => boolean = isHubAuthenticated,
 ): Promise<WorkspaceProjectListResponse> {
-  const token = getToken();
-  if (!preferHub || !token) return emptyWorkspaceProjects;
+  const authenticated = isAuthenticated();
+  if (!preferHub || !authenticated) return emptyWorkspaceProjects;
 
-  const client = createHubClient({ getToken: () => token });
+  const client = createHubClient();
   // Canonical Hub list contract (pageSize 200 x 5 pages, cap reported via
   // hasMore) — see @shared/hub/paginate for why a single page is a silent
   // truncation and not an error (#2290).
@@ -51,70 +51,70 @@ export async function fetchWorkspaceProjects(
 
 export async function fetchWorkspaceProject(
   projectId: string | undefined,
-  getToken: () => string | null = getAccessToken,
+  isAuthenticated: () => boolean = isHubAuthenticated,
 ): Promise<WorkspaceProject | undefined> {
-  const token = getToken();
-  if (!projectId || !token) return undefined;
+  const authenticated = isAuthenticated();
+  if (!projectId || !authenticated) return undefined;
 
-  const client = createHubClient({ getToken: () => token });
+  const client = createHubClient();
   return client.getWorkspaceProject(projectId);
 }
 
 export async function createWorkspaceProject(
   draft: CreateWorkspaceProjectRequest,
-  getToken: () => string | null = getAccessToken,
+  isAuthenticated: () => boolean = isHubAuthenticated,
 ): Promise<WorkspaceProject> {
-  const token = getToken();
-  if (!token) throw new Error('Hub session is required');
+  const authenticated = isAuthenticated();
+  if (!authenticated) throw new Error('Hub session is required');
 
-  const client = createHubClient({ getToken: () => token });
+  const client = createHubClient();
   return client.createWorkspaceProject(draft);
 }
 
 export async function updateWorkspaceProject(
   projectId: string,
   draft: UpdateWorkspaceProjectRequest,
-  getToken: () => string | null = getAccessToken,
+  isAuthenticated: () => boolean = isHubAuthenticated,
 ): Promise<WorkspaceProject> {
-  const token = getToken();
-  if (!token) throw new Error('Hub session is required');
+  const authenticated = isAuthenticated();
+  if (!authenticated) throw new Error('Hub session is required');
 
-  const client = createHubClient({ getToken: () => token });
+  const client = createHubClient();
   return client.updateWorkspaceProject(projectId, draft);
 }
 
 export async function fetchWorkspaceProjectThreads(
   projectId: string | undefined,
-  getToken: () => string | null = getAccessToken,
+  isAuthenticated: () => boolean = isHubAuthenticated,
 ): Promise<WorkspaceProjectThread[]> {
-  const token = getToken();
-  if (!projectId || !token) return [];
+  const authenticated = isAuthenticated();
+  if (!projectId || !authenticated) return [];
 
-  const client = createHubClient({ getToken: () => token });
+  const client = createHubClient();
   return client.listWorkspaceProjectThreads(projectId);
 }
 
 export async function createWorkspaceProjectThread(
   projectId: string,
   draft: CreateWorkspaceProjectThreadRequest,
-  getToken: () => string | null = getAccessToken,
+  isAuthenticated: () => boolean = isHubAuthenticated,
 ): Promise<WorkspaceProjectThread> {
-  const token = getToken();
-  if (!token) throw new Error('Hub session is required');
+  const authenticated = isAuthenticated();
+  if (!authenticated) throw new Error('Hub session is required');
 
-  const client = createHubClient({ getToken: () => token });
+  const client = createHubClient();
   return client.createWorkspaceProjectThread(projectId, draft);
 }
 
 export async function fetchWorkspaceProjectThreadMessages(
   projectId: string | undefined,
   threadId: string | undefined,
-  getToken: () => string | null = getAccessToken,
+  isAuthenticated: () => boolean = isHubAuthenticated,
 ): Promise<WorkspaceProjectThreadMessage[]> {
-  const token = getToken();
-  if (!projectId || !threadId || !token) return [];
+  const authenticated = isAuthenticated();
+  if (!projectId || !threadId || !authenticated) return [];
 
-  const client = createHubClient({ getToken: () => token });
+  const client = createHubClient();
   return client.listWorkspaceProjectThreadMessages(projectId, threadId, { limit: 80 });
 }
 
@@ -122,22 +122,22 @@ export async function sendWorkspaceProjectThreadMessage(
   projectId: string,
   threadId: string,
   draft: SendWorkspaceProjectThreadMessageRequest,
-  getToken: () => string | null = getAccessToken,
+  isAuthenticated: () => boolean = isHubAuthenticated,
 ): Promise<WorkspaceProjectThreadMessage> {
-  const token = getToken();
-  if (!token) throw new Error('Hub session is required');
+  const authenticated = isAuthenticated();
+  if (!authenticated) throw new Error('Hub session is required');
 
-  const client = createHubClient({ getToken: () => token });
+  const client = createHubClient();
   return client.sendWorkspaceProjectThreadMessage(projectId, threadId, draft);
 }
 
 export function useHubWorkspaceProjects(options: {
   enabled: boolean;
-  getToken?: () => string | null;
+  isAuthenticated?: () => boolean;
 }) {
   return useQuery<WorkspaceProjectListResponse>({
     queryKey: hubQueryKeys.projects.list(options.enabled ? 'hub' : 'signed-out'),
-    queryFn: () => fetchWorkspaceProjects(options.enabled, options.getToken ?? getAccessToken),
+    queryFn: () => fetchWorkspaceProjects(options.enabled, options.isAuthenticated ?? isHubAuthenticated),
     enabled: options.enabled,
     staleTime: 10_000,
     placeholderData: (previous) => previous,
@@ -147,35 +147,35 @@ export function useHubWorkspaceProjects(options: {
 export function useHubWorkspaceProject(options: {
   projectId?: string | undefined;
   enabled: boolean;
-  getToken?: () => string | null;
+  isAuthenticated?: () => boolean;
 }) {
   return useQuery<WorkspaceProject | undefined>({
     queryKey: hubQueryKeys.projects.detail(options.projectId ?? ''),
-    queryFn: () => fetchWorkspaceProject(options.projectId, options.getToken ?? getAccessToken),
+    queryFn: () => fetchWorkspaceProject(options.projectId, options.isAuthenticated ?? isHubAuthenticated),
     enabled: options.enabled && Boolean(options.projectId),
     staleTime: 10_000,
     placeholderData: (previous) => previous,
   });
 }
 
-export function useCreateHubWorkspaceProject(options: { getToken?: () => string | null } = {}) {
+export function useCreateHubWorkspaceProject(options: { isAuthenticated?: () => boolean } = {}) {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: (draft: CreateWorkspaceProjectRequest) =>
-      createWorkspaceProject(draft, options.getToken ?? getAccessToken),
+      createWorkspaceProject(draft, options.isAuthenticated ?? isHubAuthenticated),
     onSettled: () => {
       void queryClient.invalidateQueries({ queryKey: workspaceProjectsQueryKey });
     },
   });
 }
 
-export function useUpdateHubWorkspaceProject(options: { getToken?: () => string | null } = {}) {
+export function useUpdateHubWorkspaceProject(options: { isAuthenticated?: () => boolean } = {}) {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: ({ projectId, draft }: { projectId: string; draft: UpdateWorkspaceProjectRequest }) =>
-      updateWorkspaceProject(projectId, draft, options.getToken ?? getAccessToken),
+      updateWorkspaceProject(projectId, draft, options.isAuthenticated ?? isHubAuthenticated),
     onSettled: (_data, _error, variables) => {
       void queryClient.invalidateQueries({ queryKey: hubQueryKeys.projects.root });
       void queryClient.invalidateQueries({ queryKey: hubQueryKeys.projects.detail(variables.projectId) });
@@ -186,11 +186,11 @@ export function useUpdateHubWorkspaceProject(options: { getToken?: () => string 
 export function useHubWorkspaceProjectThreads(options: {
   projectId?: string | undefined;
   enabled: boolean;
-  getToken?: () => string | null;
+  isAuthenticated?: () => boolean;
 }) {
   return useQuery<WorkspaceProjectThread[]>({
     queryKey: [...hubQueryKeys.projects.threads(options.projectId ?? 'none')],
-    queryFn: () => fetchWorkspaceProjectThreads(options.projectId, options.getToken ?? getAccessToken),
+    queryFn: () => fetchWorkspaceProjectThreads(options.projectId, options.isAuthenticated ?? isHubAuthenticated),
     enabled: options.enabled && Boolean(options.projectId),
     staleTime: 10_000,
     placeholderData: (previous) => previous,
@@ -201,7 +201,7 @@ export function useHubWorkspaceProjectThreadMessages(options: {
   projectId?: string | undefined;
   threadId?: string | undefined;
   enabled: boolean;
-  getToken?: () => string | null;
+  isAuthenticated?: () => boolean;
 }) {
   return useQuery<WorkspaceProjectThreadMessage[]>({
     queryKey: [
@@ -210,7 +210,7 @@ export function useHubWorkspaceProjectThreadMessages(options: {
     queryFn: () => fetchWorkspaceProjectThreadMessages(
       options.projectId,
       options.threadId,
-      options.getToken ?? getAccessToken,
+      options.isAuthenticated ?? isHubAuthenticated,
     ),
     enabled: options.enabled && Boolean(options.projectId) && Boolean(options.threadId),
     staleTime: 5_000,

@@ -21,7 +21,8 @@ import {
   type PendingAgentTask,
   type SendMessageResponse,
 } from '@/api/hubClient';
-import { getAccessToken } from '@/hooks/useAuth';
+import { isHubAuthenticated } from '@/hooks/useAuth';
+import { getBrowserSessionGeneration } from '@/api/browserSessionRuntime';
 import { canOpenWebEvidencePreview, openWebEvidencePreview, resolveWebAttachmentImageUrl, resolveWebAttachmentMediaUrl, resolveWebEvidenceContentUrl } from './webPreview';
 import { createWebSettingsAdapter } from './webSettingsAdapter';
 import { recordWebAgentTaskIndex } from './webPlatformAgentTask';
@@ -99,7 +100,7 @@ interface WebPlatformOptions {
   ensureAuth?: () => boolean;
 }
 
-const defaultHubClient = createHubClient({ getToken: getAccessToken });
+const defaultHubClient = createHubClient();
 
 export function createWebPlatform(options: WebPlatformOptions = {}): AgentHubPlatform {
   const hubClient = options.hubClient ?? defaultHubClient;
@@ -156,7 +157,7 @@ export function createWebPlatform(options: WebPlatformOptions = {}): AgentHubPla
         throw new Error('Web platform does not support programmatic file picking. Use the composer file input instead.');
       },
       async uploadAttachment(file: File): Promise<AttachmentRef> {
-        const client = createHubClient({ getToken: getAccessToken });
+        const client = createHubClient();
         const hash = await computeFileHash(file);
         const ref = await client.uploadAttachment(file, hash);
         return {
@@ -177,7 +178,7 @@ export function createWebPlatform(options: WebPlatformOptions = {}): AgentHubPla
         const dataMode = normalizeWorkbenchDataMode(
           options.dataMode ?? import.meta.env.VITE_AGENTHUB_DATA_MODE,
         );
-        const hasHubToken = Boolean(getAccessToken());
+        const hasHubSession = Boolean(isHubAuthenticated());
         // demo success only via shared fail-closed gate (explicit mock/fixture opt-in).
         // Never silent-fallback from auto/observed/approved-real, even when unsigned-out.
         // ensureAuth is for the real Hub path only; it must not block intentional fixture demos.
@@ -189,10 +190,10 @@ export function createWebPlatform(options: WebPlatformOptions = {}): AgentHubPla
         if (shouldUseDemoFallback) {
           return demoRuntimeStore.submitComposerIntent(intent);
         }
-        if (!hasHubToken && ensureAuth && !ensureAuth()) {
+        if (!hasHubSession && ensureAuth && !ensureAuth()) {
           throw new Error('Hub authentication is required before Web can submit real Hub work.');
         }
-        if (!hasHubToken && !ensureAuth && !hasInjectedHubClient) {
+        if (!hasHubSession && !ensureAuth && !hasInjectedHubClient) {
           throw new Error('Hub authentication is required before Web can submit real Hub work.');
         }
         return submitWebComposerIntent(hubClient, createClientMessageId, intent, { queryClient, now });
@@ -204,7 +205,7 @@ export function createWebPlatform(options: WebPlatformOptions = {}): AgentHubPla
         const dataMode = normalizeWorkbenchDataMode(
           options.dataMode ?? import.meta.env.VITE_AGENTHUB_DATA_MODE,
         );
-        const hasHubToken = Boolean(getAccessToken());
+        const hasHubSession = Boolean(isHubAuthenticated());
         const shouldUseDemoFallback = allowsWorkbenchDemoRuntimeMutation({
           demoRuntimeFallback: options.demoRuntimeFallback,
           dataMode,
@@ -213,10 +214,10 @@ export function createWebPlatform(options: WebPlatformOptions = {}): AgentHubPla
         if (shouldUseDemoFallback) {
           return { taskId: undefined };
         }
-        if (!hasHubToken && ensureAuth && !ensureAuth()) {
+        if (!hasHubSession && ensureAuth && !ensureAuth()) {
           throw new Error('Hub authentication is required before Web can submit real Hub work.');
         }
-        if (!hasHubToken && !ensureAuth && !hasInjectedHubClient) {
+        if (!hasHubSession && !ensureAuth && !hasInjectedHubClient) {
           throw new Error('Hub authentication is required before Web can submit real Hub work.');
         }
         return redispatchWebTask(hubClient, messageId, intent, { queryClient });
@@ -281,7 +282,7 @@ interface SubmitWebComposerIntentOptions {
  * array with attachmentRef populated for each successfully uploaded file.
  */
 async function uploadPendingAttachments(intent: ComposerIntent): Promise<ComposerAttachment[]> {
-  const hubAttachments = createHubClient({ getToken: getAccessToken });
+  const hubAttachments = createHubClient();
   return Promise.all(intent.attachments.map(async (attachment) => {
     // Already uploaded or no File to upload
     if (attachment.attachmentRef || !attachment.file) return attachment;
@@ -317,12 +318,17 @@ async function submitWebComposerIntent(
   intent: ComposerIntent,
   options: SubmitWebComposerIntentOptions = {},
 ): Promise<ComposerSubmitResult> {
+  const generation = getBrowserSessionGeneration();
+  const assertSession = () => {
+    if (generation !== getBrowserSessionGeneration()) throw new DOMException('Session changed', 'AbortError');
+  };
   // Upload any attachments that have a File reference but no server-side ref yet
   const pendingUploads = intent.attachments.filter((a) => a.file && !a.attachmentRef);
   const enrichedAttachments = pendingUploads.length > 0
     ? await uploadPendingAttachments(intent)
     : intent.attachments;
   const enrichedIntent = { ...intent, attachments: enrichedAttachments };
+  assertSession();
 
   // #1406 @agent 派单：选取 dispatchRole !== 'context' 的第一个 mention 作为派单目标。
   // backward-compat：已有 mention（无 dispatchRole）视为可派单；显式 'context' 跳过。
@@ -340,15 +346,17 @@ async function submitWebComposerIntent(
     : undefined;
 
   const clientMessageId = createClientMessageId();
+  assertSession();
   const optimisticMessage = optimisticHubMessageFromIntent(enrichedIntent, clientMessageId, options.now?.() ?? new Date().toISOString());
   upsertHubMessage(options.queryClient, optimisticMessage);
 
   let message: SendMessageResponse;
   try {
     message = await sendComposerMessage(hubClient, clientMessageId, enrichedIntent);
+    assertSession();
     confirmOptimisticHubMessage(options.queryClient, enrichedIntent.conversationId, clientMessageId, message);
   } catch (error) {
-    removeOptimisticHubMessage(options.queryClient, enrichedIntent.conversationId, clientMessageId);
+    if (generation === getBrowserSessionGeneration()) removeOptimisticHubMessage(options.queryClient, enrichedIntent.conversationId, clientMessageId);
     throw error;
   }
 
@@ -371,6 +379,7 @@ async function submitWebComposerIntent(
     return { intentId: message.message_id, dispatchError: error instanceof Error ? error.message : 'Agent dispatch failed' };
   }
   if (task.id) {
+    assertSession();
     const targetId = task.target_id ?? dispatchTarget?.id;
     recordWebAgentTaskIndex(options.queryClient, {
       taskId: task.id,
@@ -399,6 +408,7 @@ async function redispatchWebTask(
   intent: ComposerIntent,
   options: { queryClient?: QueryClient } = {},
 ): Promise<RedispatchTaskResult> {
+  const generation = getBrowserSessionGeneration();
   const dispatchMention = intent.mentions.find((m) => m.dispatchRole !== 'context');
   if (!dispatchMention) {
     // Nothing to dispatch (e.g. only context mentions) — treat as success so
@@ -417,6 +427,7 @@ async function redispatchWebTask(
   );
   try {
     const task = await triggerMentionedAgent(hubClient, messageId, agentInstance?.id, dispatchTarget, intent);
+    if (generation !== getBrowserSessionGeneration()) throw new DOMException('Session changed', 'AbortError');
     if (task.id) {
       const targetId = task.target_id ?? dispatchTarget?.id;
       recordWebAgentTaskIndex(options.queryClient, {
@@ -464,6 +475,7 @@ async function ensureMentionedAgentInstance(
   mention: ComposerIntent['mentions'][number],
   queryClient: QueryClient | undefined,
 ): Promise<AgentInstance> {
+  const generation = getBrowserSessionGeneration();
   const runtimeId = mention.runtimeId?.trim();
   if (!runtimeId) {
     throw new Error(`Mentioned Hub agent "${mention.label}" is missing a runtime id.`);
@@ -480,6 +492,7 @@ async function ensureMentionedAgentInstance(
     agent_type: runtimeId,
     display_name: mention.label,
   });
+  if (generation !== getBrowserSessionGeneration()) throw new DOMException('Session changed', 'AbortError');
   if (!agentInstance?.id) {
     throw new Error(`Hub did not return an agent instance id for "${mention.label}".`);
   }

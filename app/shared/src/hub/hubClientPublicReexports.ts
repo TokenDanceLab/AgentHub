@@ -5,6 +5,7 @@
  */
 
 // ── Envelope / error runtime (extracted #799) ──
+export type { HubAuthTransport, HubBrowserSession, HubBrowserCallbackRequest } from './hubClientDomainTypes';
 export {
   HubError,
   isHubResponseEnvelope,

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { getAccessToken } from '@/hooks/useAuth';
+import { isHubAuthenticated } from '@/hooks/useAuth';
 import {
   fetchExecutionTargets,
   summarizeExecutionTargets,
@@ -8,21 +8,21 @@ import {
 import { getAuthorization } from '@/__tests__/requestInitTestUtils';
 
 vi.mock('@/hooks/useAuth', () => ({
-  getAccessToken: vi.fn(),
+  isHubAuthenticated: vi.fn(),
 }));
 
 describe('web execution target queries', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
-    vi.mocked(getAccessToken).mockReturnValue(null);
+    vi.mocked(isHubAuthenticated).mockReturnValue(false);
   });
 
-  it('fetches real Hub execution target inventory when a Hub session token is available', async () => {
-    vi.mocked(getAccessToken).mockReturnValue('hub-access');
+  it('fetches real Hub execution target inventory when a Hub browser session is authenticated', async () => {
+    vi.mocked(isHubAuthenticated).mockReturnValue(true);
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-      expect(String(input)).toBe('http://localhost:8080/web/execution-targets?pageSize=50');
-      expect(getAuthorization(init)).toBe('Bearer hub-access');
+      expect(String(input)).toBe('/web/execution-targets?pageSize=50');
+      expect(getAuthorization(init)).toBeNull();
       return new Response(
         JSON.stringify({
           code: 'ok',
@@ -60,7 +60,7 @@ describe('web execution target queries', () => {
   });
 
   it('walks cursor pages up to the shared 50x10 cap and reports hasMore honestly', async () => {
-    vi.mocked(getAccessToken).mockReturnValue('hub-access');
+    vi.mocked(isHubAuthenticated).mockReturnValue(true);
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(new Response(
         JSON.stringify({
@@ -103,14 +103,14 @@ describe('web execution target queries', () => {
     const res = await fetchExecutionTargets(true);
 
     expect(fetchMock).toHaveBeenCalledTimes(2);
-    expect(String(fetchMock.mock.calls[0]?.[0])).toBe('http://localhost:8080/web/execution-targets?pageSize=50');
-    expect(String(fetchMock.mock.calls[1]?.[0])).toBe('http://localhost:8080/web/execution-targets?pageSize=50&pageCursor=cur-1');
+    expect(String(fetchMock.mock.calls[0]?.[0])).toBe('/web/execution-targets?pageSize=50');
+    expect(String(fetchMock.mock.calls[1]?.[0])).toBe('/web/execution-targets?pageSize=50&pageCursor=cur-1');
     expect(res.items).toHaveLength(2);
     expect(res.page.hasMore).toBe(false);
   });
 
   it('reports hasMore=true after exhausting the maximum cursor pages', async () => {
-    vi.mocked(getAccessToken).mockReturnValue('hub-access');
+    vi.mocked(isHubAuthenticated).mockReturnValue(true);
     const fetchMock = vi.fn(async () => new Response(
       JSON.stringify({
         code: 'ok',
@@ -218,7 +218,7 @@ describe('web execution target queries', () => {
   });
 
   it('surfaces 401 unauthorized from execution target inventory as AppError', async () => {
-    vi.mocked(getAccessToken).mockReturnValue('stale-token');
+    vi.mocked(isHubAuthenticated).mockReturnValue(true);
     vi.stubGlobal(
       'fetch',
       vi.fn(
@@ -242,7 +242,7 @@ describe('web execution target queries', () => {
     ['NOT_FOUND', 404, 'Not Found', 'targets missing'],
     ['INTERNAL_ERROR', 500, 'Internal Server Error', 'hub down'],
   ])('surfaces %s from execution target inventory as AppError', async (code, status, statusText, message) => {
-    vi.mocked(getAccessToken).mockReturnValue('hub-access');
+    vi.mocked(isHubAuthenticated).mockReturnValue(true);
     vi.stubGlobal(
       'fetch',
       vi.fn(
@@ -262,7 +262,7 @@ describe('web execution target queries', () => {
   });
 
   it('normalizes malformed inventory fields without leaking backend dialects into UI state', async () => {
-    vi.mocked(getAccessToken).mockReturnValue('hub-access');
+    vi.mocked(isHubAuthenticated).mockReturnValue(true);
     vi.stubGlobal(
       'fetch',
       vi.fn(
@@ -351,7 +351,7 @@ describe('web execution target queries', () => {
   });
 
   it('keeps registered health states in the pass-through instead of collapsing to unknown', async () => {
-    vi.mocked(getAccessToken).mockReturnValue('hub-access');
+    vi.mocked(isHubAuthenticated).mockReturnValue(true);
     vi.stubGlobal(
       'fetch',
       vi.fn(

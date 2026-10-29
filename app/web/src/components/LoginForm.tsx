@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Loader2, AlertCircle, KeyRound } from 'lucide-react';
 import { TokenDanceMark } from '@shared/ui';
 import { useAuth } from '@/hooks/useAuth';
-import { OidcError } from '@/api/hubAuth';
+import { OidcError } from '@shared/api/auth';
 import type { UserProfile } from '@/api/hubClient';
 import styles from './AuthPage.module.css';
 

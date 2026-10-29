@@ -3,13 +3,13 @@ import { useTranslation } from 'react-i18next';
 import { fetchAllPages } from '@shared/hub/paginate';
 import { createHubClient } from './hubClient';
 import type { AgentProfile, CreateAgentProfileRequest, UpdateAgentProfileRequest } from './hubClient';
-import { getAccessToken } from '@/hooks/useAuth';
+import { isHubAuthenticated } from '@/hooks/useAuth';
 import { useHubStore } from '@/stores/hubStore';
 import { hubQueryKeys } from '@shared/stores/queryKeys';
 import type { AgentCapabilities, AgentInfo, ListResponse } from '@shared/types';
 import type { AgentConfig } from '@agenthub/workbench';
 
-const hubClient = createHubClient({ getToken: getAccessToken });
+const hubClient = createHubClient();
 
 const defaultCapabilities: AgentCapabilities = {
   streaming: true,
@@ -297,8 +297,8 @@ export function agentConfigToUpdateAgentProfileRequest(agent: AgentConfig, t?: (
 }
 
 
-async function fetchHubAgentProfiles(token: string): Promise<ListResponse<AgentInfo>> {
-  const client = createHubClient({ getToken: () => token });
+async function fetchHubAgentProfiles(): Promise<ListResponse<AgentInfo>> {
+  const client = createHubClient();
   // Was a single `pageSize: 50` request with the cursor dropped, i.e. the 51st
   // agent profile was silently missing from the agent list. Same defect class
   // and same fix as the projects list (#2290): walk the canonical contract in
@@ -312,9 +312,9 @@ async function fetchHubAgentProfiles(token: string): Promise<ListResponse<AgentI
 }
 
 export async function fetchAgentList(preferHub: boolean): Promise<ListResponse<AgentInfo>> {
-  const token = getAccessToken();
-  if (preferHub && token) {
-    return fetchHubAgentProfiles(token);
+  const authenticated = isHubAuthenticated();
+  if (preferHub && authenticated) {
+    return fetchHubAgentProfiles();
   }
   return { items: [], page: { hasMore: false } };
 }
