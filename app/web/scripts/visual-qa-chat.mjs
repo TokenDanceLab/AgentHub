@@ -56,8 +56,7 @@ const GOAL_OBJECTIVE = 'Migrate every endpoint to the single typed API client';
 // callId is ours to choose — stableInteractionId renders `call-<toolCallId>`
 // as the tool card data-block-id (chatview stable DOM identity).
 const TOOL_CALL_ID = 'vqa-read';
-const hubUrlPattern =
-  /https?:\/\/(?:localhost:8080|127\.0\.0\.1:8080|hub\.vectorcontrol\.tech|api\.hub\.vectorcontrol\.tech)\/.*/;
+const hubUrlPattern = (url) => url.origin === new URL(baseUrl).origin && /^\/(?:client|web|health)(?:\/|$)/.test(url.pathname);
 
 function wait(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -229,14 +228,18 @@ async function installMockHub(context, scene = 'main') {
         json({ status: 'ok', version: 'web-visual-qa-chat', uptime: '1h', checks: {} }),
       );
     }
-    if (pathname === '/client/auth/me') {
+    if (pathname === '/client/auth/browser/session') {
       return route.fulfill(
         json(
           hubEnvelope({
-            id: 'user_visual',
-            username: 'visual-reviewer',
-            nickname: 'Visual Reviewer',
-            avatar_url: '',
+            user: {
+              id: 'user_visual',
+              username: 'visual-reviewer',
+              nickname: 'Visual Reviewer',
+              avatar_url: '',
+            },
+            csrf_token: 'fixture-qa-csrf',
+            expires_at: '2099-01-01T00:00:00Z',
           }),
         ),
       );
@@ -378,10 +381,10 @@ async function maybeStartDevServer() {
       shell: process.platform === 'win32',
       env: {
         ...process.env,
-        // Match visual-qa-shell.mjs: mount at the origin root and pin the
-        // hub URL so every Hub call lands in the Playwright route stub.
+        // Match shell QA: mount at root and fail closed if a same-origin
+        // Hub request is not handled by the Playwright fixture.
         VITE_BASE_PATH: '/',
-        VITE_HUB_URL: 'http://localhost:8080',
+        AGENTHUB_WEB_DEV_PROXY_TARGET: 'http://127.0.0.1:9',
       },
     },
   );
@@ -403,26 +406,26 @@ async function captureTheme(browser, theme, scene, vp = { width: 1440, height: 8
     colorScheme: theme,
   });
   await installMockHub(context, scene);
+  await context.addCookies([{ name: 'agenthub_browser_session', value: 'fixture-qa-session', url: baseUrl, httpOnly: true, sameSite: 'Lax' }]);
+  await context.routeWebSocket(`${new URL(baseUrl).origin.replace(/^http/, 'ws')}/client/ws`, (socket) => socket.send(JSON.stringify({ type: 'auth.ok', payload: null })));
   const page = await context.newPage();
+  const failures = [];
+  page.on('pageerror', (error) => failures.push(error.message));
+  page.on('requestfailed', (request) => {
+    failures.push(`${request.method()} ${new URL(request.url()).pathname}: ${request.failure()?.errorText}`);
+  });
 
-  // Storage before navigation: theme (v4 SSOT + legacy), locale, hub auth,
+  // Storage before navigation: theme (v4 SSOT + legacy), locale,
   // approved-real data mode and the finished active task (replay source).
   await page.addInitScript(
     ({ v4Key, legacyKey, theme: t, sessionId, taskId }) => {
       window.localStorage.setItem(v4Key, t);
       window.localStorage.setItem(legacyKey, t);
       window.localStorage.setItem('agenthub-language', 'zh');
-      window.localStorage.setItem('agenthub_hub_url', 'http://localhost:8080');
       window.localStorage.setItem('agenthub.workbench.dataMode', 'approved-real');
       window.localStorage.setItem(
         `agenthub.web.activeAgentTask.${sessionId}`,
         JSON.stringify({ taskId, sessionId, status: 'done' }),
-      );
-      window.sessionStorage.setItem('agenthub_hub_token', 'visual-qa-token');
-      window.sessionStorage.setItem('agenthub_token_source', 'hub');
-      window.sessionStorage.setItem(
-        'agenthub_hub_user',
-        JSON.stringify({ userId: 'user_visual', username: 'visual-reviewer' }),
       );
     },
     {
@@ -441,7 +444,7 @@ async function captureTheme(browser, theme, scene, vp = { width: 1440, height: 8
   } catch {
     const diagFile = path.join(outDir, `${shotBase}${dprSuffix}-DIAGNOSTIC.png`);
     await page.screenshot({ path: diagFile, fullPage: false });
-    throw new Error(`Workbench shell not visible for chat theme=${theme} scene=${scene}. Diagnostic: ${diagFile}`);
+    throw new Error(`Workbench shell not visible for chat theme=${theme} scene=${scene}. Failures: ${failures.join('; ') || 'none'}. Diagnostic: ${diagFile}`);
   }
 
   // Prefer the Chat rail so capture shows transcript + composer + inspector.
@@ -550,6 +553,7 @@ async function captureTheme(browser, theme, scene, vp = { width: 1440, height: 8
     };
   }, TOOL_CALL_ID);
   const contractFile = path.join(outDir, `${shotBase}${dprSuffix}.json`);
+  Object.assign(contract, { evidence_level: 'fixture', real_tested: false, browser_session: 'stubbed-hub-session' });
   await writeFile(contractFile, JSON.stringify(contract, null, 2) + '\n');
 
   const applied = await page.evaluate(() => document.documentElement.getAttribute('data-theme'));

@@ -48,8 +48,7 @@ const AGENTS_PAGE = 'section.agents-page, .agents-page';
 // Locale-stable rail selector: aria-label resolves through chatview i18n
 // (zh: 全局导航栏), so target the data-rail-page hook instead (#1826).
 const AGENTS_RAIL_BUTTON = 'button[data-rail-page="agents"]';
-const hubUrlPattern =
-  /https?:\/\/(?:localhost:8080|127\.0\.0\.1:8080|hub\.vectorcontrol\.tech|api\.hub\.vectorcontrol\.tech)\/.*/;
+const hubUrlPattern = (url) => url.origin === new URL(baseUrl).origin && /^\/(?:client|web|health)(?:\/|$)/.test(url.pathname);
 
 function wait(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -100,14 +99,18 @@ async function installMockHub(context) {
         json({ status: 'ok', version: 'web-visual-qa-shell', uptime: '1h', checks: {} }),
       );
     }
-    if (pathname === '/client/auth/me') {
+    if (pathname === '/client/auth/browser/session') {
       return route.fulfill(
         json(
           hubEnvelope({
-            id: 'user_visual',
-            username: 'visual-reviewer',
-            nickname: 'Visual Reviewer',
-            avatar_url: '',
+            user: {
+              id: 'user_visual',
+              username: 'visual-reviewer',
+              nickname: 'Visual Reviewer',
+              avatar_url: '',
+            },
+            csrf_token: 'fixture-qa-csrf',
+            expires_at: '2099-01-01T00:00:00Z',
           }),
         ),
       );
@@ -236,8 +239,8 @@ async function maybeStartDevServer() {
         VITE_BASE_PATH: '/',
         // Pin mock data mode so workbench renders with demo agents/conversations
         VITE_AGENTHUB_DATA_MODE: 'mock',
-        // Pin hub URL so the app routes all calls through Playwright mock
-        VITE_HUB_URL: 'http://localhost:8080',
+        // Unhandled same-origin Hub requests must not reach a live service.
+        AGENTHUB_WEB_DEV_PROXY_TARGET: 'http://127.0.0.1:9',
       },
     },
   );
@@ -258,22 +261,17 @@ async function captureTheme(browser, theme, vp = { width: 1440, height: 810, lab
     colorScheme: theme,
   });
   await installMockHub(context);
+  await context.addCookies([{ name: 'agenthub_browser_session', value: 'fixture-qa-session', url: baseUrl, httpOnly: true, sameSite: 'Lax' }]);
+  await context.routeWebSocket(`${new URL(baseUrl).origin.replace(/^http/, 'ws')}/client/ws`, (socket) => socket.send(JSON.stringify({ type: 'auth.ok', payload: null })));
   const page = await context.newPage();
 
-  // Set storage BEFORE navigation so auth + theme are ready on first load
+  // Set presentation storage before navigation; auth is the fixture cookie.
   await page.addInitScript(
     ({ v4Key, legacyKey, theme: t }) => {
       // Theme: dual-write both v4 (SSOT) and legacy keys for any component that reads either
       window.localStorage.setItem(v4Key, t);
       window.localStorage.setItem(legacyKey, t);
       window.localStorage.setItem('agenthub-language', 'zh');
-      window.localStorage.setItem('agenthub_hub_url', 'http://localhost:8080');
-      // Auth: hub access token + user profile in sessionStorage
-      window.sessionStorage.setItem('agenthub_hub_token', 'visual-qa-token');
-      window.sessionStorage.setItem(
-        'agenthub_hub_user',
-        JSON.stringify({ userId: 'user_visual', username: 'visual-reviewer' }),
-      );
     },
     { v4Key: THEME_KEY_V4, legacyKey: THEME_KEY_LEGACY, theme },
   );
@@ -439,6 +437,7 @@ async function captureTheme(browser, theme, vp = { width: 1440, height: 810, lab
     };
   });
   const contractFile = path.join(outDir, `web-shell-${theme}-${vp.label}${dprSuffix}.json`);
+  Object.assign(contract, { evidence_level: 'fixture', real_tested: false, browser_session: 'stubbed-hub-session' });
   await writeFile(contractFile, JSON.stringify(contract, null, 2) + '\n');
 
   // #1874: cover three structurally-different panes (Installed/Tools/Audit) at
@@ -476,6 +475,7 @@ async function capturePane(page, theme, vp, paneId, dprSuffix) {
     };
   }, paneId);
   const contractFile = path.join(outDir, `web-shell-${theme}-${vp.label}-${paneId}${dprSuffix}.json`);
+  Object.assign(contract, { evidence_level: 'fixture', real_tested: false, browser_session: 'stubbed-hub-session' });
   await writeFile(contractFile, JSON.stringify(contract, null, 2) + '\n');
   return { file, contractFile, contract };
 }

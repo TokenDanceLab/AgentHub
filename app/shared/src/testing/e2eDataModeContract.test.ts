@@ -7,6 +7,20 @@ import {
 } from './e2eDataModeContract';
 
 describe('e2e data-mode contract', () => {
+  it('counts same-origin browser APIs as Hub while preserving app assets and fail-closed boundaries', () => {
+    const origin = 'http://127.0.0.1:5184';
+    const scenario = createE2EDataModeScenario({ name: 'cookie-web', surface: 'web', dataMode: 'approved-real', dataSource: 'stubbed-hub-session', appOrigin: origin, hubOrigin: origin });
+    expect(classifyE2ERequest(`${origin}/client/auth/browser/session`, scenario)).toBe('hub');
+    expect(classifyE2ERequest(`${origin}/web/agent-tasks/task-a`, scenario)).toBe('hub');
+    for (const pathname of ['/', '/src/App.tsx', '/assets/app.css', '/web-assets/logo.svg', '/client-assets/icon.svg']) {
+      expect(classifyE2ERequest(`${origin}${pathname}`, scenario)).toBe('app');
+    }
+    expect(classifyE2ERequest('https://outside.example.test/client/messages', scenario)).toBe('other-http');
+    expect(validateE2EDataModeScenario({ ...scenario, dataMode: 'mock', dataSource: 'local-mock' }, [
+      { method: 'GET', url: `${origin}/client/auth/browser/session` },
+    ]).ok).toBe(false);
+    expect(buildE2EDataModeManifest(scenario, [{ method: 'GET', url: `${origin}/client/auth/browser/session` }])).toMatchObject({ real_tested: false, requestedBoundaries: ['hub'] });
+  });
   it('rejects mock UI scenarios that contact Hub or Local Edge backends', () => {
     const scenario = createE2EDataModeScenario({
       name: 'desktop-chat-flow',

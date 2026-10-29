@@ -1,7 +1,7 @@
 import { defineConfig, devices } from '@playwright/test';
 
 // Keep fixture E2E off the regular Web dev port (5174). Reusing a developer's
-// Vite process would also reuse its compile-time VITE_HUB_URL and can silently
+// Vite process would also reuse its proxy target and can silently
 // turn the fail-closed stubbed-Hub suite into a signed-out localhost session.
 const webE2EPort = Number(process.env.AGENTHUB_WEB_E2E_PORT ?? 5184);
 process.env.AGENTHUB_WEB_E2E_PORT = String(webE2EPort);
@@ -52,10 +52,9 @@ export default defineConfig({
       // Keep renderer E2E on that same base instead of Vite's production
       // /workbench/ asset base.
       VITE_BASE_PATH: '/',
-      // Renderer specs must intercept every Hub call. Reserved origins make a
-      // missing route fail closed instead of reaching localhost or production.
-      VITE_HUB_URL: 'https://hub.test.invalid',
-      VITE_HUB_WS_URL: 'wss://hub.test.invalid/client/ws',
+      // Renderer specs intercept same-origin Hub calls. An unbound local port
+      // makes any missing route fail closed instead of reaching a live Hub.
+      AGENTHUB_WEB_DEV_PROXY_TARGET: 'http://127.0.0.1:9',
     },
     url: webE2EBaseURL,
     // Never accept an arbitrary process that only happens to answer on the

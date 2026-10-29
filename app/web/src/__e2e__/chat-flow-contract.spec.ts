@@ -1,3 +1,4 @@
+import { BROWSER_FIXTURE_ORIGIN, browserSessionFixture, installBrowserSessionFixture, assertBrowserFixtureRequest } from './browserSessionFixture';
 import { expect, test, type Page, type Route } from '@playwright/test';
 import {
   assertE2EDataModeScenario,
@@ -7,10 +8,9 @@ import {
 } from '../../../shared/src/testing/e2eDataModeContract';
 import { fulfillExternalFontIfMatch } from '../../../e2e/fontBlocker';
 
-// Must match playwright.config.ts webServer VITE_HUB_URL: the fail-closed
-// reserved origin keeps every Hub call inside the route stub instead of
-// reaching localhost or production.
-const HUB_ORIGIN = 'https://hub.test.invalid';
+// Browser APIs share the app origin. The fixture proxy fails closed for any
+// request not handled by the Hub routes below.
+const HUB_ORIGIN = BROWSER_FIXTURE_ORIGIN;
 const WEB_E2E_PORT = Number(process.env.AGENTHUB_WEB_E2E_PORT ?? 5174);
 const WEB_E2E_APP_ORIGIN = `http://127.0.0.1:${WEB_E2E_PORT}`;
 const SESSION_ID = 'session-chat-flow';
@@ -182,18 +182,13 @@ async function enterApprovedRealHubSession(
   page: Page,
   options: { activeTaskStatus?: string } = {},
 ): Promise<void> {
+  await installBrowserSessionFixture(page);
   await page.addInitScript(({ sessionId, taskId, status }) => {
     window.localStorage.setItem('agenthub.workbench.dataMode', 'approved-real');
     window.localStorage.setItem(`agenthub.web.activeAgentTask.${sessionId}`, JSON.stringify({
       taskId,
       sessionId,
       status,
-    }));
-    window.sessionStorage.setItem('agenthub_hub_token', 'stubbed-chat-flow-token');
-    window.sessionStorage.setItem('agenthub_token_source', 'hub');
-    window.sessionStorage.setItem('agenthub_hub_user', JSON.stringify({
-      userId: 'user-chat-flow',
-      username: 'chat-flow',
     }));
   }, { sessionId: SESSION_ID, taskId: TASK_ID, status: options.activeTaskStatus ?? 'running' });
 
@@ -243,6 +238,7 @@ async function installChatFlowHubStub(page: Page, options: ChatFlowHubStubOption
     }
 
     if (boundary === 'hub') {
+      assertBrowserFixtureRequest(request);
       endpoints.add(`${request.method()} ${url.pathname}`);
       requests.push({ method: request.method(), url: request.url() });
 
@@ -293,13 +289,13 @@ async function fulfillHubRoute(
   pathname: string,
   options: ChatFlowHubStubOptions,
 ): Promise<void> {
-  if (pathname === '/client/auth/me') {
-    await route.fulfill(json(hubEnvelope({
+  if (pathname === '/client/auth/browser/session') {
+    await route.fulfill(json(hubEnvelope(browserSessionFixture({
       id: 'user-chat-flow',
       username: 'chat-flow',
       nickname: 'Chat Flow',
       avatar_url: '',
-    })));
+    }))));
     return;
   }
 

@@ -1,3 +1,4 @@
+import { BROWSER_FIXTURE_ORIGIN, browserSessionFixture, installBrowserSessionFixture, assertBrowserFixtureRequest } from './browserSessionFixture';
 import { expect, test, type Page, type Route } from '@playwright/test';
 import {
   DESKTOP_WORKSPACE_VIEWPORT,
@@ -63,15 +64,9 @@ test.describe('Web geometry smoke (#1284)', () => {
 });
 
 async function enterMockGeometrySession(page: Page): Promise<void> {
+  await installBrowserSessionFixture(page);
   await page.addInitScript(() => {
     window.localStorage.setItem('agenthub.workbench.dataMode', 'mock');
-    window.localStorage.setItem('agenthub_hub_url', 'http://localhost:8080');
-    window.sessionStorage.setItem('agenthub_hub_token', 'geometry-smoke-token');
-    window.sessionStorage.setItem('agenthub_token_source', 'hub');
-    window.sessionStorage.setItem(
-      'agenthub_hub_user',
-      JSON.stringify({ userId: 'user-geometry', username: 'geometry-smoke' }),
-    );
   });
   await page.goto('/');
 }
@@ -113,12 +108,7 @@ async function installGeometryMockHub(page: Page): Promise<void> {
     const request = route.request();
     const url = new URL(request.url());
 
-    const isHub =
-      url.origin.includes('localhost:8080') ||
-      url.origin.includes('127.0.0.1:8080') ||
-      url.hostname.includes('hub.example.invalid') ||
-      url.hostname.includes('api.hub.example.invalid') ||
-      url.hostname.includes('hub.example.invalid');
+    const isHub = url.origin === BROWSER_FIXTURE_ORIGIN && /^\/(?:client|web|health)(?:\/|$)/.test(url.pathname);
 
     if (!isHub) {
       return route.continue();
@@ -128,6 +118,7 @@ async function installGeometryMockHub(page: Page): Promise<void> {
       return route.fulfill({ status: 204, headers: corsHeaders() });
     }
 
+    assertBrowserFixtureRequest(request);
     return fulfillGeometryHub(route, url.pathname);
   });
 }
@@ -139,15 +130,15 @@ async function fulfillGeometryHub(route: Route, pathname: string): Promise<void>
     );
   }
 
-  if (pathname === '/client/auth/me') {
+  if (pathname === '/client/auth/browser/session') {
     return route.fulfill(
       json(
-        hubEnvelope({
+        hubEnvelope(browserSessionFixture({
           id: 'user-geometry',
           username: 'geometry-smoke',
           nickname: 'Geometry Smoke',
           avatar_url: '',
-        }),
+        })),
       ),
     );
   }

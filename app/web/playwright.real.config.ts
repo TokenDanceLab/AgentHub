@@ -9,9 +9,9 @@ import { fileURLToPath } from 'node:url';
 // These specs live at app/e2e/ (not app/web/src/__e2e__) because they reference
 // the full Hub+Edge stack; the Web Hub-only boundary gate forbids Local Edge
 // references under app/web/src/. Unlike playwright.config.ts (the CI stubbed-hub
-// config), this config does NOT override VITE_HUB_URL / VITE_HUB_WS_URL — the dev
-// server keeps its default live-local endpoints, so real login/chat flows reach
-// real services.
+// config), Vite proxies same-origin browser /client and /web calls to the
+// configured Hub. Browser cookies/CSRF remain on the Web origin. Native Edge
+// API calls use the separate provisioned native credential lane.
 //
 // Included specs:
 //   - chat-real.spec.ts            Hub/Edge API + IM lifecycle (dev-secret JWT lane)
@@ -64,8 +64,9 @@ export default defineConfig({
     // "en-US@posix", which crashes Intl (RangeError) inside the transcript
     // time formatter and hides chat messages.
     locale: 'en-US',
-    trace: 'on',
-    screenshot: 'only-on-failure',
+    trace: 'off',
+    screenshot: 'off',
+    video: 'off',
   },
   projects: [
     {
@@ -82,6 +83,7 @@ export default defineConfig({
     : {
         webServer: {
           command: 'pnpm dev --host 127.0.0.1 --port 5174',
+          env: { ...process.env, AGENTHUB_WEB_DEV_PROXY_TARGET: process.env.AGENTHUB_E2E_HUB_BASE_URL || 'http://127.0.0.1:8080' },
           url: 'http://127.0.0.1:5174',
           reuseExistingServer: !process.env.CI,
         },

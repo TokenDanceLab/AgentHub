@@ -1,124 +1,123 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
 import fs from 'node:fs';
 import path from 'node:path';
+import { BROWSER_FIXTURE_ORIGIN, browserSessionFixture, installBrowserSessionFixture, assertBrowserFixtureRequest } from './browserSessionFixture';
 
-/**
- * AgentHub Web — OIDC Login E2E Tests
- *
- * The Web app uses sessionStorage-based PKCE flow with a callback route
- * (/auth/account/callback) for browser OIDC login.
- *
- * These tests mock the Hub API to verify the complete login lifecycle:
- * authorize → redirect → callback → token exchange → authenticated session.
- */
-
-const WEB_E2E_PORT = Number(process.env.AGENTHUB_WEB_E2E_PORT ?? 5174);
-const WEB_E2E_ORIGIN = `http://127.0.0.1:${WEB_E2E_PORT}`;
-const WEB_CALLBACK_PATH = '/auth/account/callback';
 const ACCOUNT_ISSUER = 'https://account.example.test';
+const WEB_CALLBACK_PATH = '/auth/account/callback';
+const LOGIN_BUTTON = /Continue with TokenDance Account|使用 TokenDance Account 登录/;
+test.use({ trace: 'off', screenshot: 'off', video: 'off' });
 
-// ── Test helpers ──────────────────────────────────
-
-interface MockOIDCParams {
-  state?: string;
-  code?: string;
-  authError?: string;
-  tokenError?: string;
-  deviceId?: string;
-  issuer?: string;
+function callbackUrl(state = 'fixture-state', issuer = ACCOUNT_ISSUER) {
+  return `${WEB_CALLBACK_PATH}?code=fixture-code&state=${encodeURIComponent(state)}&iss=${encodeURIComponent(issuer)}`;
 }
 
-async function mockOIDCFlow(page: import('@playwright/test').Page, params: MockOIDCParams = {}) {
-  const {
-    state = 'web-test-state-mock-12345',
-    authError,
-    tokenError,
-    deviceId = '00000000-0000-0000-0000-000000000002',
-    issuer = ACCOUNT_ISSUER,
-  } = params;
-
-  let authCallCount = 0;
-  let tokenCallCount = 0;
-
-  // Mock POST /client/auth/oidc/authorize
-  await page.route('**/client/auth/oidc/authorize', async (route) => {
-    authCallCount++;
-    if (authError) {
-      await route.fulfill({
-        status: 400,
-        contentType: 'application/json',
-        body: JSON.stringify({ code: 'ERROR', message: authError }),
-      });
-      return;
+/** Fixture Account/Hub flow: server owns state/PKCE; no credential is extracted. */
+async function mockBrowserFlow(page: Page, options: { authenticated?: boolean; authorizeFails?: boolean; callbackFails?: boolean } = {}) {
+  await installBrowserSessionFixture(page);
+  await page.addInitScript(() => { localStorage.setItem('agenthub.workbench.dataMode', 'approved-real'); });
+  let authenticated = options.authenticated ?? false;
+  let logoutFails = false;
+  const calls: string[] = [];
+  await page.route('**/*', async (route) => {
+    const request = route.request();
+    const url = new URL(request.url());
+    if (url.origin === ACCOUNT_ISSUER) return route.fulfill({ contentType: 'text/html', body: '<h1>Fixture Account</h1>' });
+    if (url.origin !== BROWSER_FIXTURE_ORIGIN) return route.abort();
+    if (!/^\/(client|web)(\/|$)/.test(url.pathname)) return route.continue();
+    calls.push(`${request.method()} ${url.pathname}`);
+    assertBrowserFixtureRequest(request);
+    const response = (data: unknown, status = 200) => route.fulfill({ status, json: { code: status === 200 ? 'ok' : 'auth_failed', data } });
+    if (url.pathname === '/client/auth/browser/authorize') {
+      expect(Object.keys(request.postDataJSON())).toEqual(['device_id']);
+      return options.authorizeFails ? response(null, 503) : response({ state: 'fixture-state', issuer: ACCOUNT_ISSUER, authorization_url: `${ACCOUNT_ISSUER}/oauth/authorize?state=fixture-state` });
     }
-
-    const body = route.request().postDataJSON();
-    const authUrl = new URL(`${ACCOUNT_ISSUER}/oauth/authorize`);
-    authUrl.searchParams.set('response_type', 'code');
-    authUrl.searchParams.set('client_id', 'c_test_client');
-    authUrl.searchParams.set('redirect_uri', body.redirect_uri || buildWebRedirectUri());
-    authUrl.searchParams.set('scope', 'openid profile');
-    authUrl.searchParams.set('state', state);
-    authUrl.searchParams.set('nonce', 'web-test-nonce');
-    authUrl.searchParams.set('code_challenge', body.code_challenge);
-    authUrl.searchParams.set('code_challenge_method', 'S256');
-
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({ state, authorization_url: authUrl.toString(), issuer }),
-    });
-  });
-
-  // Mock POST /client/auth/oidc/callback
-  await page.route('**/client/auth/oidc/callback', async (route) => {
-    tokenCallCount++;
-    if (tokenError) {
-      await route.fulfill({
-        status: 400,
-        contentType: 'application/json',
-        body: JSON.stringify({ code: 'ERROR', message: tokenError }),
-      });
-      return;
+    if (url.pathname === '/client/auth/browser/callback') {
+      const body = request.postDataJSON();
+      expect(Object.keys(body).sort()).toEqual(['code', 'iss', 'state']);
+      if (options.callbackFails || body.state !== 'fixture-state' || body.iss !== ACCOUNT_ISSUER) return response(null, 400);
+      authenticated = true;
+      return response(browserSessionFixture({ id: 'web-user', username: 'webuser', nickname: 'Web User' }));
     }
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({
-        access_token: 'web-test-access-token-mock',
-        refresh_token: 'web-test-refresh-token-mock',
-        expires_in: 900,
-        user: { id: deviceId, username: 'webuser', nickname: 'Web User' },
-      }),
-    });
+    if (url.pathname === '/client/auth/browser/session') return authenticated
+      ? response(browserSessionFixture({ id: 'web-user', username: 'webuser', nickname: 'Web User' }))
+      : response(null, 401);
+    if (url.pathname === '/client/auth/browser/logout' || url.pathname === '/client/auth/browser/logout/account') {
+      if (logoutFails) return response(null, 503);
+      authenticated = false;
+      return response(url.pathname.endsWith('/account') ? { logout_url: `${ACCOUNT_ISSUER}/logout` } : null);
+    }
+    if (url.pathname === '/client/settings') return response({});
+    return response(url.pathname.startsWith('/web/') || /public/.test(url.pathname) ? { items: [], page: { hasMore: false } } : []);
+  });
+  return { calls, setLogoutFails(value: boolean) { logoutFails = value; } };
+}
+
+test.describe('Web browser session fixture lifecycle', () => {
+  test('anonymous bootstrap shows Account login and authorize redirects without client PKCE', async ({ page }) => {
+    const flow = await mockBrowserFlow(page);
+    await page.goto('/');
+    await page.getByRole('button', { name: LOGIN_BUTTON }).click();
+    await expect(page).toHaveURL(new RegExp('account\\.example\\.test/oauth/authorize'));
+    expect(flow.calls).toContain('POST /client/auth/browser/authorize');
   });
 
-  // Mock GET /client/auth/me (for post-login profile fetch)
-  await page.route('**/client/auth/me', async (route) => {
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({
-        code: 'OK',
-        data: { id: deviceId, username: 'webuser', nickname: 'Web User' },
-      }),
-    });
+  test('callback and reload restore the server profile without native bearer endpoints', async ({ page }) => {
+    const flow = await mockBrowserFlow(page);
+    await page.goto(callbackUrl());
+    await expect(page.getByRole('button', { name: 'Web User', exact: true })).toBeVisible();
+    await expect(page).toHaveURL(BROWSER_FIXTURE_ORIGIN + '/');
+    await page.reload();
+    await expect(page.getByRole('button', { name: 'Web User', exact: true })).toBeVisible();
+    expect(flow.calls).toContain('POST /client/auth/browser/callback');
+    expect(flow.calls).not.toContain('POST /client/auth/refresh');
+    expect(flow.calls).not.toContain('GET /client/auth/me');
   });
 
-  return { authCallCount: () => authCallCount, tokenCallCount: () => tokenCallCount };
-}
+  for (const [name, destination] of [
+    ['mismatched state', callbackUrl('wrong-state')],
+    ['mismatched issuer', callbackUrl('fixture-state', 'https://wrong.example.test')],
+    ['incomplete callback', WEB_CALLBACK_PATH + '?error=access_denied'],
+  ] as const) {
+    test(`rejects ${name} and scrubs the callback URL`, async ({ page }) => {
+      await mockBrowserFlow(page);
+      await page.goto(destination);
+      await expect(page.getByRole('button', { name: LOGIN_BUTTON })).toBeVisible();
+      await expect(page).toHaveURL(BROWSER_FIXTURE_ORIGIN + '/');
+      await expect(page.getByRole('button', { name: 'Web User', exact: true })).toHaveCount(0);
+    });
+  }
 
-function buildWebRedirectUri(): string {
-  return `${WEB_E2E_ORIGIN}${WEB_CALLBACK_PATH}`;
-}
+  test('authorize errors keep the login action retryable', async ({ page }) => {
+    await mockBrowserFlow(page, { authorizeFails: true });
+    await page.goto('/');
+    await page.getByRole('button', { name: LOGIN_BUTTON }).click();
+    await expect(page.getByRole('alert').first()).toBeVisible();
+    await expect(page.getByRole('button', { name: LOGIN_BUTTON })).toBeEnabled();
+  });
 
-function buildCallbackUrl(state: string, code: string, issuer = ACCOUNT_ISSUER): string {
-  const url = new URL(`${WEB_E2E_ORIGIN}${WEB_CALLBACK_PATH}`);
-  url.searchParams.set('code', code);
-  url.searchParams.set('state', state);
-  url.searchParams.set('iss', issuer);
-  return `${url.pathname}${url.search}`;
-}
+  test('local logout preserves retry after failure and returns to login on success', async ({ page }) => {
+    const flow = await mockBrowserFlow(page, { authenticated: true });
+    await page.goto('/');
+    await page.getByRole('button', { name: 'Web User', exact: true }).click();
+    await page.getByRole('button', { name: /^(Log out|退出登录)$/ }).click();
+    flow.setLogoutFails(true);
+    await page.getByRole('button', { name: 'Log out of AgentHub', exact: true }).click();
+    await expect(page.getByRole('alert')).toContainText('Could not end the session');
+    flow.setLogoutFails(false);
+    await page.getByRole('button', { name: 'Log out of AgentHub', exact: true }).click();
+    await expect(page.getByRole('button', { name: LOGIN_BUTTON })).toBeVisible();
+  });
+
+  test('Account logout follows the server-provided Account destination', async ({ page }) => {
+    await mockBrowserFlow(page, { authenticated: true });
+    await page.goto('/');
+    await page.getByRole('button', { name: 'Web User', exact: true }).click();
+    await page.getByRole('button', { name: /^(Log out|退出登录)$/ }).click();
+    await page.getByRole('button', { name: 'Log out of AgentHub and Account', exact: true }).click();
+    await expect(page).toHaveURL(ACCOUNT_ISSUER + '/logout');
+  });
+});
 
 interface LoginE2EConfig {
   oauthClientId: string;
@@ -340,15 +339,6 @@ function validateEvidenceManifest(manifest: LoginE2EEvidenceManifest): void {
   if (manifest.web_to_local_edge_direct === true) throw new Error('evidence manifest must not prove direct Web-to-LocalEdge access');
 }
 
-async function waitForHubAccessToken(page: import('@playwright/test').Page): Promise<string> {
-  await expect.poll(async () => page.evaluate(() => sessionStorage.getItem('agenthub_hub_token')), {
-    timeout: 180_000,
-    message: 'waiting for Hub-issued session after TokenDance Account login',
-  }).not.toBeNull();
-  const token = await page.evaluate(() => sessionStorage.getItem('agenthub_hub_token'));
-  return String(token);
-}
-
 async function writeEvidenceManifest(config: LoginE2EConfig, manifest: LoginE2EEvidenceManifest): Promise<string> {
   validateEvidenceManifest(manifest);
   const fullRoot = path.resolve(process.cwd(), config.artifactRoot);
@@ -357,236 +347,6 @@ async function writeEvidenceManifest(config: LoginE2EConfig, manifest: LoginE2EE
   await fs.promises.writeFile(manifestPath, JSON.stringify(redactForEvidence(manifest), null, 2), 'utf8');
   return manifestPath;
 }
-
-// ── Tests ────────────────────────────────────────
-
-test.describe('Web OIDC Login — Happy Path', () => {
-  test('login button exists and is clickable', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
-
-    const loginBtn = page.getByRole('button', {
-      name: /Continue with TokenDance Account|使用 TokenDance Account 登录/i,
-    });
-    const visible = await loginBtn.isVisible({ timeout: 5000 }).catch(() => false);
-    // If the button isn't visible, the app may show a different auth view
-    // (already authenticated state), which is also valid
-    if (visible) {
-      await expect(loginBtn).toBeEnabled();
-    }
-  });
-
-  test('clicking Account login redirects to TokenDance Account', async ({ page }) => {
-    await mockOIDCFlow(page);
-
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
-
-    const loginBtn = page.getByRole('button', {
-      name: /Continue with TokenDance Account|使用 TokenDance Account 登录/i,
-    });
-
-    if (await loginBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
-      // Click the button — the app will call window.location.assign()
-      // which Playwright intercepts. We'll see the navigation in the URL.
-      await loginBtn.click();
-      await page.waitForTimeout(3000);
-    }
-  });
-
-  test('callback URL completes full OIDC login cycle', async ({ page }) => {
-    await mockOIDCFlow(page);
-
-    // Plant pending PKCE data in sessionStorage
-    await page.goto('/');
-    await page.evaluate(({ redirectUri, issuer }) => {
-      sessionStorage.setItem('agenthub_oidc_pkce_pending', JSON.stringify({
-        state: 'web-test-state-mock-12345',
-        codeVerifier: 'web-test-code-verifier-base64url',
-        deviceId: '00000000-0000-0000-0000-000000000002',
-        redirectUri,
-        issuer,
-        createdAt: Date.now(),
-      }));
-    }, { redirectUri: buildWebRedirectUri(), issuer: ACCOUNT_ISSUER });
-
-    await page.goto(buildCallbackUrl('web-test-state-mock-12345', 'web-test-auth-code-67890'));
-    await page.waitForTimeout(3000);
-  });
-
-  test('auth session persists across page reloads', async ({ page }) => {
-    await mockOIDCFlow(page);
-
-    await page.goto('/');
-    await page.evaluate(() => {
-      sessionStorage.setItem('agenthub_token_source', 'account');
-      sessionStorage.setItem('agenthub_hub_token', 'web-test-access-token-mock');
-    });
-
-    // Reload and check auth state
-    await page.reload({ waitUntil: 'networkidle' });
-    await page.waitForTimeout(2000);
-  });
-});
-
-test.describe('Web OIDC Login — Error Handling', () => {
-  test('handles CSRF state mismatch', async ({ page }) => {
-    await mockOIDCFlow(page);
-
-    await page.goto('/');
-    await page.evaluate(({ redirectUri, issuer }) => {
-      sessionStorage.setItem('agenthub_oidc_pkce_pending', JSON.stringify({
-        state: 'honest-state',
-        codeVerifier: 'test-code-verifier-base64url',
-        deviceId: '00000000-0000-0000-0000-000000000002',
-        redirectUri,
-        issuer,
-        createdAt: Date.now(),
-      }));
-    }, { redirectUri: buildWebRedirectUri(), issuer: ACCOUNT_ISSUER });
-
-    await page.goto(buildCallbackUrl('attacker-state', 'evil-code'));
-    await page.waitForTimeout(2000);
-
-    // URL should be cleaned
-    expect(page.url()).not.toContain('/auth/account/callback');
-  });
-
-  test('rejects a callback whose RFC 9207 issuer differs from the pinned issuer', async ({ page }) => {
-    const flow = await mockOIDCFlow(page);
-
-    await page.goto('/');
-    await page.evaluate(({ redirectUri, issuer }) => {
-      sessionStorage.setItem('agenthub_oidc_pkce_pending', JSON.stringify({
-        state: 'web-test-state-mock-12345',
-        codeVerifier: 'test-code-verifier-base64url',
-        deviceId: '00000000-0000-0000-0000-000000000002',
-        redirectUri,
-        issuer,
-        createdAt: Date.now(),
-      }));
-    }, { redirectUri: buildWebRedirectUri(), issuer: ACCOUNT_ISSUER });
-
-    await page.goto(buildCallbackUrl(
-      'web-test-state-mock-12345',
-      'issuer-mismatch-code',
-      'https://wrong-account.example.test',
-    ));
-    await page.waitForTimeout(1000);
-
-    expect(flow.tokenCallCount()).toBe(0);
-    expect(page.url()).not.toContain('/auth/account/callback');
-  });
-
-  test('handles expired PKCE (over 10 minutes)', async ({ page }) => {
-    await mockOIDCFlow(page);
-
-    await page.goto('/');
-    await page.evaluate(({ redirectUri, issuer }) => {
-      sessionStorage.setItem('agenthub_oidc_pkce_pending', JSON.stringify({
-        state: 'web-expired-test',
-        codeVerifier: 'test-code-verifier-base64url',
-        deviceId: '00000000-0000-0000-0000-000000000002',
-        redirectUri,
-        issuer,
-        createdAt: Date.now() - 11 * 60 * 1000,
-      }));
-    }, { redirectUri: buildWebRedirectUri(), issuer: ACCOUNT_ISSUER });
-
-    await page.goto(buildCallbackUrl('web-expired-test', 'some-code'));
-    await page.waitForTimeout(2000);
-
-    expect(page.url()).not.toContain('/auth/account/callback');
-  });
-
-  test('handles orphan callback (no pending PKCE)', async ({ page }) => {
-    await mockOIDCFlow(page);
-
-    await page.goto('/');
-    // No pending PKCE sessionStorage data
-
-    await page.goto(buildCallbackUrl('orphan-state', 'orphan-code'));
-    await page.waitForTimeout(2000);
-
-    expect(page.url()).not.toContain('/auth/account/callback');
-  });
-
-  test('handles authorize API failure gracefully', async ({ page }) => {
-    await mockOIDCFlow(page, { authError: 'Service unavailable' });
-
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
-
-    const loginBtn = page.getByRole('button', {
-      name: /Continue with TokenDance Account|使用 TokenDance Account 登录/i,
-    });
-    if (await loginBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
-      await loginBtn.click();
-      await page.waitForTimeout(2000);
-    }
-  });
-
-  test('handles token exchange failure after callback', async ({ page }) => {
-    await mockOIDCFlow(page, { tokenError: 'Invalid authorization code' });
-
-    await page.goto('/');
-    await page.evaluate(({ redirectUri, issuer }) => {
-      sessionStorage.setItem('agenthub_oidc_pkce_pending', JSON.stringify({
-        state: 'web-test-state-mock-12345',
-        codeVerifier: 'test-code-verifier-base64url',
-        deviceId: '00000000-0000-0000-0000-000000000002',
-        redirectUri,
-        issuer,
-        createdAt: Date.now(),
-      }));
-    }, { redirectUri: buildWebRedirectUri(), issuer: ACCOUNT_ISSUER });
-
-    await page.goto(buildCallbackUrl('web-test-state-mock-12345', 'bad-code'));
-    await page.waitForTimeout(3000);
-
-    expect(page.url()).not.toContain('/auth/account/callback');
-  });
-});
-
-test.describe('Web OIDC Login — Logout', () => {
-  test('logout clears session and returns to login screen', async ({ page }, testInfo) => {
-    const oidcFlow = await mockOIDCFlow(page);
-    let logoutCalls = 0;
-    // Mock logout
-    await page.route('**/client/auth/logout', async (route) => {
-      logoutCalls++;
-      await route.fulfill({ status: 200, contentType: 'application/json', body: '{"code":"OK"}' });
-    });
-
-    await page.goto('/');
-    await page.evaluate(({ redirectUri, issuer }) => {
-      sessionStorage.setItem('agenthub_oidc_pkce_pending', JSON.stringify({
-        state: 'web-test-state-mock-12345',
-        codeVerifier: 'test-code-verifier-base64url',
-        deviceId: '00000000-0000-0000-0000-000000000002',
-        redirectUri,
-        issuer,
-        createdAt: Date.now(),
-      }));
-    }, { redirectUri: buildWebRedirectUri(), issuer: ACCOUNT_ISSUER });
-
-    await page.goto(buildCallbackUrl('web-test-state-mock-12345', 'web-test-auth-code'));
-    await expect.poll(oidcFlow.tokenCallCount).toBe(1);
-    await expect.poll(() => page.evaluate(() => sessionStorage.getItem('agenthub_hub_token')))
-      .toBe('web-test-access-token-mock');
-    await page.getByRole('button', { name: 'Web User' }).click();
-    await expect(page.getByRole('dialog').first()).toBeVisible();
-    await page.screenshot({ path: testInfo.outputPath('profile-menu-open.png'), fullPage: true });
-    await page.getByRole('button', { name: /^(退出登录|Log out|user\.logout)$/ }).click();
-
-    await expect.poll(() => logoutCalls).toBe(1);
-    await expect(page.getByRole('heading', { name: 'AgentHub' })).toBeVisible();
-    await expect.poll(() => page.evaluate(() => ({
-      accessToken: sessionStorage.getItem('agenthub_hub_token'),
-      tokenSource: sessionStorage.getItem('agenthub_token_source'),
-    }))).toEqual({ accessToken: null, tokenSource: null });
-  });
-});
 
 test.describe('Web OIDC Login — Real Mode Approval Gate', () => {
   test('fails closed when approval env is missing', () => {
@@ -729,73 +489,54 @@ test.describe('Web OIDC Login — Real Mode Approval Gate', () => {
   });
 });
 
+/** Runs only with the existing explicit operator/test-account gates. */
+async function browserApi(page: Page, endpoint: string, data?: Record<string, unknown>) {
+  return page.evaluate(async ({ endpoint, data }) => {
+    const sessionResponse = await fetch('/client/auth/browser/session', { credentials: 'same-origin' });
+    if (!sessionResponse.ok) return { status: sessionResponse.status, data: null };
+    const session = (await sessionResponse.json()).data;
+    if (endpoint === '/client/auth/browser/session') return { status: sessionResponse.status, data: { user: session.user } };
+    const response = await fetch(endpoint, {
+      credentials: 'same-origin', method: data ? 'POST' : 'GET',
+      headers: data ? { 'Content-Type': 'application/json', 'X-Hub-CSRF': session.csrf_token } : {},
+      ...(data ? { body: JSON.stringify(data) } : {}),
+    });
+    const payload = await response.json();
+    return { status: response.status, data: payload.data ?? payload };
+  }, { endpoint, data });
+}
+
 test.describe('Web OIDC Login — Approved Real Login And Remote Dispatch', () => {
-  test.skip(!hasApprovedRealLoginEnv(), 'real TokenDance Account login E2E requires explicit env approval and a disposable/test account');
+  test.skip(!hasApprovedRealLoginEnv(), 'Real Account lane requires explicit operator approval and disposable test identity; fixture success is not L3 evidence.');
 
-  test('proves Hub session, target inventory, selected Desktop target, dispatch, and replay evidence', async ({ page, request }) => {
+  test('proves cookie session, explicit target dispatch and replay without extracting credentials', async ({ page }) => {
     const config = readRealLoginConfig();
-
-    await page.goto(config.webUrl, { waitUntil: 'networkidle' });
-    const loginBtn = page.getByRole('button', {
-      name: /Continue with TokenDance Account|使用 TokenDance Account 登录/i,
-    });
-    if (await loginBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
-      await loginBtn.click();
-    }
-
-    const token = await waitForHubAccessToken(page);
-    expect(looksSecretLike(token)).toBe(false);
-
-    const authHeaders = { Authorization: `Bearer ${token}` };
-    const me = await request.get(`${config.hubBaseUrl}/client/auth/me`, { headers: authHeaders });
-    expect(me.ok()).toBeTruthy();
-
-    const targetInventory = await request.get(`${config.hubBaseUrl}/web/execution-targets?target_type=local_edge&pageSize=50`, {
-      headers: authHeaders,
-    });
-    expect(targetInventory.ok()).toBeTruthy();
-    const inventoryBody = await targetInventory.json();
-    const targets = Array.isArray(inventoryBody.items) ? inventoryBody.items : [];
-    expect(targets.length, 'target inventory proof is required').toBeGreaterThan(0);
-
-    const selectedTarget = targets.find((target: { id?: string; target_type?: string; is_online?: boolean; health_state?: string }) =>
-      target.id === config.targetId,
-    ) ?? targets.find((target: { target_type?: string; is_online?: boolean; health_state?: string }) =>
-      target.target_type === 'local_edge' && target.is_online === true && target.health_state !== 'offline',
-    );
-    expect(selectedTarget, 'selected Desktop target proof is required').toBeTruthy();
-
-    const teamId = config.teamId;
-    expect(teamId, 'AGENTHUB_LOGIN_E2E_TEAM_ID is required for approved remote-control dispatch evidence').toBeTruthy();
-
-    const dispatch = await request.post(`${config.hubBaseUrl}/web/agent-teams/${encodeURIComponent(String(teamId))}/runs`, {
-      headers: { ...authHeaders, 'Content-Type': 'application/json' },
-      data: {
-        trigger_message: 'Approved login E2E remote-control dispatch proof.',
-        target_id: selectedTarget.id,
-      },
-    });
-    expect(dispatch.ok()).toBeTruthy();
-    const dispatchBody = await dispatch.json();
-    expect(dispatchBody.target_id ?? selectedTarget.id).toBe(selectedTarget.id);
-
-    const runId = dispatchBody.id;
-    expect(runId, 'dispatch must return a run id for event replay proof').toBeTruthy();
-    const events = await request.get(`${config.hubBaseUrl}/web/agent-teams/${encodeURIComponent(String(teamId))}/runs/${encodeURIComponent(String(runId))}/events`, {
-      headers: authHeaders,
-    });
-    expect(events.ok()).toBeTruthy();
-
+    expect(new URL(config.hubBaseUrl).origin, 'browser Hub must share the application origin').toBe(new URL(config.webUrl).origin);
+    await page.goto(config.webUrl);
+    await expect.poll(async () => (await browserApi(page, '/client/auth/browser/session')).status, { timeout: 180_000 }).toBe(200);
+    const me = await browserApi(page, '/client/auth/browser/session');
+    const inventory = await browserApi(page, '/web/execution-targets?target_type=local_edge&pageSize=50');
+    expect(inventory.status).toBe(200);
+    const targets = inventory.data.items ?? [];
+    expect(config.targetId, 'real dispatch requires an explicit target id').toBeTruthy();
+    const selectedTarget = targets.find((target: { id: string }) => target.id === config.targetId);
+    expect(selectedTarget?.is_online).toBe(true);
+    expect(config.teamId, 'real dispatch requires an explicit team id').toBeTruthy();
+    const dispatchPath = `/web/agent-teams/${encodeURIComponent(config.teamId ?? '')}/runs`;
+    const dispatch = await browserApi(page, dispatchPath, { trigger_message: 'Approved login E2E dispatch proof.', target_id: selectedTarget.id });
+    expect(dispatch.status).toBeLessThan(300);
+    const runId = dispatch.data.id;
+    expect(runId).toBeTruthy();
+    const eventsPath = `${dispatchPath}/${encodeURIComponent(runId)}/events`;
+    const events = await browserApi(page, eventsPath);
+    expect(events.status).toBe(200);
     await writeEvidenceManifest(config, {
-      real_login_approved: true,
-      remote_dispatch_approved: true,
-      redaction_status: 'redacted',
-      web_to_local_edge_direct: false,
-      hub_session: { ref: 'api:/client/auth/me', status: me.status() },
-      target_inventory: { ref: 'api:/web/execution-targets?target_type=local_edge&pageSize=50', count: targets.length },
-      selected_desktop_target: { id: selectedTarget.id, target_type: selectedTarget.target_type, is_online: selectedTarget.is_online },
-      dispatch_request: { ref: `api:/web/agent-teams/${teamId}/runs`, target_id: selectedTarget.id, run_id: runId },
-      event_replay: { ref: `api:/web/agent-teams/${teamId}/runs/${runId}/events`, status: events.status() },
+      real_login_approved: true, remote_dispatch_approved: true, redaction_status: 'redacted', web_to_local_edge_direct: false,
+      hub_session: { ref: 'api:/client/auth/browser/session', status: me.status },
+      target_inventory: { ref: 'api:/web/execution-targets', count: targets.length },
+      selected_desktop_target: { id: selectedTarget.id, target_type: selectedTarget.target_type },
+      dispatch_request: { ref: `api:${dispatchPath}`, target_id: selectedTarget.id, run_id: runId },
+      event_replay: { ref: `api:${eventsPath}`, status: events.status },
     });
   });
 });
