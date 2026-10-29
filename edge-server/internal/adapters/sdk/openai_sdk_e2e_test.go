@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/agenthub/edge-server/internal/adapters"
@@ -978,7 +979,7 @@ func TestOpenAISDK_E2E_ParseStream_HTTPError(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusUnauthorized)
-		_, _ = w.Write([]byte(`{"error":{"message":"Invalid API key","type":"invalid_request_error","code":"invalid_api_key"}}`))
+		_, _ = w.Write([]byte(`{"error":{"message":"Invalid API key private-fixture-key","type":"invalid_request_error","code":"invalid_api_key"}}`))
 	}))
 	defer srv.Close()
 
@@ -1009,6 +1010,9 @@ func TestOpenAISDK_E2E_ParseStream_HTTPError(t *testing.T) {
 	err := adapter.ParseStream(ctx, nil, nil, emitter, run)
 	if err == nil {
 		t.Fatal("expected error from HTTP 401, got nil")
+	}
+	if strings.Contains(err.Error(), "private-fixture-key") {
+		t.Fatal("provider body leaked into the error")
 	}
 
 	// Verify a failure result event was emitted.

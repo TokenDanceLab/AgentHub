@@ -21,6 +21,7 @@ import (
 	"github.com/agenthub/edge-server/internal/api"
 	"github.com/agenthub/edge-server/internal/ccswitch"
 	"github.com/agenthub/edge-server/internal/deliverydedup"
+	"github.com/agenthub/edge-server/internal/device"
 	"github.com/agenthub/edge-server/internal/edgehttp"
 	"github.com/agenthub/edge-server/internal/edgeidentity"
 	"github.com/agenthub/edge-server/internal/events"
@@ -45,6 +46,8 @@ func HubUserIDFromContext(ctx context.Context) string {
 
 // Config holds server configuration.
 type Config struct {
+	DeviceCredential       *device.Credential
+	DeviceJournalPath      string
 	Addr                   string
 	Store                  store.Repository
 	ProcessExecutor        lifecycle.ProcessExecutorConfig
@@ -178,6 +181,12 @@ func Run(cfg Config) error {
 	// Graceful shutdown on SIGINT/SIGTERM.
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
+	defer signal.Stop(stop)
+	stopDevice, err := startEnrolledWorker(cfg, handler)
+	if err != nil {
+		return err
+	}
+	defer stopDevice()
 
 	go func() {
 		slog.Info("edge server listening", "addr", cfg.Addr)
@@ -188,6 +197,7 @@ func Run(cfg Config) error {
 	}()
 
 	<-stop
+	stopDevice()
 	slog.Info("shutting down...")
 
 	budget := shutdownTotalBudget
@@ -319,6 +329,9 @@ func buildProcessExecutor(cfg Config, bus *events.Bus, agentReg *agents.Registry
 		return nil, nil, nil, err
 	}
 	processExecutor.SetMetrics(edgeMetrics)
+	if cfg.DeviceCredential != nil {
+		processExecutor.WithTextOnlyExecution()
+	}
 	processExecutor.WithAgentRegistry(agentReg).WithMessageQueue(msgQueue).WithResultAggregator(resultAgg)
 
 	var hubCallbackClient *hub.CallbackClient
@@ -332,6 +345,7 @@ func buildProcessExecutor(cfg Config, bus *events.Bus, agentReg *agents.Registry
 		// fail-closed defaults inside hub.CallbackConfig; the http.Client
 		// (connection reuse, redirect refusal) is built here too and injected.
 		callbackCfg := hub.DefaultCallbackConfig()
+		callbackCfg.DeviceMode = cfg.DeviceCredential != nil
 		if cfg.HubCallbackTimeout > 0 {
 			callbackCfg.Timeout = cfg.HubCallbackTimeout
 		}
@@ -478,7 +492,9 @@ func newHandlerFromConfig(cfg Config) (*api.Handler, error) {
 		skillsDirs = skills.DefaultDirs("")
 	}
 	skillReg := skills.NewSkillRegistry(skillsDirs)
-	if err := skillReg.Discover(); err != nil {
+	if cfg.DeviceCredential != nil {
+		skillReg = nil
+	} else if err := skillReg.Discover(); err != nil {
 		slog.Warn("skill discovery failed; skills will not be injected", "error", err)
 	} else if skillReg.Count() > 0 {
 		slog.Info("loaded skills", "count", skillReg.Count(), "dirs", skillsDirs)
@@ -507,7 +523,9 @@ func newHandlerFromConfig(cfg Config) (*api.Handler, error) {
 
 	// Detect cc-switch and wire into handler for API endpoints and model
 	// catalog enrichment. Non-fatal: missing cc-switch is normal.
-	wireCCSwitch(cfg, h)
+	if cfg.DeviceCredential == nil {
+		wireCCSwitch(cfg, h)
+	}
 
 	// Validate security-critical configuration at startup.
 	// An empty workspace allowlist means all non-empty workDir values

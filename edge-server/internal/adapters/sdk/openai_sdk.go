@@ -95,7 +95,7 @@ func (a *OpenAISDKAdapter) Metadata() AdapterMetadata {
 func (a *OpenAISDKAdapter) Capabilities() AgentCapabilities {
 	return AgentCapabilities{
 		Streaming:       true,
-		ToolCalls:       true,
+		ToolCalls:       false, // no tool declaration/execution/result loop
 		FileChanges:     false,
 		PermissionHooks: false,
 		ThinkingVisible: false,
@@ -121,7 +121,7 @@ func (a *OpenAISDKAdapter) CapabilityHealthMetadata() map[string]any {
 		"model":          a.model,
 		"capabilities": map[string]bool{
 			"streaming":       true,
-			"toolCalls":       true,
+			"toolCalls":       false,
 			"fileChanges":     false,
 			"permissionHooks": false,
 			"thinkingVisible": false,
@@ -228,8 +228,9 @@ func (a *OpenAISDKAdapter) ParseStream(ctx context.Context, stdout io.Reader, st
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
-		errMsg := fmt.Sprintf("openai-sdk: API returned status %d: %s", resp.StatusCode, string(body))
+		// Provider error bodies may echo credentials, prompts or internal
+		// routing data; neither local events nor Hub callbacks should copy it.
+		errMsg := fmt.Sprintf("openai-sdk: API returned status %d", resp.StatusCode)
 		emitter.Emit(BusEventResult, scope, map[string]any{
 			"success":        false,
 			"error":          errMsg,

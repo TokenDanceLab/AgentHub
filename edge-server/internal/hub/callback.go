@@ -39,6 +39,8 @@ import (
 // client, assembled at the composition root (#1564). Zero fields fall back to
 // DefaultCallbackConfig semantics.
 type CallbackConfig struct {
+	// DeviceMode selects the isolated enrolled-device callback endpoints.
+	DeviceMode bool
 	// Timeout bounds each individual request (default 30s).
 	Timeout time.Duration
 	// MaxAttempts is the total number of attempts including the first
@@ -380,7 +382,11 @@ func (c *CallbackClient) callback(ctx context.Context, taskID string, action str
 // callbacks and the typed stream request share this single serializer and
 // retry loop.
 func (c *CallbackClient) callbackWithRetry(ctx context.Context, taskID string, action string, runID string, body any, retryableAction bool) error {
-	url := fmt.Sprintf("%s/edge/agent-tasks/%s/%s", c.hubURL, taskID, action)
+	prefix := "/edge/agent-tasks/"
+	if c.cfg.DeviceMode {
+		prefix = "/edge/device/tasks/"
+	}
+	url := fmt.Sprintf("%s%s%s/%s", c.hubURL, prefix, taskID, action)
 
 	payload, err := json.Marshal(body)
 	if err != nil {

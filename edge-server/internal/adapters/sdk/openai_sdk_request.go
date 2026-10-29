@@ -71,7 +71,9 @@ func (a *OpenAISDKAdapter) doRequestWithRetry(ctx context.Context, body []byte, 
 
 		resp, err := a.httpClient.Do(req)
 		if err != nil {
-			lastErr = err
+			// Transport errors may contain the URL, including operator query
+			// credentials. Keep details out of emitted retry/result payloads.
+			lastErr = fmt.Errorf("model transport unavailable")
 			continue // Network errors are retriable
 		}
 

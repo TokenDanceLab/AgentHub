@@ -10,28 +10,35 @@ import (
 	"strings"
 	"time"
 
+	"github.com/agenthub/edge-server/internal/device"
 	"github.com/agenthub/edge-server/internal/lifecycle"
 	"github.com/agenthub/edge-server/internal/security"
 )
 
 type config struct {
-	Addr               string
-	StoreFile          string
-	StoreBackend       string
-	StoreDB            string
-	StoreReadiness     bool
-	RunnerProfile      string
-	RunnerCommand      string
-	RunnerArgs         repeatedString
-	RunnerEnv          repeatedString
-	RunnerWorkDir      string
-	WorkspaceAllowlist repeatedString
-	LocalAuthToken     string
-	HubJWTSecret       string // shared secret for validating Hub-issued HS256 JWTs
-	EdgeDeviceID       string // local Edge device ID expected in Edge-scoped Hub JWTs
-	RemoteMode         bool   // allow non-loopback bind + remote origins (requires auth)
-	AllowedOrigins     repeatedString
-	Dev                bool // disable auto-generated local auth token for development
+	Enroll               bool
+	EnrollmentName       string
+	EnrollmentWorkspace  string
+	DeviceCredentialFile string
+	DeviceJournalPath    string
+	DeviceCredential     *device.Credential
+	Addr                 string
+	StoreFile            string
+	StoreBackend         string
+	StoreDB              string
+	StoreReadiness       bool
+	RunnerProfile        string
+	RunnerCommand        string
+	RunnerArgs           repeatedString
+	RunnerEnv            repeatedString
+	RunnerWorkDir        string
+	WorkspaceAllowlist   repeatedString
+	LocalAuthToken       string
+	HubJWTSecret         string // shared secret for validating Hub-issued HS256 JWTs
+	EdgeDeviceID         string // local Edge device ID expected in Edge-scoped Hub JWTs
+	RemoteMode           bool   // allow non-loopback bind + remote origins (requires auth)
+	AllowedOrigins       repeatedString
+	Dev                  bool // disable auto-generated local auth token for development
 
 	ShutdownTimeout string // overall graceful-shutdown budget (default 10s)
 
@@ -157,6 +164,7 @@ func buildConfig(args []string) (config, error) {
 	fs.SetOutput(os.Stderr)
 
 	cfg := config{}
+	cfg.deviceFlags(fs)
 	fs.StringVar(&cfg.Addr, "addr", getEnv("AGENTHUB_ADDR", "127.0.0.1:3210"), "listen address")
 	fs.StringVar(&cfg.StoreFile, "store-file", getEnv("AGENTHUB_STORE_FILE", ""), "JSON store snapshot file path")
 	fs.StringVar(&cfg.StoreBackend, "store-backend", getEnv("AGENTHUB_STORE_BACKEND", ""), "store backend; empty = legacy auto, supported: memory, file, sqlite")
@@ -224,6 +232,9 @@ func buildConfig(args []string) (config, error) {
 		return config{}, err
 	}
 	if err := cfg.validateRunnerAndArgs(fs); err != nil {
+		return config{}, err
+	}
+	if err := cfg.validateDeviceMode(); err != nil {
 		return config{}, err
 	}
 	return cfg, nil

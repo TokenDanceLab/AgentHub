@@ -42,6 +42,7 @@ type ProcessExecutor struct {
 
 	// Evidence gate configuration for post-run verification.
 	evidenceGateCfg EvidenceGateConfig
+	textOnly        bool // no workspace snapshots, project commands or fault-retry execution
 
 	// Fault auto-retry configuration for run failure recovery.
 	faultEscalationCfg FaultEscalationConfig
@@ -83,6 +84,16 @@ type deferredParentFinish struct {
 // Start for the first time.
 func NewProcessExecutor(bus *events.Bus, store store.RunLifecycleStore, cfg ProcessExecutorConfig, adapter adapters.AgentAdapter, adapterReg *adapters.Registry) (*ProcessExecutor, error) {
 	return newProcessExecutor(bus, store, cfg, adapter, adapterReg)
+}
+
+// WithTextOnlyExecution restricts a dedicated text SDK executor before its first
+// Start. A model conversation does not authorize project inspection/build/tests
+// or automatic new execution attempts. Ordinary local Edge behavior is unchanged.
+func (e *ProcessExecutor) WithTextOnlyExecution() *ProcessExecutor {
+	e.textOnly = true
+	e.evidenceGateCfg.Enabled = false
+	e.faultEscalationCfg.Enabled = false
+	return e
 }
 
 // Start creates a background context with the configured run timeout, registers

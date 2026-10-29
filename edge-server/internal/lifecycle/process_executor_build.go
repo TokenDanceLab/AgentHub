@@ -71,7 +71,7 @@ func (e *ProcessExecutor) buildAndStartProcess(
 	}
 
 	// Pre-run workdir snapshot for auto-surface.
-	if workDir != "" {
+	if workDir != "" && !e.textOnly {
 		snapshot := adapters.TakeWorkdirSnapshot(workDir)
 		e.mu.Lock()
 		e.workDirs[run.ID] = workDir

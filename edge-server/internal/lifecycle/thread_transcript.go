@@ -40,7 +40,11 @@ func (e *threadTranscriptEmitter) Emit(eventType string, scope map[string]any, p
 	switch eventType {
 	case adapters.BusEventTextDelta, adapters.BusEventTextBlock:
 		if text := extractHubCallbackText(payload); text != "" {
-			e.collector.Append(text)
+			if isStreamSnapshot(eventType, payload) {
+				e.collector.SetFallback(text)
+			} else {
+				e.collector.Append(text)
+			}
 		}
 	case adapters.BusEventResult:
 		if text := extractHubCallbackText(payload); text != "" {
