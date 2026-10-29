@@ -21,6 +21,19 @@ func (s *DispatchService) CancelTask(ctx context.Context, userID, taskID string)
 		s.recordDispatchAudit(ctx, auditActionTaskCancel, taskID, userID, auditOutcomeDenied, "not task owner")
 		return err
 	}
+	if s.paired != nil {
+		paired, err := s.paired.IsPairedDevice(ctx, task.EdgeDeviceID)
+		if err != nil {
+			return err
+		}
+		if paired {
+			if err := s.paired.RequestCancel(ctx, userID, taskID); err != nil {
+				return err
+			}
+			s.recordDispatchAudit(ctx, auditActionTaskCancel, taskID, userID, auditOutcomeSuccess, "cancellation requested; awaiting device receipt")
+			return nil
+		}
+	}
 	if err := dispatch.CancelTaskTerminalError(task.Status); err != nil {
 		return err
 	}

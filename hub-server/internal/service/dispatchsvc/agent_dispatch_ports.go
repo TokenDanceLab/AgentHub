@@ -13,6 +13,7 @@ import (
 	"github.com/agenthub/hub-server/internal/cache"
 	"github.com/agenthub/hub-server/internal/config"
 	"github.com/agenthub/hub-server/internal/metrics"
+	"github.com/agenthub/hub-server/internal/model"
 	"github.com/agenthub/hub-server/internal/service/dispatch"
 )
 
@@ -112,6 +113,16 @@ type RelayPort interface {
 	CreateCommand(ctx context.Context, targetEdgeID, commandType string, payload json.RawMessage, createdBy string) (pushReached bool, err error)
 }
 
+// PairedDevicePort is the outbound-only Edge transport. Its implementation
+// atomically persists the task and pull delivery under the current device grant.
+// A paired device remains owned by this transport even after revocation.
+type PairedDevicePort interface {
+	ValidateTarget(context.Context, *model.ExecutionTarget, *model.ExecutionTargetEvidence) error
+	CreateTask(context.Context, *model.PendingAgentTask, dispatch.Payload) (*model.PendingAgentTask, error)
+	IsPairedDevice(context.Context, string) (bool, error)
+	RequestCancel(context.Context, string, string) error
+}
+
 // DispatchService owns agent task dispatch orchestration: trigger, payload build,
 // edge HTTP/WS/offline routing, capability minting, history/pins loading, and
 // redispatch. DeliveryOutbox retries enter via Redispatcher; the Payload DTO
@@ -123,6 +134,7 @@ type DispatchService struct {
 	cacheClient dispatchCache
 	relay       RelayPort
 	outbox      dispatchOutbox
+	paired      PairedDevicePort
 	// edgeCfg is the Hub→Edge dispatch client config (#1549). Read once at
 	// construction by the composition root; the request path never calls
 	// os.Getenv. edgeClient is the shared outbound client built at the
@@ -149,6 +161,9 @@ type DispatchService struct {
 	dispatchSem chan struct{}
 	audit       PrivilegedActionAuditor
 }
+
+// SetPairedDeviceService is configured by the composition root before serving.
+func (s *DispatchService) SetPairedDeviceService(p PairedDevicePort) { s.paired = p }
 
 // SetAuditService injects the privileged-action auditor (#2067). nil disables recording.
 func (s *DispatchService) SetAuditService(a PrivilegedActionAuditor) {

@@ -32,6 +32,9 @@ type PendingAgentTask struct {
 	CreatedAt         time.Time  `gorm:"autoCreateTime" json:"created_at"`
 	DispatchedAt      *time.Time `gorm:"type:timestamptz" json:"dispatched_at,omitempty"`
 	FinishedAt        *time.Time `gorm:"type:timestamptz" json:"finished_at,omitempty"`
+	CancelRequestedAt *time.Time `gorm:"type:timestamptz" json:"cancel_requested_at,omitempty"`
+	CancelAppliedAt   *time.Time `gorm:"type:timestamptz" json:"cancel_applied_at,omitempty"`
+	CancelError       string     `gorm:"type:text;not null;default:''" json:"cancel_error,omitempty"`
 	ExpireAt          time.Time  `gorm:"type:timestamptz;not null;index:idx_pending_agent_tasks_status_expire,priority:2" json:"expire_at"`
 }
 

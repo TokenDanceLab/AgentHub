@@ -16,6 +16,7 @@ type Entry struct {
 	NextRetryAt  *time.Time
 	LastError    string
 	EdgeDeviceID string
+	Transport    string
 	CreatedAt    time.Time
 	UpdatedAt    time.Time
 	DeliveredAt  *time.Time
