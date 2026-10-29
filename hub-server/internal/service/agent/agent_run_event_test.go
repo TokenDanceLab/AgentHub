@@ -68,6 +68,9 @@ func newAgentRunEventTestDB(t *testing.T) *gorm.DB {
 			created_at DATETIME,
 			dispatched_at DATETIME,
 			finished_at DATETIME,
+			cancel_requested_at DATETIME,
+			cancel_applied_at DATETIME,
+			cancel_error TEXT NOT NULL DEFAULT '',
 			expire_at DATETIME NOT NULL
 		)`,
 		`CREATE TABLE messages (

@@ -134,6 +134,16 @@ func (s *Service) CreateTask(ctx context.Context, task *model.PendingAgentTask, 
 		if _, err := BuildRunRequest(p, payload); err != nil {
 			return err
 		}
+		var agent model.AgentInstance
+		if err := tx.Where("id = ? AND inviter_user_id = ?", task.AgentInstanceID, p.UserID).Take(&agent).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return errcode.AgentNotFound
+			}
+			return err
+		}
+		if payload.AgentInstanceID != agent.ID || payload.SessionID != agent.SessionID || payload.AgentType != agent.AgentType || payload.TriggerMessageID != task.TriggerMessageID {
+			return errcode.AuthDeviceMismatch
+		}
 		created, err = repository.CreatePendingTaskUnlessActive(tx, task)
 		if err != nil {
 			return err
@@ -268,6 +278,9 @@ func (s *Service) AckControl(ctx context.Context, p *edgeenrollment.Principal, c
 			return errcode.ErrBadRequest
 		}
 		if task.CancelAppliedAt != nil {
+			if ack.Status != "applied" {
+				return errcode.ErrBadRequest
+			}
 			return nil
 		}
 		now := time.Now().UTC()
