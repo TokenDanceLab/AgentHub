@@ -126,6 +126,18 @@ func SetupRoutes(r *gin.Engine, cfg *config.Config, authMW *middleware.AuthMiddl
 			if oidcHandler != nil {
 				auth.POST("/oidc/authorize", middleware.RateLimit(cacheClient, config.AuthLoginRateLimit, config.AuthRateLimitWindow, middleware.IPKey), oidcHandler.PostOIDCAuthorize)
 				auth.POST("/oidc/callback", middleware.RateLimit(cacheClient, config.AuthLoginRateLimit, config.AuthRateLimitWindow, middleware.IPKey), oidcHandler.PostOIDCCallback)
+				if browser := oidcHandler.Browser; browser != nil {
+					auth.POST("/oidc/backchannel-logout", browser.BackchannelLogout)
+					if browser.Enabled() {
+						auth.POST("/browser/authorize", middleware.RateLimit(cacheClient, config.AuthLoginRateLimit, config.AuthRateLimitWindow, middleware.IPKey), browser.Authorize)
+						auth.POST("/browser/callback", middleware.RateLimit(cacheClient, config.AuthLoginRateLimit, config.AuthRateLimitWindow, middleware.IPKey), browser.Callback)
+						auth.GET("/browser/logout/account/callback", browser.AccountLogoutCallback)
+						protected := auth.Group("/browser", authMW.Handler(), authMW.RequireHubSession())
+						protected.GET("/session", browser.Session)
+						protected.POST("/logout", browser.Logout)
+						protected.POST("/logout/account", browser.AccountLogout)
+					}
+				}
 			}
 		}
 

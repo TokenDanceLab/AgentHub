@@ -36,9 +36,11 @@ type LoginResponse struct {
 }
 
 type Service struct {
-	db          *gorm.DB
-	jwtCfg      config.JWTConfig
-	cacheClient authCache
+	accountClientID        string
+	browserSessionsEnabled bool
+	db                     *gorm.DB
+	jwtCfg                 config.JWTConfig
+	cacheClient            authCache
 }
 
 var (
@@ -49,6 +51,15 @@ var (
 func NewService(db *gorm.DB, jwtCfg config.JWTConfig, cacheClient authCache) *Service {
 	return &Service{db: db, jwtCfg: jwtCfg, cacheClient: cacheClient}
 }
+
+// SetBrowserSessionsEnabled is configured before serving requests. Existing
+// browser bearer refresh chains must not bypass the cookie-session cutover.
+func (s *Service) SetBrowserSessionsEnabled(enabled bool) { s.browserSessionsEnabled = enabled }
+
+// SetAccountClientID pins sessions to the current relying-party registration.
+// A replacement client requires fresh Account consent, so old-client refresh
+// must not silently extend sessions outside the replacement's logout grant set.
+func (s *Service) SetAccountClientID(clientID string) { s.accountClientID = clientID }
 
 // RefreshToken validates a refresh token, issues a new access token,
 // and rotates the refresh token (#134: old one is revoked, new one is issued).
@@ -64,11 +75,18 @@ func (s *Service) RefreshToken(ctx context.Context, rawRefreshToken string) (*Lo
 	if err := s.validateRefreshPresentation(ctx, rt, tokenHash); err != nil {
 		return nil, err
 	}
-	accessToken, rawRefresh, err := s.generateRefreshRotation(rt)
+	if s.accountClientID != "" && rt.OIDCClientID != s.accountClientID {
+		return nil, errcode.AuthRefreshInvalid
+	}
+	if s.browserSessionsEnabled && rt.DeviceType == "web" {
+		return nil, errcode.AuthRefreshInvalid
+	}
+	rawRefresh, err := jwtutil.GenerateRefreshToken()
 	if err != nil {
 		return nil, err
 	}
-	if err := s.rotateRefreshToken(rt, tokenHash, rawRefresh); err != nil {
+	accessToken, err := s.rotateRefreshToken(rt, tokenHash, rawRefresh)
+	if err != nil {
 		if isRefreshRotationRejection(err) {
 			if errors.Is(err, errRefreshClaimLost) {
 				s.recordRefreshReuse("rotation rejected", rt)
@@ -131,32 +149,26 @@ func (s *Service) recordRefreshReuse(reason string, rt *model.RefreshToken) {
 	}
 }
 
-func (s *Service) generateRefreshRotation(rt *model.RefreshToken) (string, string, error) {
-	// Generate both replacement tokens before the transaction so a generator
-	// failure cannot consume the presented refresh token.
-	accessToken, err := jwtutil.GenerateAccessToken(rt.UserID, rt.DeviceType, rt.DeviceID,
-		s.jwtCfg.Secret, s.jwtCfg.AccessTTL)
-	if err != nil {
-		return "", "", err
-	}
-	rawRefresh, err := jwtutil.GenerateRefreshToken()
-	if err != nil {
-		return "", "", err
-	}
-	return accessToken, rawRefresh, nil
-}
-
-func (s *Service) rotateRefreshToken(rt *model.RefreshToken, tokenHash, rawRefresh string) error {
+func (s *Service) rotateRefreshToken(rt *model.RefreshToken, tokenHash, rawRefresh string) (string, error) {
 	// Claim, device-wide revoke, and replacement upsert commit together. The
 	// exact identity row is locked active until commit, closing the race where
 	// retirement could land between authorization and new-token insertion.
-	return s.db.Transaction(func(tx *gorm.DB) error {
-		active, err := repository.LockActiveRefreshIdentity(tx, *rt.UserIdentityID)
+	var accessToken string
+	err := s.db.Transaction(func(tx *gorm.DB) error {
+		identity, err := repository.LockRefreshIdentity(tx, *rt.UserIdentityID)
 		if err != nil {
 			return err
 		}
-		if !active {
+		if identity == nil {
 			return errRefreshIdentityInactive
+		}
+		epoch, err := repository.LockSubjectEpoch(tx, identity.Issuer, identity.Subject)
+		if err != nil {
+			return err
+		}
+		accessToken, err = jwtutil.GenerateIdentityAccessToken(rt.UserID, rt.DeviceType, rt.DeviceID, identity.ID, epoch.Generation, s.jwtCfg.Secret, s.jwtCfg.AccessTTL, rt.OIDCClientID)
+		if err != nil {
+			return err
 		}
 		claimed, err := repository.ClaimRefreshTokenForRotation(tx, tokenHash)
 		if err != nil {
@@ -173,11 +185,13 @@ func (s *Service) rotateRefreshToken(rt *model.RefreshToken, tokenHash, rawRefre
 			DeviceType:     rt.DeviceType,
 			DeviceID:       rt.DeviceID,
 			UserIdentityID: rt.UserIdentityID,
+			OIDCClientID:   rt.OIDCClientID,
 			TokenHash:      jwtutil.HashRefreshToken(rawRefresh),
 			ExpiresAt:      time.Now().Add(s.jwtCfg.RefreshTTL),
 		}
 		return repository.UpsertRefreshToken(tx, newRT)
 	})
+	return accessToken, err
 }
 
 func isRefreshRotationRejection(err error) bool {

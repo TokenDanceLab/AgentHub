@@ -30,15 +30,23 @@ func newJTI() (string, error) {
 }
 
 func GenerateAccessToken(userID, deviceType, deviceID, secret string, ttl time.Duration) (string, error) {
+	return GenerateIdentityAccessToken(userID, deviceType, deviceID, "", 0, secret, ttl)
+}
+
+// GenerateIdentityAccessToken binds a native product session to the durable
+// Account logout generation. The response remains an ordinary Hub bearer JWT.
+func GenerateIdentityAccessToken(userID, deviceType, deviceID, identityID string, generation int64, secret string, ttl time.Duration, clientIDs ...string) (string, error) {
 	now := time.Now()
 	jti, err := newJTI()
 	if err != nil {
 		return "", fmt.Errorf("mint access jti: %w", err)
 	}
 	claims := Claims{
-		UserID:     userID,
-		DeviceType: deviceType,
-		DeviceID:   deviceID,
+		UserID:         userID,
+		DeviceType:     deviceType,
+		DeviceID:       deviceID,
+		IdentityID:     identityID,
+		AuthGeneration: generation,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ID:        jti,
 			Issuer:    "agenthub-hub",
@@ -47,6 +55,9 @@ func GenerateAccessToken(userID, deviceType, deviceID, secret string, ttl time.D
 			ExpiresAt: jwt.NewNumericDate(now.Add(ttl)),
 			IssuedAt:  jwt.NewNumericDate(now),
 		},
+	}
+	if len(clientIDs) > 0 {
+		claims.OIDCClientID = clientIDs[0]
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	return token.SignedString([]byte(secret))

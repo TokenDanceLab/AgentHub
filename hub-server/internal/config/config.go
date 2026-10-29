@@ -14,16 +14,17 @@ import (
 // Domain sections and env helpers live in companion files.
 
 type Config struct {
-	Server      ServerConfig       `mapstructure:"server"`
-	DB          DBConfig           `mapstructure:"db"`
-	Redis       RedisConfig        `mapstructure:"redis"`
-	JWT         JWTConfig          `mapstructure:"jwt"`
-	Upload      UploadConfig       `mapstructure:"upload"`
-	S3          S3Config           `mapstructure:"s3"`
-	AccountOIDC AccountOIDCConfig  `mapstructure:"account_oidc"`
-	AgentTeam   AgentTeamConfig    `mapstructure:"agent_team"`
-	Egress      EgressConfig       `mapstructure:"egress"`
-	Edge        EdgeDispatchConfig `mapstructure:"edge"`
+	Server         ServerConfig         `mapstructure:"server"`
+	DB             DBConfig             `mapstructure:"db"`
+	Redis          RedisConfig          `mapstructure:"redis"`
+	JWT            JWTConfig            `mapstructure:"jwt"`
+	Upload         UploadConfig         `mapstructure:"upload"`
+	S3             S3Config             `mapstructure:"s3"`
+	AccountOIDC    AccountOIDCConfig    `mapstructure:"account_oidc"`
+	BrowserSession BrowserSessionConfig `mapstructure:"browser_session"`
+	AgentTeam      AgentTeamConfig      `mapstructure:"agent_team"`
+	Egress         EgressConfig         `mapstructure:"egress"`
+	Edge           EdgeDispatchConfig   `mapstructure:"edge"`
 }
 
 // EdgeDispatchConfig is the Hub→trusted-Edge dispatch client config (#1549).
@@ -64,6 +65,7 @@ func Load(configPath string) (*Config, error) {
 		"redis.host", "redis.port", "redis.password", "redis.db",
 		"redis.pool_size", "redis.min_idle_conns", "redis.read_timeout_sec", "redis.write_timeout_sec",
 		"jwt.access_ttl", "jwt.refresh_ttl",
+		"browser_session.origin", "browser_session.redirect_uri", "browser_session.post_logout_redirect_uri",
 		"upload.dir", "upload.max_size",
 		"egress.allow_cidrs", "egress.allow_hostnames", "egress.allow_plain_http", "egress.timeout",
 	} {
@@ -89,6 +91,8 @@ func Load(configPath string) (*Config, error) {
 	// fail-closed response cap).
 	v.SetDefault("account_oidc.http_timeout", 10*time.Second)
 	v.SetDefault("account_oidc.max_response_body_bytes", int64(64*1024))
+	v.SetDefault("browser_session.secure", true)
+	v.SetDefault("browser_session.ttl", 12*time.Hour)
 	setAgentTeamDefaults(v)
 
 	// A missing config file is valid for env-only deployments (including the
@@ -136,6 +140,9 @@ func (c *Config) Validate() error {
 		return err
 	}
 	if err := c.validateAccountOIDC(); err != nil {
+		return err
+	}
+	if err := c.validateBrowserSession(); err != nil {
 		return err
 	}
 

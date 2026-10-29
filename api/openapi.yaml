@@ -2415,21 +2415,26 @@ paths:
         middleware.extractWSToken. Query-string auth is therefore not part of
         this contract. TokenDance Account OIDC ID/access/refresh tokens and
         TokenDance API keys are not Hub WebSocket credentials. Hub WebSocket
-        accepts only a Hub-issued HS256 product-session access token. The legacy
-        first-frame `auth` event is only for tests and compatibility entries
-        that do not install AuthMiddleware.WSHandler(). See api/events.md for Hub
-        event types.
+        also accepts a host-only HttpOnly browserSession cookie when browser
+        sessions are configured. Cookie upgrades require the exact Web Origin
+        and send no bearer subprotocol. Native access credentials carry an
+        identity generation and Account client ID; both session types are rechecked on inbound frames,
+        actual outbound writes and heartbeat. Revoked sessions receive
+        auth.revoked then close with 1008; storage outages close with 1013 without a logout event.
+        No in-band first-frame auth is accepted. See api/events.md for Hub events.
       x-agenthub-status: implemented
       x-agenthub-owner: Hub
       security:
         - bearerAuth: []
+        - browserSession: []
       parameters:
         - name: Sec-WebSocket-Protocol
           in: header
           required: false
           schema: { type: string }
           description: >
-            Preferred browser token carriage. Send
+            Optional native/webview bearer token carriage. Cookie Web clients
+            omit this header. Bearer clients send
             `agenthub.bearer.v1, <hub-jwt>` (Hub negotiates back only the fixed
             `agenthub.bearer.v1` marker) or the single-token form
             `access_token.<hub-jwt>`.
@@ -2872,6 +2877,193 @@ paths:
 
   # ── Auth ──
 
+  /client/auth/browser/authorize:
+    post:
+      tags: [HubSyncRelay]
+      operationId: hubBrowserAuthorize
+      summary: Start same-origin browser login with server-owned PKCE.
+      description: >
+        Requires the exact configured Origin and Host. Sets a short-lived
+        HttpOnly flow cookie binding this browser to the authorization state.
+        The verifier stays in Redis. Enabled only with browser_session.origin.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [device_id]
+              properties:
+                device_id: {type: string, format: uuid}
+      responses:
+        "200":
+          description: Account authorization URL, state and pinned issuer; HttpOnly flow cookie.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/HubOIDCAuthorizeResponse"}
+        "400": {$ref: "#/components/responses/Error"}
+        "403": {$ref: "#/components/responses/Error"}
+        "503": {$ref: "#/components/responses/Error"}
+
+  /client/auth/browser/callback:
+    post:
+      tags: [HubSyncRelay]
+      operationId: hubBrowserCallback
+      summary: Complete browser login and set an opaque HttpOnly Hub cookie.
+      description: >
+        Requires the exact configured Origin and original HttpOnly flow cookie.
+        Consumes state and server-held verifier, verifies Account ID token and
+        UserInfo, and stores a hashed Hub browser-session credential. Returns
+        user metadata and CSRF proof only, never access/refresh/provider tokens.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [code, state, iss]
+              properties:
+                code: {type: string}
+                state: {type: string}
+                iss: {type: string, format: uri}
+      responses:
+        "200":
+          description: Browser session established; Set-Cookie is Secure, HttpOnly, SameSite=Lax and host-only.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/HubBrowserSessionResponse"}
+        "400": {$ref: "#/components/responses/Error"}
+        "401": {$ref: "#/components/responses/Error"}
+        "403": {$ref: "#/components/responses/Error"}
+        "503": {$ref: "#/components/responses/Error"}
+
+  /client/auth/browser/session:
+    get:
+      tags: [HubSyncRelay]
+      operationId: hubBrowserSession
+      summary: Restore and verify the current browser session.
+      description: >
+        Returns no-store user metadata, absolute RFC3339 expiry and CSRF proof.
+        Missing, expired, revoked or previous-Account-client cookie returns 401. Storage unavailability
+        returns 503 auth_unavailable and must not be treated as logout.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{browserSession: []}]
+      responses:
+        "200":
+          description: Verified Hub browser session.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/HubBrowserSessionResponse"}
+        "401": {$ref: "#/components/responses/Error"}
+        "403": {$ref: "#/components/responses/Error"}
+        "503": {$ref: "#/components/responses/Error"}
+
+  /client/auth/browser/logout:
+    post:
+      tags: [HubSyncRelay]
+      operationId: hubBrowserLogout
+      summary: Revoke the browser session and its WebSocket connections.
+      description: Requires exact Origin and X-Hub-CSRF. Clears the HttpOnly cookie after durable revocation.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{browserSession: []}]
+      parameters:
+        - {$ref: "#/components/parameters/HubCSRF"}
+      responses:
+        "200": {$ref: "#/components/responses/Ok"}
+        "401": {$ref: "#/components/responses/Error"}
+        "403": {$ref: "#/components/responses/Error"}
+        "503": {$ref: "#/components/responses/Error"}
+
+  /client/auth/browser/logout/account:
+    post:
+      tags: [HubSyncRelay]
+      operationId: hubBrowserAccountLogout
+      summary: Revoke the Hub session and start Account global logout.
+      description: >
+        Requires exact Origin and X-Hub-CSRF. Revokes the Hub browser session
+        first, then sets a one-time HttpOnly logout state cookie and returns a
+        top-level Account end-session navigation URL. No id_token_hint is kept.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: [{browserSession: []}]
+      parameters:
+        - {$ref: "#/components/parameters/HubCSRF"}
+      responses:
+        "200":
+          description: Navigate the top-level browser to data.logout_url.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [code, data]
+                properties:
+                  code: {type: string, enum: [ok]}
+                  data:
+                    type: object
+                    required: [logout_url]
+                    properties:
+                      logout_url: {type: string, format: uri}
+        "401": {$ref: "#/components/responses/Error"}
+        "403": {$ref: "#/components/responses/Error"}
+        "503": {$ref: "#/components/responses/Error"}
+
+  /client/auth/browser/logout/account/callback:
+    get:
+      tags: [HubSyncRelay]
+      operationId: hubBrowserAccountLogoutCallback
+      summary: Verify the one-time Account logout return.
+      description: Requires the original HttpOnly logout state cookie and exact state; redirects to the configured Web origin root.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: []
+      parameters:
+        - name: state
+          in: query
+          required: true
+          schema: {type: string}
+      responses:
+        "303": {description: Logout return verified; Location is the configured Web origin root.}
+        "400": {$ref: "#/components/responses/Error"}
+        "503": {$ref: "#/components/responses/Error"}
+
+  /client/auth/oidc/backchannel-logout:
+    post:
+      tags: [HubSyncRelay]
+      operationId: hubAccountBackchannelLogout
+      summary: Consume a signed Account subject-scoped Logout Token.
+      description: >
+        Accepts an at-most 8 KiB form with exactly one logout_token. Verifies
+        RS256/JWKS, issuer, audience, iat, exp, jti and the backchannel-logout
+        event, rejecting nonce and sid. Atomically advances the issuer/subject
+        generation and revokes browser sessions and refresh chains; native
+        access tokens and live WebSockets check that same durable generation.
+        Identical JTI/claims retries are idempotent; changed claims are rejected.
+        No browser cookie, CSRF header or provider token is accepted as proof.
+      x-agenthub-status: implemented
+      x-agenthub-owner: Hub
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [logout_token]
+              properties:
+                logout_token: {type: string, maxLength: 8192}
+      responses:
+        "204": {description: Durable revocation committed, including an identical retry.}
+        "400": {$ref: "#/components/responses/Error"}
+        "503": {$ref: "#/components/responses/Error"}
+
   /client/auth/oidc/authorize:
     post:
       tags: [HubSyncRelay]
@@ -2890,6 +3082,8 @@ paths:
         authorization, token, UserInfo, and JWKS endpoints; Account management
         APIs, internal service endpoints, and database details are never exposed.
         Account tokens are identity proof for login and are not Hub credentials.
+        When browser sessions are enabled, native clients must explicitly supply
+        a registered non-Web callback; device_type=web uses browser/authorize.
         Error codes: 400 `bad_request` for malformed PKCE/device/redirect input;
         500 `internal_error` for Account discovery or transport failure.
       x-agenthub-status: implemented
@@ -4264,6 +4458,11 @@ paths:
       tags: [HubSyncRelay]
       operationId: hubRefresh
       summary: Refresh JWT access token using refresh token.
+      description: >
+        Native refresh chains must be bound to the currently configured Account
+        client ID. Missing or previous client bindings require a new Account
+        login. When browser sessions are enabled, Web bearer refresh chains
+        are rejected; Web restores through browser/session or signs in again.
       x-agenthub-status: implemented
       x-agenthub-owner: Hub
       requestBody:
@@ -7801,6 +8000,15 @@ paths:
           $ref: "#/components/responses/Error"
 components:
   securitySchemes:
+    browserSession:
+      type: apiKey
+      in: cookie
+      name: __Host-agenthub_session
+      description: >
+        Host-only Secure HttpOnly opaque Hub session. Same-origin Web clients
+        may use it on Hub product APIs that accept bearerAuth; unsafe methods
+        additionally require exact Origin and X-Hub-CSRF. Edge APIs never accept
+        this cookie. Local HTTP development uses agenthub_session_dev instead.
     bearerAuth:
       type: http
       scheme: bearer
@@ -7834,6 +8042,12 @@ components:
         /v1/events: one subprotocol entry of the form `access_token.<edge-token>`.
         Hub WebSocket uses Hub-issued access tokens separately.
   parameters:
+    HubCSRF:
+      name: X-Hub-CSRF
+      in: header
+      required: true
+      description: CSRF token returned by the verified browser session endpoint.
+      schema: {type: string}
     PageSize:
       name: pageSize
       in: query
@@ -8403,6 +8617,19 @@ components:
           type: string
           maxLength: 128
           description: Alias for run_id for explicit Hub persistence.
+    HubBrowserSessionResponse:
+      type: object
+      required: [code, data]
+      properties:
+        code: {type: string, enum: [ok]}
+        data:
+          type: object
+          required: [user, expires_at, csrf_token]
+          properties:
+            user: {$ref: "#/components/schemas/HubUser"}
+            expires_at: {type: string, format: date-time}
+            csrf_token: {type: string}
+          additionalProperties: false
     HubWebSocketFrame:
       type: object
       required: [type]
@@ -8412,6 +8639,7 @@ components:
           type: string
           enum:
             - auth.ok
+            - auth.revoked
             - typing
             - message.new
             - message.recall

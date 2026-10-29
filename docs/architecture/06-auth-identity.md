@@ -2,7 +2,7 @@
 
 > 子文档 | 主索引：[architecture.md](../architecture.md)
 >
-> 最后更新：2026-10-23
+> 最后更新：2026-10-29
 
 ## 概述
 
@@ -13,7 +13,7 @@ Hub 只消费 Account 公开的 OIDC discovery、authorization、token、UserInf
 ## OIDC Flow
 
 ```text
-Desktop / Web / Mobile
+Desktop / CLI / Mobile
   -> 生成 PKCE verifier + challenge
   -> POST /client/auth/oidc/authorize
   -> Hub 创建 state + nonce，返回 Account authorization URL
@@ -28,7 +28,9 @@ Desktop / Web / Mobile
   -> Hub 签发自己的 access/refresh session
 ```
 
-Hub 只注册 `POST /client/auth/oidc/authorize` 和 `POST /client/auth/oidc/callback`。浏览器回跳地址不是 Hub code-exchange 地址，旧的 GET callback 不属于当前契约。
+上面的 PKCE/token wire 合同继续用于 Desktop/CLI/Mobile。配置浏览器会话后，Web 使用 `POST /client/auth/browser/authorize` 和 `POST /client/auth/browser/callback`：Hub 持有 verifier，HttpOnly flow cookie 绑定发起浏览器；Web 回跳页面只提交 `code/state/iss`。浏览器回跳地址不是 Hub code-exchange 地址，旧的 GET login callback 不属于当前契约。
+
+原 native authorize/callback 在 browser session 启用后要求显式的非 Web 已注册 callback，拒绝 `device_type=web`；Web 旧 refresh chain 也不能通过 native refresh 恢复。新 Web 前端必须清除旧 access/refresh storage，再向 browser/session 验证会话。
 
 ## Identity Mapping
 
@@ -44,7 +46,7 @@ Hub 只注册 `POST /client/auth/oidc/authorize` 和 `POST /client/auth/oidc/cal
 
 - Account access token、ID token 和 client secret 只由 Hub 服务端在 OIDC code exchange 中使用。
 - Account token 不能作为 Hub REST bearer，也不能在 WebSocket upgrade 中使用。
-- Hub REST 和 WebSocket 只接受 Hub 签发的 HS256 session token。
+- Hub REST 和 WebSocket 接受 Hub 签发的 HS256 native session，或配置后的同源 HttpOnly browser session；两者都不是 Account token。
 - Hub access token 的 `sub` 是 Hub user ID，不是 Account subject；`user_id`、`device_id` 和 `device_type` 由 Hub session 写入。
 - 浏览器、Desktop renderer 和 agent context 不接收 Account token、Account client secret 或 provider credential。
 
@@ -52,13 +54,21 @@ Hub 只注册 `POST /client/auth/oidc/authorize` 和 `POST /client/auth/oidc/cal
 
 Desktop 由 Tauri keyring 或当前进程 session 保存 Hub access token，后续请求通过 `getAccessToken()` 注入。
 
-Web 当前把 Hub access/refresh token 保存在 tab-scoped `sessionStorage`，并使用内存 fallback；这不是 HttpOnly cookie session，也不是 BFF-owned server session。公开 Web 发布若需要此类安全属性，必须另行实现，不能把当前存储描述成 cookie 会话。
+Web 的 browser-session 接口只返回 `user`、RFC3339 `expires_at` 和独立 `csrf_token`。认证 cookie 是随机 opaque token；PostgreSQL `browser_sessions` 只存 SHA-256 digest，绑定精确 user identity、device、logout generation 和绝对过期时间。cookie 为 `__Host-agenthub_session`，`Secure; HttpOnly; SameSite=Lax; Path=/`，无 Domain。默认绝对 TTL 为 12 小时，上限 24 小时，不滑动续期；到期重新经过 Account。
+
+浏览器刷新通过 `GET /client/auth/browser/session` 恢复，不能根据本地 user metadata 猜测登录。cookie-auth unsafe request 必须带精确 Origin 和 `X-Hub-CSRF`；CSRF proof 来自已验证的 session 响应，不能替代认证 cookie。浏览器只调用同源 Hub API/WS；WebSocket 不携带 bearer subprotocol，必须有精确 Origin。原 native Authorization 和 webview bearer subprotocol 合同保留，显式错误 bearer 不回退 cookie。
+
+认证与会话响应 `Cache-Control: no-store`。无效、撤销或过期会话返回 401；数据库/密钥等依赖故障返回 503 `auth_unavailable`，客户端不能把故障宣称为账户退出。CSRF/Origin 校验失败返回 403 `auth_csrf_invalid`。本地 loopback HTTP 仅在显式开发配置下使用非 `__Host-` cookie 名；生产不能关闭 Secure。
 
 Mobile 默认是 fixture/边界验证 lane。真实 Account 登录只在 `EXPO_PUBLIC_AGENTHUB_ACCOUNT_LOGIN_ENABLED=true` 且配置非空 `EXPO_PUBLIC_ACCOUNT_OIDC_ISSUER` 时启用；启用后仍只持有 Hub 发放的 session token，不持有 Account token。
 
 ## Production
 
 生产环境必须显式配置 `AGENTHUB_ACCOUNT_OIDC_ISSUER_URL`、`AGENTHUB_ACCOUNT_OIDC_CLIENT_ID`、`AGENTHUB_ACCOUNT_OIDC_CLIENT_SECRET` 和 `AGENTHUB_ACCOUNT_OIDC_REDIRECT_URI`；`AGENTHUB_ACCOUNT_OIDC_ALLOWED_REDIRECT_URIS` 只在存在额外精确 callback 时需要。任一组字段部分配置或核心配置缺失都会使 Hub 启动失败，已退役的旧 provider 环境变量也会在生产启动时被拒绝。
+
+Web cookie lane 额外配置 `AGENTHUB_BROWSER_SESSION_ORIGIN`、`AGENTHUB_BROWSER_SESSION_REDIRECT_URI`、`AGENTHUB_BROWSER_SESSION_POST_LOGOUT_REDIRECT_URI`。登录 callback 必须已在 Account/Hub 精确 allowlist；logout callback 固定为该 Web origin 的 `/client/auth/browser/logout/account/callback`。`AGENTHUB_BROWSER_SESSION_SECURE` 默认 true，`AGENTHUB_BROWSER_SESSION_TTL` 默认 12h。未配置 origin 时不注册 browser-session 路由；Account back-channel 路由随 Account OIDC 注册。
+
+代理必须保留公共 Host、直接路由 `/client/auth/*`，不能把 back-channel 或 logout callback 重定向到 SPA fallback。Account client 必须登记精确 HTTPS `https://<web-origin>/client/auth/oidc/backchannel-logout` 与 post-logout callback；是否生产激活需要独立读回和真实验收。Account 当前支持 create/validate/disable，不提供原地 client metadata 更新；缺少登记时使用替代 client 的受审切换，保留 native callbacks 和 issuer/subject 映射。
 
 真实 Account L3 必须走真实 Account issuer、真实浏览器授权码交换和真实 UserInfo。fixture、mock、stubbed Hub 或只验证配置形状的运行不能冒充 L3；对外证据必须按 `scripts/verify/verify-real-e2e-contract.py` 记录 `evidence_level`、`real_tested` 和实际命令。
 
@@ -70,7 +80,19 @@ Mobile 默认是 fixture/边界验证 lane。真实 Account 登录只在 `EXPO_P
 - redirect URI 必须精确匹配配置集合；非 loopback 地址必须使用 HTTPS。
 - Account token、secret、cookie、原始 callback code 和用户凭据不进入公开日志、测试 evidence 或 agent context。
 - Hub refresh 只在 Hub 明确返回 401/403 时清除本地 session；网络错误、429 和 5xx 保留 refresh token，避免把临时故障误判成登出。
-- 当前 Hub logout 只撤销 Hub-local session，不调用 Account RP-initiated logout。Hub 不持久化或下发 Account ID token，因此 Account 浏览器 SSO session 会保留；需要全局登出的部署必须另做受审的 `id_token_hint` 保管和 logout 设计。
+- `POST /client/auth/browser/logout` 只撤销当前 Hub browser session；`POST /client/auth/browser/logout/account` 先撤销本地会话，再返回 Account discovery end-session URL，使用 confidential `client_id` 和精确 post-logout URI。Account 的 host-only cookie 完成全局退出，不需要保存或下发 `id_token_hint`。Hub 用短时 HttpOnly cookie 和一次性服务端 state 验证回跳。
+
+## Account 撤销与迁移
+
+`POST /client/auth/oidc/backchannel-logout` 只接收最多 8 KiB form 和唯一 `logout_token`。复用已有有界 JWKS cache，未知 kid 刷新一次；固定 RS256，校验精确 issuer/audience、iat/exp/sub/jti 和标准 backchannel-logout event，拒绝 nonce/sid。JWKS/数据库故障返回可重试 503，非法 proof 返回 400。
+
+事务内按 `(issuer, subject)` 推进 `oidc_subject_epochs.generation`，撤销其 browser sessions 和 refresh chains，记录 `(issuer,jti)` 与 claims digest。相同 JTI/claims 重试幂等；同 JTI 不同 claims 拒绝。未知 subject 也保留 epoch；callback 在同一 identity/epoch 锁序中拒绝早于或等于最近 logout iat 的 ID proof，避免首次登录或旧 callback 复活会话。同秒合法新登录可能需要重试。
+
+新 native JWT 内含 `identity_id/auth_generation/oidc_client_id`；REST、WS upgrade、inbound frame、实际 outbound write 和 heartbeat 都复验持久 generation、过期和当前 Account client。browser session 和 native refresh 也绑定签发时的 `oidc_client_id`；替换 Account client 后，旧 client 或未绑定 client 的会话一律重新登录，不通过 refresh 迁移，避免会话落在新 client 的 logout grant 范围之外。重新登录仍复用同一 `(issuer, subject)` 的 Hub user 与授权。仅 identity claim 缺失、但 refresh 已绑定当前 client 的 native JWT 可以通过 refresh 升级；浏览器旧 bearer 则重新登录。纯 unit fixtures 可注入无 checker 的 middleware，生产 composition root 总是配置 checker。
+
+本实例在撤销提交后立即重验该 identity 的全部 socket，发送 `auth.revoked` payload `{reason:"session_revoked"}` 并关闭；已排队的业务帧在实际写出前再次检查。其他 Hub 实例通过每次读写检查拒绝旧 epoch，空闲连接最迟下一 heartbeat 关闭。依赖故障只关闭 socket，不能发送代表账户撤销的事件。客户端收到撤销事件停止自动重连并清除会话缓存。已经获批准的 Edge task 按原 task-scoped 授权运行；此会话变更不隐式取消既有 delegation。
+
+迁移 0079 增加 browser sessions、持久 subject epochs、logout JTI 记录和 refresh 的 client 绑定列。历史 refresh 的 client 为空，不猜测或回填，部署后要求重新登录。回滚仅删除 browser sessions（迫使重登），保留 client 列、epochs/JTI 防止丢失撤销事实；回退到不检查 generation/client 的旧应用代码不是安全兼容降级。每小时有界清理已过期 browser session 和过期 JTI，epoch 不过期。真实 Account logout/client 注册和 packaged Desktop 验收仍需部署 lane 单独取证，代码测试不能替代。
 
 ## 公开仓与 Account 内部面
 

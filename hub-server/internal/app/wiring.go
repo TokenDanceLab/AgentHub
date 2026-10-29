@@ -166,6 +166,8 @@ func newAgentTeamService(
 func (a *App) initServices(ctx context.Context) error {
 	// Service layer
 	a.AuthService = auth.NewService(a.DB, a.Config.JWT, a.CacheClient)
+	a.AuthService.SetBrowserSessionsEnabled(a.Config.BrowserSession.Enabled())
+	a.AuthService.SetAccountClientID(a.Config.AccountOIDC.ClientID)
 	a.NotificationService = notification.NewService(a.DB, a.mgr)
 	// Attachment storage: S3 when configured, otherwise local filesystem.
 	var attachmentStorage attachment.ObjectStorage
@@ -269,6 +271,7 @@ func (a *App) initServices(ctx context.Context) error {
 	if a.Config.AccountOIDC.ClientID != "" {
 		a.OIDCService = oidc.NewService(a.DB, a.Config.AccountOIDC, a.Config.JWT, a.CacheClient)
 		a.OIDCHandler = handler.NewOIDCHandler(a.OIDCService)
+		a.OIDCHandler.Browser = handler.NewBrowserAuthHandler(a.Config.BrowserSession, a.OIDCService, a.AuthService, a.mgr)
 	}
 
 	return nil
@@ -311,6 +314,22 @@ func (a *App) startServer(ctx context.Context) error {
 	// Background goroutines
 	a.startTaskScheduler(a.bg.Ctx())
 	a.mgr.StartHeartbeat(a.bg.Ctx())
+	if a.AuthService != nil {
+		a.bg.Go(func() error {
+			ticker := time.NewTicker(time.Hour)
+			defer ticker.Stop()
+			for {
+				select {
+				case <-a.bg.Ctx().Done():
+					return nil
+				case <-ticker.C:
+					if err := a.AuthService.PruneExpiredSessions(a.bg.Ctx()); err != nil {
+						slog.Warn("auth session cleanup unavailable")
+					}
+				}
+			}
+		})
+	}
 	// durable Hub->Edge delivery retry loop (delivery_outbox).
 	if a.AgentService != nil {
 		a.AgentService.StartDeliveryRetryLoop(a.bg.Ctx())

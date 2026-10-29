@@ -18,7 +18,7 @@ import (
 func UpsertRefreshToken(db *gorm.DB, rt *model.RefreshToken) error {
 	err := db.Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "user_id"}, {Name: "device_type"}, {Name: "device_id"}},
-		DoUpdates: clause.AssignmentColumns([]string{"token_hash", "expires_at", "revoked", "user_identity_id"}),
+		DoUpdates: clause.AssignmentColumns([]string{"token_hash", "expires_at", "revoked", "user_identity_id", "oidc_client_id"}),
 	}).Create(rt).Error
 	if err != nil {
 		return err
@@ -66,20 +66,25 @@ func FindRefreshTokenForRotation(db *gorm.DB, hash string) (*model.RefreshToken,
 // LockActiveRefreshIdentity serializes refresh rotation against identity
 // retirement until the enclosing transaction commits.
 func LockActiveRefreshIdentity(db *gorm.DB, identityID string) (bool, error) {
+	identity, err := LockRefreshIdentity(db, identityID)
+	return identity != nil, err
+}
+
+func LockRefreshIdentity(db *gorm.DB, identityID string) (*model.UserIdentity, error) {
 	if identityID == "" {
-		return false, nil
+		return nil, nil
 	}
 	var identity model.UserIdentity
 	err := db.Clauses(clause.Locking{Strength: "UPDATE"}).
 		Where("id = ? AND status = 'active'", identityID).
 		First(&identity).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return false, nil
+		return nil, nil
 	}
 	if err != nil {
-		return false, err
+		return nil, err
 	}
-	return true, nil
+	return &identity, nil
 }
 
 // ClaimRefreshTokenForRotation atomically flips the presented token row from

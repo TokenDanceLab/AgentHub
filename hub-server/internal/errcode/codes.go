@@ -38,6 +38,8 @@ var (
 
 var (
 	AuthInvalidToken = New("auth_invalid_token", "token is invalid or expired", http.StatusUnauthorized)
+	AuthUnavailable  = New("auth_unavailable", "session verification is temporarily unavailable", http.StatusServiceUnavailable)
+	AuthCSRFInvalid  = New("auth_csrf_invalid", "same-origin session proof is required", http.StatusForbidden)
 	// AuthTokenExpired 当前无 Go 生产路径产生，但客户端错误上报契约仍映射该码
 	// （app/shared/src/errorReporting.ts），保留以保证契约可追溯。
 	AuthTokenExpired   = New("auth_token_expired", "token has expired", http.StatusUnauthorized)

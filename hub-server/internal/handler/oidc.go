@@ -20,6 +20,7 @@ type OIDCService interface {
 
 type OIDCHandler struct {
 	service OIDCService
+	Browser *BrowserAuthHandler
 }
 
 func NewOIDCHandler(service OIDCService) *OIDCHandler {
@@ -52,6 +53,9 @@ func (h *OIDCHandler) PostOIDCAuthorize(c *gin.Context) {
 		return
 	}
 	redirectURI := strings.TrimSpace(req.RedirectURI)
+	if h.rejectBrowserBearer(c, deviceType, redirectURI) {
+		return
+	}
 	if err := validateAccountRedirectURI(redirectURI); err != nil {
 		FailWithMessage(c, errcode.ErrBadRequest, "redirect_uri is not allowed")
 		return
@@ -104,6 +108,9 @@ func (h *OIDCHandler) handleCallback(c *gin.Context, req oidcCallbackReq) {
 		return
 	}
 	redirectURI := strings.TrimSpace(req.RedirectURI)
+	if h.rejectBrowserBearer(c, deviceType, redirectURI) {
+		return
+	}
 	if err := validateAccountRedirectURI(redirectURI); err != nil {
 		FailWithMessage(c, errcode.ErrBadRequest, "redirect_uri is not allowed")
 		return
@@ -124,6 +131,17 @@ func (h *OIDCHandler) handleCallback(c *gin.Context, req oidcCallbackReq) {
 		return
 	}
 	OK(c, result)
+}
+
+// Once browser sessions are configured, the registered Web callback cannot be
+// used as a JavaScript-readable native token exchange. Native loopback and
+// other non-Web callbacks keep their existing JSON contract.
+func (h *OIDCHandler) rejectBrowserBearer(c *gin.Context, deviceType, redirectURI string) bool {
+	if h.Browser != nil && h.Browser.Enabled() && (deviceType == "web" || redirectURI == h.Browser.cfg.RedirectURI || redirectURI == "") {
+		FailWithMessage(c, errcode.ErrBadRequest, "browser login requires the browser session endpoint; native clients must provide their registered callback")
+		return true
+	}
+	return false
 }
 
 func logOIDCServiceError(c *gin.Context, message string, err error) {

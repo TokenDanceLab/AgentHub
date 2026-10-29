@@ -32,6 +32,7 @@ type AccessTokenBlacklistChecker interface {
 // Fail-open/fail-closed semantics live in the implementations: the Redis
 // checker itself fails open on Redis errors (documented policy).
 type AuthDependencies struct {
+	Sessions         SessionChecker
 	BlacklistChecker AccessTokenBlacklistChecker
 	PermissionAudit  func(ctx context.Context, userID string, decision string, allowed bool, details map[string]interface{}, clientIP string)
 }
@@ -55,9 +56,9 @@ func NewAuthMiddleware(cfg *config.Config, deps AuthDependencies) *AuthMiddlewar
 
 // AuthMiddleware returns a Gin middleware that validates JWT bearer tokens and
 // classifies the auth source.
-// Only Hub-issued HS256 product sessions are accepted. Account ID/access
-// tokens are provider credentials used by the OIDC service and must never be
-// accepted as Hub REST or WebSocket bearer tokens.
+// Hub-issued HS256 product tokens and configured same-origin browser cookies
+// are accepted. Account ID/access tokens are provider credentials used by the
+// OIDC service and must never be accepted as Hub REST or WebSocket bearer tokens.
 //
 // User identity (user_id, device_type, device_id) is injected into the Gin context.
 // Product APIs must add RequireHubSession after this middleware.
@@ -66,7 +67,13 @@ func NewAuthMiddleware(cfg *config.Config, deps AuthDependencies) *AuthMiddlewar
 func (m *AuthMiddleware) Handler() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		header := c.GetHeader("Authorization")
-		if header == "" || !strings.HasPrefix(header, "Bearer ") {
+		if header == "" {
+			if m.browserSession(c, false) {
+				c.Next()
+			}
+			return
+		}
+		if !strings.HasPrefix(header, "Bearer ") {
 			fail(c, errcode.AuthInvalidToken)
 			c.Abort()
 			return
@@ -116,7 +123,18 @@ const WSBearerSubprotocol = "agenthub.bearer.v1"
 // WSHandler returns the WebSocket auth middleware (browser subprotocol JWT).
 func (m *AuthMiddleware) WSHandler() gin.HandlerFunc {
 	return func(c *gin.Context) {
+		if header := c.GetHeader("Authorization"); header != "" && !strings.HasPrefix(header, "Bearer ") {
+			fail(c, errcode.AuthInvalidToken)
+			c.Abort()
+			return
+		}
 		tokenStr := extractWSToken(c)
+		if tokenStr == "" && c.GetHeader("Authorization") == "" && len(c.Request.Header.Values("Sec-WebSocket-Protocol")) == 0 && m.cfg.BrowserSession.Enabled() {
+			if m.browserSession(c, true) && m.enforceHubSession(c) {
+				c.Next()
+			}
+			return
+		}
 		if tokenStr == "" {
 			// Audit the failed upgrade and count it in WSAuthFailures.
 			m.auditPermission(c, "", "auth_validate", false, map[string]interface{}{
@@ -147,7 +165,7 @@ func (m *AuthMiddleware) WSHandler() gin.HandlerFunc {
 			c.Abort()
 			return
 		}
-		if !m.acceptAccessClaims(c, claims) {
+		if !m.acceptSessionClaims(c, claims) {
 			return
 		}
 		setHubLocalClaims(c, claims)
@@ -228,7 +246,7 @@ func (m *AuthMiddleware) validateToken(c *gin.Context, tokenStr string) {
 		c.Abort()
 		return
 	}
-	if !m.acceptAccessClaims(c, claims) {
+	if !m.acceptSessionClaims(c, claims) {
 		return
 	}
 	setHubLocalClaims(c, claims)

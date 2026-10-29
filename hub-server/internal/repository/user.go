@@ -25,6 +25,7 @@ var errAccountIdentityConflict = errors.New("account identity was created concur
 // together for an Account login. The raw refresh token never enters the
 // repository; only its hash is persisted.
 type AccountSessionInput struct {
+	OIDCClientID     string
 	Issuer           string
 	Subject          string
 	Name             string
@@ -135,6 +136,7 @@ func FindOrCreateAccountSession(db *gorm.DB, in AccountSessionInput) (*model.Use
 				DeviceType:     in.DeviceType,
 				DeviceID:       in.DeviceID,
 				UserIdentityID: &identity.ID,
+				OIDCClientID:   in.OIDCClientID,
 				TokenHash:      in.RefreshTokenHash,
 				ExpiresAt:      in.RefreshExpiresAt,
 			})

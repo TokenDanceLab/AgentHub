@@ -98,6 +98,14 @@ func (h *WebSocketHandler) ServeWS(c *gin.Context) {
 	}
 
 	conn := ws.NewConnWithBufferSize(wsConn, h.manager.SendBufferSize())
+	if value, ok := c.Get("session_validator"); ok {
+		if validate, ok := value.(func(context.Context) error); ok {
+			conn.SetSessionVerifier(c.GetString("session_identity_id"), validate)
+			if err := conn.ValidateSession(c.Request.Context()); err != nil {
+				return
+			}
+		}
+	}
 	if err := h.manager.Register(conn); err != nil {
 		slog.Error("ws register failed", "error", err)
 		_ = wsConn.Close(websocket.StatusInternalError, "")
@@ -183,7 +191,7 @@ func (h *WebSocketHandler) writeLoop(conn *ws.Conn) {
 		// bounded write context fails fast so writeLoop returns and
 		// cleanupConn reaps the connection promptly.
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		err := conn.W.Write(ctx, websocket.MessageText, data)
+		err := conn.WriteAuthenticated(ctx, data)
 		cancel()
 		if err != nil {
 			slog.Warn("ws write error", "conn_id", conn.ID, "error", err)
@@ -207,6 +215,12 @@ func (h *WebSocketHandler) processIncoming(conn *ws.Conn) {
 		data, err := conn.ReadMessage(context.Background())
 		if err != nil {
 			slog.Info("ws read error", "user_id", conn.UserID, "error", err)
+			return
+		}
+		checkCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		err = conn.ValidateSession(checkCtx)
+		cancel()
+		if err != nil {
 			return
 		}
 

@@ -21,7 +21,8 @@ const (
 	TypeTyping = "typing"
 
 	// TypeAuthOK is the post-upgrade handshake ack; idempotent on apply per conn.
-	TypeAuthOK = "auth.ok"
+	TypeAuthOK      = "auth.ok"
+	TypeAuthRevoked = "auth.revoked"
 
 	// Message family: UPSERT / idempotent by message or (session, message) ids;
 	// message.read advances last_read_seq watermark only.

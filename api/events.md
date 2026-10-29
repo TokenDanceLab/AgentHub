@@ -1,6 +1,6 @@
 # WebSocket Events
 
-最后更新：2026-10-19
+最后更新：2026-10-29
 
 WebSocket 事件合同入口：协议边界、源码 owner、**重复投递/幂等语义**、验收命令。
 
@@ -11,7 +11,7 @@ WebSocket 事件合同入口：协议边界、源码 owner、**重复投递/幂�
 | Edge envelope | `app/shared/src/events.ts` | 前端 `EventEnvelope` |
 | Edge event bus | `edge-server/internal/events/` | 发布、订阅、背压、gap |
 | Runtime event names | `edge-server/internal/orchestration/contracts.go`、`edge-server/internal/adapters/surfacing.go` | `run.agent.*` 常量（adapters 包通过 `contract_aliases.go` 别名重导出） |
-| Hub WS frame | `hub-server/internal/ws/frame.go` | `{type, seq_id?, payload?}` + 31 常量 |
+| Hub WS frame | `hub-server/internal/ws/frame.go` | `{type, seq_id?, payload?}` + 32 常量 |
 | Hub client constants | `app/shared/src/hubEvents.ts` | 与 `frame.go` 1:1 |
 | Hub runtime replay | `hub-server/internal/service/agent/agent_edge_callback.go` | `agent.stream` / 聊天投影 |
 | Transcript normalization | `app/shared/src/transcript/` | Edge/Hub → 聊天流 |
@@ -68,18 +68,19 @@ Hub/Edge 实时面均为 **at-least-once**：重连、离线队列、outbox、�
 {"type":"message.new","seq_id":42,"payload":{"id":"<message-uuid>","session_id":"<session-uuid>","client_msg_id":"<client-uuid>","seq_id":7}}
 ```
 
-- `/client/ws` 仅接受 Hub-issued HS256 access token；TokenDance Account 的 ID/access token 不能当 WS session。
+- `/client/ws` 接受 Hub-issued HS256 native access token，或已配置的同源 HttpOnly browser session cookie；TokenDance Account 的 ID/access token 不能当 WS session。cookie upgrade 必须带精确 Origin，并省略 bearer subprotocol。
 - `seq_id` 服务端保留、单连接投递序；**不能**替代下表业务幂等键；客户端不得写入。
 - 与 Edge envelope 不同；进 transcript 须经 Hub normalizer。多数 bridge 用 RQ invalidation；直写 store 路径须遵守下表。
 
 ## Hub WS 事件：重复投递 / 幂等语义
 
-SSOT：`frame.go` ↔ `hubEvents.ts` ↔ OpenAPI `HubWebSocketFrame.type`（31 个）；未列出的 type 不得写回客户端常量表。
+SSOT：`frame.go` ↔ `hubEvents.ts` ↔ OpenAPI `HubWebSocketFrame.type`（32 个）；未列出的 type 不得写回客户端常量表。
 
 | type | 方向 | 幂等键 | 重复投递语义 | 备注 |
 |---|---|---|---|---|
 | `typing` | C→S fanout | 无（ephemeral） | **ephemeral** | 唯一合法 C→S 业务帧；其余 type 丢弃 |
 | `auth.ok` | S→C | 连接生命周期 | **idempotent on apply** | `Manager.SetAuth` 经 `enqueueLocked` 入队，是连接的 seq_id 1 首帧；无 `auth`/`auth.fail` 首帧 |
+| `auth.revoked` | S→C | 连接生命周期 | **idempotent on apply** | payload `{reason:"session_revoked"}`；持久会话撤销、过期或 Account client 不匹配后发出并以 1008 关闭，停止重连并清空本地会话缓存。依赖故障以 1013 关闭，不发虚假退出事件；重连失败时仍以 browser/session 或 native refresh 验证为准 |
 | `message.new` | S→C | `payload.id`（另有 `client_msg_id`） | **UPSERT by id** | 库 `(session_id, client_msg_id)` 唯一 |
 | `message.recall` | S→C | `message_id` + `session_id` | **idempotent on apply** | `recalled=true` |
 | `message.pin` | S→C | `(session_id, message_id)` | **UPSERT by id** | |
