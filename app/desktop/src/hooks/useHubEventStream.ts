@@ -23,7 +23,7 @@ import {
 } from '@/stores/hubEventBridge';
 import { queryClient } from '@/api/queryClient';
 import { createHubClient } from '@/api/hubClient';
-import { getAccessToken } from '@/hooks/useAuth';
+import { getAccessToken, invalidateAccessSession } from '@/hooks/useAuth';
 import { hubQueryKeys } from '@shared/stores/queryKeys';
 
 // ── Public types ─────────────────────────────────
@@ -108,9 +108,19 @@ export function useHubEventStream(
   } | null>(null);
 
   useEffect(() => {
+    let connectionToken = getToken();
     const handle = createHubWS({
-      getToken,
+      getToken: () => { connectionToken = getToken(); return connectionToken; },
       url: url ?? HUB_WS_URL,
+      onAuthRevoked: () => {
+        if (connectionToken !== getToken()) return;
+        // Keep local Edge work independent; discard only Hub-owned snapshots.
+        void queryClient.cancelQueries({ queryKey: ['hub'] });
+        queryClient.removeQueries({ queryKey: ['hub'] });
+        void invalidateAccessSession(connectionToken).catch(() => {
+          console.error('[HubWS] Failed to clear persisted revoked credentials');
+        });
+      },
     });
     handleRef.current = handle;
     queueMicrotask(() => setHubWS(handle));

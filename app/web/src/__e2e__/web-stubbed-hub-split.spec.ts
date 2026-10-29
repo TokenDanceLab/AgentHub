@@ -1,3 +1,4 @@
+import { BROWSER_FIXTURE_ORIGIN, browserSessionFixture, installBrowserSessionFixture, assertBrowserFixtureRequest } from './browserSessionFixture';
 /**
  * Web stubbed-hub split view E2E (#1997).
  *
@@ -18,9 +19,8 @@ import {
 } from '../../../shared/src/testing/e2eDataModeContract';
 import { fulfillExternalFontIfMatch } from '../../../e2e/fontBlocker';
 
-// Must match playwright.config.ts webServer VITE_HUB_URL: the fail-closed
-// reserved origin keeps every Hub call inside the route stub.
-const HUB_ORIGIN = 'https://hub.test.invalid';
+// Browser APIs share the app origin; missing fixture routes fail closed.
+const HUB_ORIGIN = BROWSER_FIXTURE_ORIGIN;
 const WEB_E2E_PORT = Number(process.env.AGENTHUB_WEB_E2E_PORT ?? 5174);
 const WEB_E2E_APP_ORIGIN = `http://127.0.0.1:${WEB_E2E_PORT}`;
 
@@ -137,6 +137,7 @@ function collectPageDiagnostics(page: Page): void {
 }
 
 async function enterApprovedRealSplitSession(page: Page): Promise<void> {
+  await installBrowserSessionFixture(page);
   await page.addInitScript(({ sessionId, taskId }) => {
     window.localStorage.setItem('agenthub.workbench.dataMode', 'approved-real');
     // Fresh split state — a leftover layout blob must not change this flow.
@@ -145,12 +146,6 @@ async function enterApprovedRealSplitSession(page: Page): Promise<void> {
       taskId,
       sessionId,
       status: 'running',
-    }));
-    window.sessionStorage.setItem('agenthub_hub_token', 'stubbed-split-token');
-    window.sessionStorage.setItem('agenthub_token_source', 'hub');
-    window.sessionStorage.setItem('agenthub_hub_user', JSON.stringify({
-      userId: 'user-split',
-      username: 'split',
     }));
   }, { sessionId: SESSION_A, taskId: TASK_A });
 
@@ -177,6 +172,7 @@ async function installSplitHubStub(page: Page): Promise<BackendRequestLog> {
     }
 
     if (boundary === 'hub') {
+      assertBrowserFixtureRequest(request);
       endpoints.add(`${request.method()} ${url.pathname}`);
       requests.push({ method: request.method(), url: request.url() });
 
@@ -219,13 +215,13 @@ async function installSplitHubStub(page: Page): Promise<BackendRequestLog> {
 }
 
 async function fulfillHubRoute(route: Route, method: string, pathname: string): Promise<void> {
-  if (pathname === '/client/auth/me') {
-    await route.fulfill(json(hubEnvelope({
+  if (pathname === '/client/auth/browser/session') {
+    await route.fulfill(json(hubEnvelope(browserSessionFixture({
       id: 'user-split',
       username: 'split',
       nickname: 'Split',
       avatar_url: '',
-    })));
+    }))));
     return;
   }
 

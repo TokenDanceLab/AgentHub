@@ -1,3 +1,4 @@
+import { BROWSER_FIXTURE_ORIGIN, browserSessionFixture, installBrowserSessionFixture, assertBrowserFixtureRequest } from './browserSessionFixture';
 import { expect, test, type Route } from '@playwright/test';
 import { fulfillExternalFontIfMatch } from '../../../e2e/fontBlocker';
 
@@ -5,7 +6,7 @@ import { fulfillExternalFontIfMatch } from '../../../e2e/fontBlocker';
 // code must render as code blocks in the Web transcript, for both human
 // (partner) and agent senders, using the real REST shapes (snake_case
 // session id, jsonb string content with a `text` field).
-const HUB_ORIGIN_HOST = 'hub.test.invalid';
+const HUB_ORIGIN_HOST = new URL(BROWSER_FIXTURE_ORIGIN).host;
 
 const HUMAN_FENCED = 'partner fenced probe\n```python\nprint("hello fenced")\n```\n';
 const AGENT_FENCED = 'Here is a fenced code sample:\n```python\ndef greet():\n    return 42\n```\n';
@@ -29,21 +30,16 @@ function fulfill(data: unknown) {
 
 test.describe('Web stubbed Hub fenced-code transcript (#1971)', () => {
   test('renders fenced code blocks from Hub history for human and agent senders', async ({ page }) => {
+    await installBrowserSessionFixture(page);
     await page.addInitScript(() => {
       window.localStorage.setItem('agenthub.workbench.dataMode', 'approved-real');
-      window.sessionStorage.setItem('agenthub_hub_token', 'stubbed-hub-token');
-      window.sessionStorage.setItem('agenthub_token_source', 'hub');
-      window.sessionStorage.setItem('agenthub_hub_user', JSON.stringify({
-        userId: 'user-fenced',
-        username: 'fenced',
-      }));
     });
 
     await page.route('**/*', async (route: Route) => {
       const request = route.request();
       const url = new URL(request.url());
 
-      if (url.host !== HUB_ORIGIN_HOST) {
+      if (url.host !== HUB_ORIGIN_HOST || !/^\/(?:client|web)(?:\/|$)/.test(url.pathname)) {
         if (await fulfillExternalFontIfMatch(route)) {
           return;
         }
@@ -54,9 +50,10 @@ test.describe('Web stubbed Hub fenced-code transcript (#1971)', () => {
         return route.fulfill({ status: 204, headers: corsHeaders() });
       }
 
+      assertBrowserFixtureRequest(request);
       const p = url.pathname;
-      if (p === '/client/auth/me') {
-        return route.fulfill(fulfill({ id: 'user-fenced', username: 'fenced', nickname: 'Fenced', avatar_url: '' }));
+      if (p === '/client/auth/browser/session') {
+        return route.fulfill(fulfill(browserSessionFixture({ id: 'user-fenced', username: 'fenced', nickname: 'Fenced', avatar_url: '' })));
       }
       if (p === '/client/sessions') {
         return route.fulfill(fulfill([{

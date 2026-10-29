@@ -37,6 +37,8 @@ export interface HubWSOptions {
   transport?: Transport;
   /** Called after the auth handshake succeeds. */
   onAuthSuccess?: () => void;
+  /** A terminal server revocation, including the upgrade-to-auth.ok race. */
+  onAuthRevoked?: () => void;
   /**
    * When true, also append access_token to the WS URL (legacy fallback).
    * Default false — preferred path carries the token via
@@ -220,6 +222,17 @@ export function createHubWS(opts: HubWSOptions): HubWSHandle {
       }
       hasEverAuthenticated = true;
       opts.onAuthSuccess?.();
+      return;
+    }
+    // Revocation can precede auth.ok when the session changes during upgrade.
+    // Close explicitly so the transport cannot retry with a revoked credential.
+    if (frameType === HUB_EVENTS.AUTH_REVOKED) {
+      authenticated = false;
+      try {
+        opts.onAuthRevoked?.();
+      } finally {
+        transport.close();
+      }
       return;
     }
     // Drop application events before auth

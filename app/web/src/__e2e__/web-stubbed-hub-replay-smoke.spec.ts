@@ -1,3 +1,4 @@
+import { BROWSER_FIXTURE_ORIGIN, browserSessionFixture, installBrowserSessionFixture, assertBrowserFixtureRequest } from './browserSessionFixture';
 import { expect, test, type Page, type Route } from '@playwright/test';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -10,10 +11,9 @@ import {
 import { fulfillExternalFontIfMatch } from '../../../e2e/fontBlocker';
 
 const ARTIFACT_DIR = path.resolve(process.cwd(), '.tmp', 'web-stubbed-hub-replay-smoke');
-// Must match playwright.config.ts webServer VITE_HUB_URL: the fail-closed
-// reserved origin keeps every Hub call inside the route stub instead of
-// reaching localhost or production.
-const HUB_ORIGIN = 'https://hub.test.invalid';
+// Browser APIs share the app origin. The fixture proxy fails closed for any
+// request not handled by the Hub routes below.
+const HUB_ORIGIN = BROWSER_FIXTURE_ORIGIN;
 const WEB_E2E_PORT = Number(process.env.AGENTHUB_WEB_E2E_PORT ?? 5174);
 const WEB_E2E_APP_ORIGIN = `http://127.0.0.1:${WEB_E2E_PORT}`;
 const WEB_HUB_SMOKE_SCENARIO = createE2EDataModeScenario({
@@ -33,6 +33,7 @@ test.describe('Web stubbed Hub replay smoke', () => {
 
   test('shows signed-out Hub state in approved-real mode without demo fallback', async ({ page }) => {
     const requests = await installHubStub(page);
+    await page.route(`${HUB_ORIGIN}/client/auth/browser/session`, (route) => route.fulfill({ status: 401, json: { code: 'auth_required' } }));
     await setApprovedRealMode(page);
     await page.goto('/');
 
@@ -98,7 +99,7 @@ test.describe('Web stubbed Hub replay smoke', () => {
     // (scoped to the active conversation, no fake fleet totals).
     await expect(page.getByRole('button', { name: /1 awaiting approval/ })).toBeVisible();
 
-    await expect.poll(() => requests.endpoints.has('GET /client/auth/me')).toBe(true);
+    await expect.poll(() => requests.endpoints.has('GET /client/auth/browser/session')).toBe(true);
     await expect.poll(() => requests.endpoints.has('GET /client/sessions')).toBe(true);
     await expect.poll(() => requests.endpoints.has('GET /web/execution-targets')).toBe(true);
     await expect.poll(() => requests.endpoints.has('GET /web/projects')).toBe(true);
@@ -209,6 +210,7 @@ interface DispatchCapture {
 }
 
 async function setApprovedRealMode(page: Page): Promise<void> {
+  await installBrowserSessionFixture(page);
   await page.addInitScript(() => {
     window.localStorage.setItem('agenthub.workbench.dataMode', 'approved-real');
   });
@@ -220,14 +222,9 @@ async function startAuthenticatedHubSmoke(
   options: HubSmokeOptions = {},
 ): Promise<BackendRequestLog> {
   const requests = await installHubStub(page, scenario);
+  await installBrowserSessionFixture(page);
   await page.addInitScript(({ activeTask }) => {
     window.localStorage.setItem('agenthub.workbench.dataMode', 'approved-real');
-    window.sessionStorage.setItem('agenthub_hub_token', 'stubbed-hub-token');
-    window.sessionStorage.setItem('agenthub_token_source', 'hub');
-    window.sessionStorage.setItem('agenthub_hub_user', JSON.stringify({
-      userId: 'user-web-smoke',
-      username: 'web-smoke',
-    }));
     if (activeTask) {
       window.localStorage.setItem('agenthub.web.activeAgentTask.session-web-smoke', JSON.stringify({
         taskId: 'task-web-smoke',
@@ -258,6 +255,7 @@ async function installHubStub(page: Page, scenario: HubScenario = 'healthy-targe
     }
 
     if (boundary === 'hub') {
+      assertBrowserFixtureRequest(request);
       endpoints.add(`${request.method()} ${url.pathname}`);
       requests.push({ method: request.method(), url: request.url() });
 
@@ -300,13 +298,13 @@ async function installHubStub(page: Page, scenario: HubScenario = 'healthy-targe
 }
 
 async function fulfillHubRoute(page: Page, route: Route, pathname: string, scenario: HubScenario): Promise<void> {
-  if (pathname === '/client/auth/me') {
-    return route.fulfill(json(hubEnvelope({
+  if (pathname === '/client/auth/browser/session') {
+    return route.fulfill(json(hubEnvelope(browserSessionFixture({
       id: 'user-web-smoke',
       username: 'web-smoke',
       nickname: 'Web Smoke',
       avatar_url: '',
-    })));
+    }))));
   }
 
   if (pathname === '/client/sessions') {

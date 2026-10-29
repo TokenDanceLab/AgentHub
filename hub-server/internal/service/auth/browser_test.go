@@ -2,6 +2,7 @@ package auth
 
 import (
 	"context"
+	"crypto/rand"
 	"testing"
 	"time"
 
@@ -71,7 +72,7 @@ func TestAccountClientReplacementRequiresFreshBrowserAndNativeLogin(t *testing.T
 			require.NoError(t, err)
 			cookie := "fixture-cookie-" + uuid.NewString()
 			input.DeviceType, input.DeviceID = "web", uuid.NewString()
-			input.Browser = &model.BrowserSession{TokenHash: jwtutil.HashRefreshToken(cookie), CSRFToken: "fixture-csrf", CreatedAt: now, ExpiresAt: now.Add(time.Hour)}
+			input.Browser = &model.BrowserSession{TokenHash: jwtutil.HashRefreshToken(cookie), CSRFToken: rand.Text(), CreatedAt: now, ExpiresAt: now.Add(time.Hour)}
 			_, err = repository.CreateBoundAccountSession(db, input)
 			require.NoError(t, err)
 			_, browserErr := svc.BrowserSession(ctx, cookie)

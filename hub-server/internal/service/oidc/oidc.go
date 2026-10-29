@@ -229,28 +229,9 @@ func (s *Service) handleCallback(ctx context.Context, code, state, codeVerifier,
 	if tokenResponse.IDToken == "" || tokenResponse.AccessToken == "" {
 		return nil, errcode.OIDCIDTokenInvalid
 	}
-	claims, err := verifier.ParseIDToken(
-		ctx,
-		tokenResponse.IDToken,
-		s.cfg.IssuerURL,
-		s.cfg.ClientID,
-		entry.Nonce,
-	)
+	claims, err := s.parseCallbackIDToken(ctx, verifier, tokenResponse.IDToken, entry.Nonce, browser != nil)
 	if err != nil {
-		if browser != nil && errors.Is(err, jwtutil.ErrAccountKeysUnavailable) {
-			return nil, errcode.AuthUnavailable
-		}
-		if errors.Is(err, jwtutil.ErrIDTokenSubjectMissing) {
-			return nil, errcode.OIDCSubNotFound
-		}
-		slog.Warn("account_oidc.id_token.rejected",
-			"request_id", reqlog.GetRequestID(ctx),
-			"reason", "validation_failed",
-		)
-		return nil, errcode.OIDCIDTokenInvalid
-	}
-	if claims.Subject == "" {
-		return nil, errcode.OIDCSubNotFound
+		return nil, err
 	}
 	profile, err := s.fetchUserInfo(ctx, meta.UserInfoEndpoint, tokenResponse.AccessToken, claims.Subject)
 	if err != nil {
@@ -321,6 +302,29 @@ func (s *Service) handleCallback(ctx context.Context, code, state, codeVerifier,
 		ExpiresIn:    int64(s.jwtCfg.AccessTTL.Seconds()),
 		User:         *user,
 	}, nil
+}
+
+// parseCallbackIDToken owns Account proof validation and its public error
+// classification for the native and browser callback contracts.
+func (s *Service) parseCallbackIDToken(ctx context.Context, verifier *jwtutil.AccountOIDCVerifier, raw, nonce string, browser bool) (*jwtutil.AccountOIDCClaims, error) {
+	claims, err := verifier.ParseIDToken(ctx, raw, s.cfg.IssuerURL, s.cfg.ClientID, nonce)
+	if err != nil {
+		if browser && errors.Is(err, jwtutil.ErrAccountKeysUnavailable) {
+			return nil, errcode.AuthUnavailable
+		}
+		if errors.Is(err, jwtutil.ErrIDTokenSubjectMissing) {
+			return nil, errcode.OIDCSubNotFound
+		}
+		slog.Warn("account_oidc.id_token.rejected",
+			"request_id", reqlog.GetRequestID(ctx),
+			"reason", "validation_failed",
+		)
+		return nil, errcode.OIDCIDTokenInvalid
+	}
+	if claims.Subject == "" {
+		return nil, errcode.OIDCSubNotFound
+	}
+	return claims, nil
 }
 
 func (s *Service) consumeCallbackState(

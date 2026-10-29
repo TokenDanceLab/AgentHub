@@ -173,7 +173,8 @@ export function useWebHubRealtime({
     // device.kicked, which clears remaining listeners mid-emit (#1816).
     const transport = createTransport({ url: HUB_WS_URL, getToken });
     const unsubscribeDeviceKicked = transport.on('message', (raw: unknown) => {
-      if (raw && typeof raw === 'object' && (raw as { type?: string }).type === 'auth.revoked') {
+      if (!sessionCurrent()) return;
+      if (raw && typeof raw === 'object' && (raw as { type?: string }).type === HUB_EVENTS.AUTH_REVOKED) {
         transport.close();
         void resetWebHubSession();
         return;

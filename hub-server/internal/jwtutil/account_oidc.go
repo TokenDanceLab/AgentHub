@@ -22,7 +22,7 @@ import (
 
 var ErrIDTokenSubjectMissing = errors.New("id token subject is missing")
 
-var ErrAccountKeysUnavailable = errors.New("Account signing keys unavailable")
+var ErrAccountKeysUnavailable = errors.New("account signing keys unavailable")
 
 // AccountOIDCClaims contains the minimal ID-token claims Hub consumes. Profile
 // attributes are deliberately read from UserInfo, not treated as ID-token

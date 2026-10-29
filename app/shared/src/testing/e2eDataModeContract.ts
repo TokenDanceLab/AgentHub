@@ -102,6 +102,10 @@ export function classifyE2ERequest(
   const appOrigin = scenario?.appOrigin ? new URL(scenario.appOrigin).origin : undefined;
   const hubOrigin = scenario?.hubOrigin ? new URL(scenario.hubOrigin).origin : undefined;
   const accountIssuer = scenario?.accountIssuer ? new URL(scenario.accountIssuer).origin : undefined;
+  // Cookie Web deployments share an origin with app assets. Only API paths
+  // belong to the Hub boundary; JS/CSS/documents still belong to the app.
+  if (url.origin === appOrigin && url.origin === hubOrigin
+    && /^\/(?:client|web)(?:\/|$)/.test(url.pathname)) return 'hub';
   if (url.origin === appOrigin || DEFAULT_APP_HOSTS.has(url.host)) {
     return 'app';
   }

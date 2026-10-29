@@ -1,3 +1,4 @@
+import { browserHubJson } from './browserCookieSession';
 import { test, expect, type BrowserContext, type Page } from '@playwright/test';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -33,17 +34,12 @@ interface RealE2ECredentials {
   partnerPassword: string;
 }
 
-interface HubEnvelope<T> {
-  code: string;
-  data: T;
-}
-
 const SPEC_DIR = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(SPEC_DIR, '..', '..');
 const ACCOUNT_ENV_PATH = path.join(REPO_ROOT, 'tests', 'artifacts', 'real-e2e-account.env');
 const WORKBENCH_PATH = '/workbench/';
 const CALLBACK_PATH = '/workbench/auth/account/callback';
-const HUB_TOKEN_STORAGE_KEY = 'agenthub_hub_token';
+test.use({ trace: 'off', screenshot: 'off', video: 'off' });
 
 function envValue(key: string): string {
   return process.env[key]?.trim() ?? '';
@@ -101,22 +97,16 @@ const credentials = loadCredentials();
 
 /**
  * 真实 OIDC 浏览器登录：工作台触发 → TokenDance Account 登录页 → 提交凭据 →
- * consent 授权页 → 回调回 web → hub 交换出会话 token。
- * 返回登录后 sessionStorage 中 hub 颁发的 access token。
+ * consent 授权页 → 回调回 web → Hub 设置 HttpOnly session。
+ * 只确认服务端 Cookie session；不读取或返回任何凭据。
  */
 async function performRealOidcLogin(
   page: Page,
   email: string,
   password: string,
   accountIssuer: string,
-): Promise<string> {
+): Promise<void> {
   await page.goto(WORKBENCH_PATH, { waitUntil: 'domcontentloaded' });
-
-  // 未认证时工作台无直接登录按钮；在 composer 提交触发 ensureAuth 打开登录浮层。
-  const composer = page.locator('textarea[data-composer-input]').first();
-  await composer.click();
-  await composer.fill('real-e2e: open sign-in');
-  await composer.press('Enter');
 
   const loginButton = page.getByRole('button', {
     name: /Continue with TokenDance Account|使用 TokenDance Account 登录/i,
@@ -155,7 +145,7 @@ async function performRealOidcLogin(
   const approveButton = page.getByRole('button', { name: /^(Allow access|允许访问)$/i });
 
   // 批准授权 → redirect 回 Web（带 code + state + RFC 9207 iss）。
-  // 用 framenavigated 事件捕获回调 URL：SPA 换完 token 后会立刻
+  // 用 framenavigated 事件捕获回调 URL：SPA 完成服务器会话交换后会立刻
   // replaceState 清掉回调路由，轮询/生命周期等待都可能错过。
   let observedCallbackUrl: string | null = null;
   page.on('framenavigated', (frame) => {
@@ -175,63 +165,19 @@ async function performRealOidcLogin(
   expect(callbackUrl.searchParams.get('state')).toBeTruthy();
   expect(callbackUrl.searchParams.get('iss')).toBe(accountIssuer);
 
-  // web SPA 用 PKCE verifier 与 hub 交换真实会话（无旁路）。
-  await expect
-    .poll(() => page.evaluate((key) => sessionStorage.getItem(key), HUB_TOKEN_STORAGE_KEY), {
-      timeout: 30_000,
-      message: 'waiting for hub-issued session after real OIDC code exchange',
-    })
-    .not.toBeNull();
-
-  // 回调路由被清理，回到工作台。
   await expect(page).not.toHaveURL(/auth\/account\/callback/, { timeout: 15_000 });
-  const token = await page.evaluate((key) => sessionStorage.getItem(key), HUB_TOKEN_STORAGE_KEY);
-  expect(token).toBeTruthy();
-  return String(token);
+  await expect.poll(async () => (await browserHubJson(page, 'get', '/client/auth/browser/session')).status, {
+    timeout: 30_000, message: 'waiting for server-owned browser session',
+  }).toBe(200);
 }
 
-async function hubMe(request: { get: Function }, hubBaseUrl: string, token: string): Promise<Record<string, unknown>> {
-  const response = await withRateLimitRetry(() =>
-    request.get(`${hubBaseUrl}/client/auth/me`, {
-      headers: { Authorization: `Bearer ${token}` },
-    }),
-  );
-  expect(response.status()).toBe(200);
-  const body = (await response.json()) as HubEnvelope<Record<string, unknown>>;
-  expect(body.code).toBe('ok');
-  return body.data;
+async function hubMe(page: Page): Promise<Record<string, unknown>> {
+  const response = await browserHubJson(page, 'get', '/client/auth/browser/session');
+  expect(response.status).toBe(200);
+  return response.body?.data?.user ?? {};
 }
 
-async function withRateLimitRetry<T extends { status(): number; headers(): Record<string, string> }>(
-  request: () => Promise<T>,
-): Promise<T> {
-  const response = await request();
-  if (response.status() !== 429) return response;
-  const retryAfter = Number(response.headers()['retry-after'] ?? '1');
-  const waitMs = Math.max(1, Math.min(retryAfter, 120)) * 1000;
-  await new Promise((resolve) => setTimeout(resolve, waitMs));
-  return request();
-}
-
-async function hubJson(
-  request: { get: Function; post: Function; delete: Function },
-  method: 'get' | 'post' | 'delete',
-  url: string,
-  token: string,
-  data?: Record<string, unknown>,
-): Promise<{ status: number; body: Record<string, unknown> | null }> {
-  const options: Record<string, unknown> = { headers: { Authorization: `Bearer ${token}` } };
-  if (data) options.data = data;
-  const response = await withRateLimitRetry(() => request[method](url, options));
-  const text = await response.text();
-  let body: Record<string, unknown> | null = null;
-  try {
-    body = text ? (JSON.parse(text) as Record<string, unknown>) : null;
-  } catch {
-    body = null;
-  }
-  return { status: response.status(), body };
-}
+const hubJson = browserHubJson;
 
 test.describe('真实 OIDC 浏览器登录与聊天动线', () => {
   test.beforeEach(async () => {
@@ -243,10 +189,9 @@ test.describe('真实 OIDC 浏览器登录与聊天动线', () => {
 
   test('真实 OIDC 浏览器登录到达已认证工作台', async ({ page }) => {
     test.setTimeout(120_000);
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- beforeAll skip 已保证非空
     const creds = credentials!;
 
-    const token = await performRealOidcLogin(
+    await performRealOidcLogin(
       page,
       creds.userEmail,
       creds.userPassword,
@@ -254,7 +199,7 @@ test.describe('真实 OIDC 浏览器登录与聊天动线', () => {
     );
 
     // hub 以真实 OIDC 映射出的用户身份应答。
-    const me = await hubMe(page.request, creds.hubBaseUrl, token);
+    const me = await hubMe(page);
     expect(String(me.nickname ?? '').trim()).not.toBe('');
     expect(String(me.id ?? '')).toMatch(/^[0-9a-f-]{36}$/);
 
@@ -269,55 +214,53 @@ test.describe('真实 OIDC 浏览器登录与聊天动线', () => {
 
   test('聊天收发真实落 hub（双账号好友私聊）', async ({ page, browser }) => {
     test.setTimeout(240_000);
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- beforeAll skip 已保证非空
     const creds = credentials!;
 
     // ── 主账号真实登录 ──
-    const primaryToken = await performRealOidcLogin(
+    await performRealOidcLogin(
       page,
       creds.userEmail,
       creds.userPassword,
       creds.accountIssuer,
     );
-    const primaryMe = await hubMe(page.request, creds.hubBaseUrl, primaryToken);
+    const primaryMe = await hubMe(page);
     const primaryId = String(primaryMe.id);
 
     // ── 陪聊账号真实登录（独立上下文）──
-    const partnerContext: BrowserContext = await browser.newContext({ locale: 'en-US' });
+    let createdSessionId: string | undefined;
+    const partnerContext: BrowserContext = await browser.newContext({ baseURL: creds.webBaseUrl, locale: 'en-US' });
     try {
       const partnerPage = await partnerContext.newPage();
-      const partnerToken = await performRealOidcLogin(
+      await performRealOidcLogin(
         partnerPage,
         creds.partnerEmail,
         creds.partnerPassword,
         creds.accountIssuer,
       );
-      const partnerMe = await hubMe(partnerPage.request, creds.hubBaseUrl, partnerToken);
+      const partnerMe = await hubMe(partnerPage);
       const partnerId = String(partnerMe.id);
       expect(partnerId).not.toBe(primaryId);
       expect(String(partnerMe.nickname ?? '').trim()).not.toBe('');
 
       // ── 建立好友关系（私聊会话要求双方为好友）──
-      const contactsBefore = await hubJson(page.request, 'get', `${creds.hubBaseUrl}/client/contacts`, primaryToken);
+      const contactsBefore = await hubJson(page, 'get', `${new URL(creds.webBaseUrl).origin}/client/contacts`);
       expect(contactsBefore.status).toBe(200);
       const alreadyFriends = ((contactsBefore.body?.data as unknown[] | undefined) ?? []).some(
         (contact) => (contact as Record<string, unknown>).user_id === partnerId,
       );
       if (!alreadyFriends) {
         const sendResult = await hubJson(
-          page.request,
+          page,
           'post',
-          `${creds.hubBaseUrl}/client/contacts/friend-requests`,
-          primaryToken,
+          `${new URL(creds.webBaseUrl).origin}/client/contacts/friend-requests`,
           { friend_id: partnerId, message: 'real-e2e friend request' },
         );
         expect([200, 201, 409]).toContain(sendResult.status);
 
         const partnerRequests = await hubJson(
-          partnerPage.request,
+          partnerPage,
           'get',
-          `${creds.hubBaseUrl}/client/contacts/friend-requests`,
-          partnerToken,
+          `${new URL(creds.webBaseUrl).origin}/client/contacts/friend-requests`,
         );
         expect(partnerRequests.status).toBe(200);
         // ListFriendRequests 只返回发给当前用户的 pending 请求；
@@ -330,17 +273,16 @@ test.describe('真实 OIDC 浏览器登录与聊天动线', () => {
         const requestId = String(pendingRequest?.request_id ?? pendingRequest?.id ?? '');
         expect(requestId).toBeTruthy();
         const acceptResult = await hubJson(
-          partnerPage.request,
+          partnerPage,
           'post',
-          `${creds.hubBaseUrl}/client/contacts/friend-requests/${requestId}/accept`,
-          partnerToken,
+          `${new URL(creds.webBaseUrl).origin}/client/contacts/friend-requests/${requestId}/accept`,
           {},
         );
         expect([200, 201]).toContain(acceptResult.status);
 
         await expect
           .poll(async () => {
-            const contacts = await hubJson(page.request, 'get', `${creds.hubBaseUrl}/client/contacts`, primaryToken);
+            const contacts = await hubJson(page, 'get', `${new URL(creds.webBaseUrl).origin}/client/contacts`);
             const list = ((contacts.body?.data as unknown[] | undefined) ?? []).map(
               (contact) => contact as Record<string, unknown>,
             );
@@ -349,32 +291,25 @@ test.describe('真实 OIDC 浏览器登录与聊天动线', () => {
           .toBe(true);
       }
 
-      // ── 清理主账号既有会话，保证侧栏只出现本测试创建的会话 ──
-      const sessionsResult = await hubJson(page.request, 'get', `${creds.hubBaseUrl}/client/sessions`, primaryToken);
+      const sessionsResult = await hubJson(page, 'get', '/client/sessions');
       expect(sessionsResult.status).toBe(200);
-      for (const raw of (sessionsResult.body?.data as unknown[] | undefined) ?? []) {
-        const session = raw as Record<string, unknown>;
-        const sessionId = String(session.id ?? session.session_id ?? '');
-        if (sessionId) {
-          await hubJson(page.request, 'delete', `${creds.hubBaseUrl}/client/sessions/${sessionId}`, primaryToken);
-        }
-      }
-
+      const existingIds = new Set(((sessionsResult.body?.data as Record<string, unknown>[]) ?? []).map((item) => String(item.id ?? item.session_id)));
       // ── 创建私聊会话（真实 hub；self 目标被服务拒绝，故用陪聊账号）──
       const sessionResult = await hubJson(
-        page.request,
+        page,
         'post',
-        `${creds.hubBaseUrl}/client/sessions/private`,
-        primaryToken,
+        `${new URL(creds.webBaseUrl).origin}/client/sessions/private`,
         { target_user_id: partnerId },
       );
       expect([200, 201]).toContain(sessionResult.status);
       const sessionId = String((sessionResult.body?.data as Record<string, unknown> | undefined)?.session_id ?? '');
       expect(sessionId).toBeTruthy();
+      if (!existingIds.has(sessionId)) createdSessionId = sessionId;
+      await page.reload();
 
       // ── 侧栏出现该会话（会话列表 10s 轮询，放宽到 40s）──
-      // ARIA option 的稳定 ID 由 sessionId 派生；标题会随 i18n/昵称变化。
-      const sessionButton = page.locator(`#conversation-option-${sessionId}`);
+      // 以刚读取的对方显示名找到新会话，不依赖旧侧栏的 DOM 实现。
+      const sessionButton = page.getByRole('button', { name: String(partnerMe.nickname ?? partnerMe.username), exact: true });
       await expect(sessionButton).toBeVisible({ timeout: 40_000 });
       await sessionButton.click();
 
@@ -388,22 +323,29 @@ test.describe('真实 OIDC 浏览器登录与聊天动线', () => {
       await expect(page.getByText(messageMarker).first()).toBeVisible({ timeout: 20_000 });
 
       // ── 消息真实落 hub：双方视角都能读到 ──
-      const messageUrl = `${creds.hubBaseUrl}/client/sessions/${sessionId}/messages`;
-      const containsMarker = async (token: string): Promise<boolean> => {
-        const result = await hubJson(page.request, 'get', messageUrl, token);
+      const messageUrl = `${new URL(creds.webBaseUrl).origin}/client/sessions/${sessionId}/messages`;
+      const containsMarker = async (actorPage: Page): Promise<boolean> => {
+        const result = await hubJson(actorPage, 'get', messageUrl);
         const list = ((result.body?.data as unknown[] | undefined) ?? []).map(
           (message) => message as Record<string, unknown>,
         );
         return list.some((message) => String(message.content ?? '').includes(messageMarker));
       };
       await expect
-        .poll(() => containsMarker(primaryToken), { timeout: 15_000, message: 'sender-side hub persistence' })
+        .poll(() => containsMarker(page), { timeout: 15_000, message: 'sender-side hub persistence' })
         .toBe(true);
       await expect
-        .poll(() => containsMarker(partnerToken), { timeout: 15_000, message: 'receiver-side hub persistence' })
+        .poll(() => containsMarker(partnerPage), { timeout: 15_000, message: 'receiver-side hub persistence' })
         .toBe(true);
     } finally {
-      await partnerContext.close();
+      try {
+        if (createdSessionId) {
+          const result = await hubJson(page, 'delete', `/client/sessions/${encodeURIComponent(createdSessionId)}`);
+          expect(result.status, 'delete only the conversation created by this run').toBe(200);
+        }
+      } finally {
+        await partnerContext.close();
+      }
     }
   });
 });
