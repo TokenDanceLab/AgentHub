@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"time"
 
 	"github.com/agenthub/hub-server/internal/errcode"
@@ -23,12 +24,20 @@ const controlLease = 5 * time.Second
 const batchSize = 8
 
 type Service struct {
-	db         *gorm.DB
-	enrollment *edgeenrollment.Service
+	db              *gorm.DB
+	enrollment      *edgeenrollment.Service
+	cancelPublisher func(context.Context, *model.PendingAgentTask) error
 }
 
 func New(db *gorm.DB, enrollment *edgeenrollment.Service) *Service {
 	return &Service{db: db, enrollment: enrollment}
+}
+
+// SetCancelPublisher installs the existing user-facing cancellation event.
+// It fires after durable executor confirmation, never when cancellation is
+// merely requested. Configure before serving requests.
+func (s *Service) SetCancelPublisher(publish func(context.Context, *model.PendingAgentTask) error) {
+	s.cancelPublisher = publish
 }
 
 type Delivery struct {
@@ -263,7 +272,8 @@ func (s *Service) AckControl(ctx context.Context, p *edgeenrollment.Principal, c
 	if ack.TaskID != controlID || controlID == "" || (ack.Status != "applied" && ack.Status != "failed") || len(ack.Error) > 1024 || len(ack.RunID) > 128 {
 		return errcode.ErrBadRequest
 	}
-	return s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+	var cancelled *model.PendingAgentTask
+	err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		if err := s.enrollment.ValidatePrincipalTx(tx, p); err != nil {
 			return err
 		}
@@ -293,12 +303,24 @@ func (s *Service) AckControl(ctx context.Context, p *edgeenrollment.Principal, c
 		// by context cancellation may arrive before this applied receipt.
 		if task.Status == "queued" || task.Status == "dispatched" || task.Status == "running" || task.Status == "failed" || task.Status == "timeout" {
 			updates["status"], updates["finished_at"], updates["error_message"] = model.TaskStatusCancelled, now, ""
+			cancelled = &task
 		}
 		if err := tx.Model(&task).Updates(updates).Error; err != nil {
 			return err
 		}
 		return tx.Model(&outboxRow{}).Where("task_id = ? AND transport = 'edge_poll' AND status IN ?", task.ID, []string{"pending", "sent", "retrying"}).Updates(map[string]any{"status": "delivered", "delivered_at": now, "updated_at": now, "next_retry_at": nil}).Error
 	})
+	if err != nil {
+		return err
+	}
+	if cancelled != nil && s.cancelPublisher != nil {
+		if err := s.cancelPublisher(ctx, cancelled); err != nil {
+			// The authoritative state is already committed. A transient realtime
+			// notification failure cannot turn a stopped process into a failure.
+			slog.Warn("paired cancellation event publish failed", "task_id", cancelled.ID, "error", err)
+		}
+	}
+	return nil
 }
 
 // RequestCancel persists intent even for an offline/revoked device. It never

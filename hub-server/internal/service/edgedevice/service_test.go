@@ -27,12 +27,13 @@ type fixture struct {
 	p          *edgeenrollment.Principal
 	auth       edgeenrollment.Authorizer
 	agent      model.AgentInstance
+	message    model.Message
 }
 
 func newFixture(t *testing.T) *fixture {
 	t.Helper()
 	db := testkit.NewAuthDB(t)
-	require.NoError(t, db.AutoMigrate(&model.EdgeEnrollment{}, &model.EdgeDeviceCredential{}, &model.AgentInstance{}))
+	require.NoError(t, db.AutoMigrate(&model.EdgeEnrollment{}, &model.EdgeDeviceCredential{}, &model.AgentInstance{}, &model.Session{}, &model.Message{}))
 	// SQLite contract fixture uses DATETIME; production timestamptz and row
 	// locking are exercised separately by the PostgreSQL integration tests.
 	for _, ddl := range []string{
@@ -55,8 +56,12 @@ func seedFixture(t *testing.T, db *gorm.DB) *fixture {
 	require.NoError(t, db.Create(&model.OIDCSubjectEpoch{Issuer: identity.Issuer, Subject: identity.Subject}).Error)
 	f := &fixture{db: db, enrollment: edgeenrollment.New(db, "hub-test-client"), auth: edgeenrollment.Authorizer{UserID: user.ID, IdentityID: identity.ID, OIDCClientID: "hub-test-client"}}
 	f.p = f.pair(t, uuid.NewString())
-	f.agent = model.AgentInstance{SessionID: uuid.NewString(), InviterUserID: user.ID, AgentType: "openai-sdk", DisplayName: "SDK"}
+	session := model.Session{Type: model.SessionTypeGroup, OwnerUserID: &user.ID, NextSeq: 1}
+	require.NoError(t, db.Create(&session).Error)
+	f.agent = model.AgentInstance{SessionID: session.ID, InviterUserID: user.ID, AgentType: "openai-sdk", DisplayName: "SDK"}
 	require.NoError(t, db.Create(&f.agent).Error)
+	f.message = model.Message{SessionID: session.ID, SeqID: 1, ClientMsgID: uuid.NewString(), SenderType: model.SenderTypeUser, SenderID: user.ID, ContentType: model.ContentTypeText, Content: `{"text":"first turn"}`}
+	require.NoError(t, db.Create(&f.message).Error)
 	f.service = edgedevice.New(db, f.enrollment)
 	return f
 }
@@ -77,7 +82,7 @@ func (f *fixture) pair(t *testing.T, deviceID string) *edgeenrollment.Principal 
 }
 
 func (f *fixture) candidate() (*model.PendingAgentTask, dispatch.Payload) {
-	task := dispatch.NewQueuedPendingTask(f.agent.ID, f.auth.UserID, uuid.NewString(), f.p.TargetID, f.p.DeviceID, time.Now().Add(time.Hour))
+	task := dispatch.NewQueuedPendingTask(f.agent.ID, f.auth.UserID, f.message.ID, f.p.TargetID, f.p.DeviceID, time.Now().Add(time.Hour))
 	payload := dispatch.Payload{AgentInstanceID: f.agent.ID, AgentType: "openai-sdk", TriggerUserID: f.auth.UserID, TriggerMessageID: task.TriggerMessageID, TargetID: f.p.TargetID, EdgeDeviceID: f.p.DeviceID, SessionID: f.agent.SessionID, Prompt: "Second turn", ModelParams: `{"model":"fixture-model","work_dir":"/workspace/project"}`, Messages: []dispatch.Message{{Role: "user", Content: "Remember the first turn"}, {Role: "assistant", Content: "Remembered"}}}
 	return task, payload
 }
@@ -184,6 +189,14 @@ func TestCancelRequiresBoundRunReceiptAndPreservesFailures(t *testing.T) {
 	f := newFixture(t)
 	task := f.createTask(t)
 	ctx := context.Background()
+	publications := 0
+	f.service.SetCancelPublisher(func(_ context.Context, published *model.PendingAgentTask) error {
+		publications++
+		require.Equal(t, model.TaskStatusCancelled, published.Status)
+		require.Equal(t, task.ID, published.ID)
+		require.NotNil(t, f.task(t, task.ID).CancelAppliedAt, "event must follow commit")
+		return nil
+	})
 	require.NoError(t, f.db.Model(task).Updates(map[string]any{"status": "running", "edge_run_id": "original-run"}).Error)
 	require.ErrorIs(t, f.service.RequestCancel(ctx, uuid.NewString(), task.ID), errcode.AgentTaskNotFound)
 	require.NoError(t, f.service.RequestCancel(ctx, f.auth.UserID, task.ID))
@@ -192,6 +205,7 @@ func TestCancelRequiresBoundRunReceiptAndPreservesFailures(t *testing.T) {
 	require.Equal(t, model.TaskStatusRunning, stored.Status)
 	require.NotNil(t, stored.CancelRequestedAt)
 	require.Nil(t, stored.CancelAppliedAt)
+	require.Zero(t, publications)
 	poll, err := f.service.Poll(ctx, f.p)
 	require.NoError(t, err)
 	require.Empty(t, poll.Deliveries)
@@ -202,6 +216,7 @@ func TestCancelRequiresBoundRunReceiptAndPreservesFailures(t *testing.T) {
 	require.Equal(t, model.TaskStatusRunning, stored.Status)
 	require.NotEmpty(t, stored.CancelError)
 	require.NotContains(t, stored.CancelError, "secret")
+	require.Zero(t, publications)
 	ack := edgedevice.ControlAck{TaskID: task.ID, RunID: "original-run", Status: "applied"}
 	require.NoError(t, f.service.AckControl(ctx, f.p, task.ID, ack))
 	require.NoError(t, f.service.AckControl(ctx, f.p, task.ID, ack))
@@ -210,6 +225,7 @@ func TestCancelRequiresBoundRunReceiptAndPreservesFailures(t *testing.T) {
 	require.Equal(t, model.TaskStatusCancelled, stored.Status)
 	require.NotNil(t, stored.CancelAppliedAt)
 	require.Empty(t, stored.CancelError)
+	require.Equal(t, 1, publications)
 	final, err := f.service.Poll(ctx, f.p)
 	require.NoError(t, err)
 	require.Empty(t, final.Deliveries)

@@ -18,7 +18,7 @@ func (s *DispatchService) buildPairedPayload(ctx context.Context, task *model.Pe
 	db := s.db.WithContext(ctx)
 	if run, err := repository.GetTeamRunBySessionID(db, ai.SessionID); err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 		return dispatch.Payload{}, err
-	} else if run != nil {
+	} else if err == nil && run != nil && run.ID != "" {
 		return dispatch.Payload{}, errcode.ErrBadRequest.WithMessage("paired SDK target does not support Team execution")
 	}
 	trigger, err := repository.GetMessageByID(db, task.TriggerMessageID)
