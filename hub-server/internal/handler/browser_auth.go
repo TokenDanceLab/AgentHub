@@ -190,6 +190,7 @@ func (h *BrowserAuthHandler) BackchannelLogout(c *gin.Context) {
 }
 
 func (h *BrowserAuthHandler) setCookie(c *gin.Context, name, value string, ttl time.Duration) {
+	// #nosec G124 -- Config.validateBrowserSession requires Secure for public/production origins; false is permitted only for explicit loopback development.
 	http.SetCookie(c.Writer, &http.Cookie{Name: name, Value: value, Path: "/", Secure: h.cfg.Secure, HttpOnly: true, SameSite: http.SameSiteLaxMode, MaxAge: int(ttl.Seconds()), Expires: time.Now().Add(ttl).UTC()})
 }
 

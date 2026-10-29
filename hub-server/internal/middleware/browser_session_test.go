@@ -43,9 +43,9 @@ func TestBrowserCookieOriginCSRFAndUnavailable(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			req := httptest.NewRequest(tc.method, cfg.BrowserSession.Origin+"/product", nil)
-			req.AddCookie(&http.Cookie{Name: cfg.BrowserSession.CookieName(), Value: cookie})
+			req.AddCookie(&http.Cookie{Name: cfg.BrowserSession.CookieName(), Value: cookie, Path: "/", Secure: true, HttpOnly: true, SameSite: http.SameSiteLaxMode})
 			if tc.duplicate {
-				req.AddCookie(&http.Cookie{Name: cfg.BrowserSession.CookieName(), Value: "second"})
+				req.AddCookie(&http.Cookie{Name: cfg.BrowserSession.CookieName(), Value: "second", Path: "/", Secure: true, HttpOnly: true, SameSite: http.SameSiteLaxMode})
 			}
 			if tc.origin != "" {
 				req.Header.Set("Origin", tc.origin)
@@ -63,7 +63,7 @@ func TestBrowserCookieOriginCSRFAndUnavailable(t *testing.T) {
 	}
 	require.NoError(t, db.Migrator().DropTable(&model.OIDCSubjectEpoch{}))
 	req := httptest.NewRequest("GET", cfg.BrowserSession.Origin+"/product", nil)
-	req.AddCookie(&http.Cookie{Name: cfg.BrowserSession.CookieName(), Value: cookie})
+	req.AddCookie(&http.Cookie{Name: cfg.BrowserSession.CookieName(), Value: cookie, Path: "/", Secure: true, HttpOnly: true, SameSite: http.SameSiteLaxMode})
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 	require.Equal(t, 503, w.Code)

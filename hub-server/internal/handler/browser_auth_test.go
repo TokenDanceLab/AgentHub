@@ -3,6 +3,7 @@ package handler
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -47,12 +48,13 @@ func newBrowserHTTPFixture(t *testing.T) *browserHTTPFixture {
 	origin := "http://" + server.Listener.Addr().String()
 	db := testkit.NewAuthDB(t)
 	provider := oidcfixture.NewServer(t)
-	provider.ConfigureClient("hub-fixture", "fixture-secret")
+	clientSecret := rand.Text()
+	provider.ConfigureClient("hub-fixture", clientSecret)
 	mr := miniredis.RunT(t)
 	rdb := redis.NewClient(&redis.Options{Addr: mr.Addr()})
 	t.Cleanup(func() { _ = rdb.Close() })
 	cc := cache.NewClient(rdb)
-	cfg := &config.Config{BrowserSession: config.BrowserSessionConfig{Origin: origin, RedirectURI: origin + "/callback", PostLogoutRedirectURI: origin + config.BrowserLogoutCallbackPath, TTL: time.Hour}, JWT: config.JWTConfig{Secret: "fixture-hub-secret-32-characters-long", AccessTTL: time.Hour, RefreshTTL: time.Hour}, AccountOIDC: config.AccountOIDCConfig{IssuerURL: provider.Server.URL, ClientID: "hub-fixture", ClientSecret: "fixture-secret", RedirectURI: origin + "/callback"}}
+	cfg := &config.Config{BrowserSession: config.BrowserSessionConfig{Origin: origin, RedirectURI: origin + "/callback", PostLogoutRedirectURI: origin + config.BrowserLogoutCallbackPath, TTL: time.Hour}, JWT: config.JWTConfig{Secret: rand.Text(), AccessTTL: time.Hour, RefreshTTL: time.Hour}, AccountOIDC: config.AccountOIDCConfig{IssuerURL: provider.Server.URL, ClientID: "hub-fixture", ClientSecret: clientSecret, RedirectURI: origin + "/callback"}}
 	authService := auth.NewService(db, cfg.JWT, cc)
 	authService.SetBrowserSessionsEnabled(true)
 	authService.SetAccountClientID(cfg.AccountOIDC.ClientID)

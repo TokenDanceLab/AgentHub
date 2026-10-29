@@ -145,7 +145,7 @@ func (s *Service) ApplyBackchannelLogout(ctx context.Context, raw string) (strin
 	if err != nil {
 		return "", 0, errcode.ErrBadRequest
 	}
-	identity, generation, err := repository.ApplyAccountLogout(s.db.WithContext(ctx), claims.Issuer, claims.Subject, claims.ID, hash, claims.IssuedAt.Unix(), claims.ExpiresAt.Time.Add(5*time.Minute))
+	identity, generation, err := repository.ApplyAccountLogout(s.db.WithContext(ctx), claims.Issuer, claims.Subject, claims.ID, hash, claims.IssuedAt.Unix(), claims.ExpiresAt.Add(5*time.Minute))
 	if errors.Is(err, repository.ErrLogoutJTIReuse) {
 		return "", 0, errcode.ErrBadRequest
 	}

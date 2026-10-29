@@ -29,20 +29,12 @@ func (c *Config) validateBrowserSession() error {
 		}
 		return nil
 	}
-	origin, err := url.Parse(b.Origin)
-	if err != nil || origin.Host == "" || origin.User != nil || origin.Path != "" || origin.RawQuery != "" || origin.Fragment != "" || (origin.Scheme != "https" && origin.Scheme != "http") {
-		return fmt.Errorf("browser_session.origin must be an exact HTTP(S) origin")
+	origin, err := parseBrowserOrigin(b.Origin)
+	if err != nil {
+		return err
 	}
-	if strings.ContainsAny(origin.Hostname(), "*?{}") {
-		return fmt.Errorf("browser_session.origin must not contain wildcards")
-	}
-	loopback := origin.Hostname() == "localhost" || origin.Hostname() == "127.0.0.1" || origin.Hostname() == "::1"
-	if !loopback && (origin.Scheme != "https" || !b.Secure) {
-		return fmt.Errorf("public browser sessions require HTTPS and secure cookies")
-	}
-	production := strings.EqualFold(c.Server.Env, "production") || strings.EqualFold(c.Server.Env, "prod") || strings.EqualFold(c.Server.Env, "release")
-	if production && (!b.Secure || origin.Scheme != "https" || loopback) {
-		return fmt.Errorf("production browser sessions require a public HTTPS origin and secure cookies")
+	if err := b.validateTransport(origin, c.Server.Env); err != nil {
+		return err
 	}
 	if b.TTL <= 0 || b.TTL > 24*time.Hour {
 		return fmt.Errorf("browser_session.ttl must be positive and at most 24h")
@@ -50,6 +42,34 @@ func (c *Config) validateBrowserSession() error {
 	if c.AccountOIDC.ClientID == "" {
 		return fmt.Errorf("browser sessions require Account OIDC")
 	}
+	allowed := append([]string{c.AccountOIDC.RedirectURI}, c.AccountOIDC.AllowedRedirectURIs...)
+	return b.validateCallbacks(allowed)
+}
+
+func parseBrowserOrigin(raw string) (*url.URL, error) {
+	origin, err := url.Parse(raw)
+	if err != nil || origin.Host == "" || origin.User != nil || origin.Path != "" || origin.RawQuery != "" || origin.Fragment != "" || (origin.Scheme != "https" && origin.Scheme != "http") {
+		return nil, fmt.Errorf("browser_session.origin must be an exact HTTP(S) origin")
+	}
+	if strings.ContainsAny(origin.Hostname(), "*?{}") {
+		return nil, fmt.Errorf("browser_session.origin must not contain wildcards")
+	}
+	return origin, nil
+}
+
+func (b BrowserSessionConfig) validateTransport(origin *url.URL, env string) error {
+	loopback := origin.Hostname() == "localhost" || origin.Hostname() == "127.0.0.1" || origin.Hostname() == "::1"
+	if !loopback && (origin.Scheme != "https" || !b.Secure) {
+		return fmt.Errorf("public browser sessions require HTTPS and secure cookies")
+	}
+	production := strings.EqualFold(env, "production") || strings.EqualFold(env, "prod") || strings.EqualFold(env, "release")
+	if production && (!b.Secure || origin.Scheme != "https" || loopback) {
+		return fmt.Errorf("production browser sessions require a public HTTPS origin and secure cookies")
+	}
+	return nil
+}
+
+func (b BrowserSessionConfig) validateCallbacks(allowed []string) error {
 	for _, raw := range []string{b.RedirectURI, b.PostLogoutRedirectURI} {
 		u, err := url.Parse(raw)
 		if err != nil || u.Scheme+"://"+u.Host != b.Origin || u.User != nil || u.RawQuery != "" || u.Fragment != "" || u.Path == "" {
@@ -60,7 +80,6 @@ func (c *Config) validateBrowserSession() error {
 	if logout.Path != BrowserLogoutCallbackPath {
 		return fmt.Errorf("browser logout callback must use %s", BrowserLogoutCallbackPath)
 	}
-	allowed := append([]string{c.AccountOIDC.RedirectURI}, c.AccountOIDC.AllowedRedirectURIs...)
 	for _, callback := range allowed {
 		if callback == b.RedirectURI {
 			return nil
