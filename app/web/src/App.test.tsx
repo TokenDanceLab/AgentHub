@@ -21,6 +21,7 @@ const useWebWorkbenchModelMock = vi.hoisted(() => vi.fn());
 const useWebAuthMock = vi.hoisted(() => vi.fn());
 const ensureAuthMock = vi.hoisted(() => vi.fn());
 const logoutMock = vi.hoisted(() => vi.fn(async () => undefined));
+const useAuthMock = vi.hoisted(() => vi.fn());
 const getAccessTokenMock = vi.hoisted(() => vi.fn<() => string | null>(() => null));
 const hubClientStub = vi.hoisted(() => ({
   me: vi.fn(async () => ({ id: 'web-user', username: 'web-user', nickname: 'Web User', avatar_url: '' })),
@@ -63,7 +64,7 @@ vi.mock('@/hooks/useWebAuth', () => ({
 }));
 
 vi.mock('@/hooks/useAuth', () => ({
-  useAuth: () => ({ logout: logoutMock }),
+  useAuth: useAuthMock,
   getAccessToken: getAccessTokenMock,
 }));
 
@@ -100,6 +101,7 @@ describe('Web app root', () => {
     sessionStorage.clear();
     queryClient.clear();
     getAccessTokenMock.mockReturnValue(null);
+    useAuthMock.mockReturnValue({ logout: logoutMock, user: null });
     ensureAuthMock.mockReturnValue(true);
     useWebAuthMock.mockReturnValue({ ensureAuth: ensureAuthMock, authReady: true });
     useHubStore.getState().clear();
@@ -156,6 +158,26 @@ describe('Web app root', () => {
     render(<App />);
     expect(screen.getByRole('status')).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'Agent 协作群' })).not.toBeInTheDocument();
+  });
+
+  it('uses one production mode despite a stale browser fixture preference', () => {
+    vi.stubEnv('PROD', true);
+    vi.stubEnv('VITE_AGENTHUB_DATA_MODE', '');
+    localStorage.setItem('agenthub.workbench.dataMode', 'fixture');
+    render(<App />);
+    expect(screen.getByRole('dialog', { name: 'TokenDance Account login' })).toBeInTheDocument();
+    expect(useWebWorkbenchModelMock).toHaveBeenCalledWith('approved-real', undefined, undefined);
+  });
+
+  it('reuses the authenticated profile without a second profile request', () => {
+    vi.stubEnv('PROD', true);
+    vi.stubEnv('VITE_AGENTHUB_DATA_MODE', '');
+    getAccessTokenMock.mockReturnValue('test-session');
+    useAuthMock.mockReturnValue({ logout: logoutMock, user: authPageSuccessUser });
+    useHubStore.getState().setAuthenticated(true, authPageSuccessUser.id, authPageSuccessUser.username);
+    render(<App />);
+    expect(screen.getByRole('button', { name: 'Web Auth User' })).toBeInTheDocument();
+    expect(hubClientStub.me).not.toHaveBeenCalled();
   });
 
   it('mounts the shared v4 workbench shell without legacy demo chrome', () => {

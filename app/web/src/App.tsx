@@ -58,7 +58,7 @@ function WebWorkbenchRoot() {
   const [savingAgentId, setSavingAgentId] = useState<string | undefined>();
   const [deletingAgentId, setDeletingAgentId] = useState<string | undefined>();
   const { ensureAuth, authReady } = useWebAuth();
-  const { logout } = useAuth();
+  const { logout, user } = useAuth();
   const sessionQueryClient = useQueryClient();
   const showAuthModal = useHubStore((state) => state.showAuthModal);
   const setShowAuthModal = useHubStore((state) => state.setShowAuthModal);
@@ -75,10 +75,9 @@ function WebWorkbenchRoot() {
     getWorkbenchDataModeOverrideSnapshot,
     getWorkbenchDataModeOverrideSnapshot,
   );
-  const dataMode = resolveWorkbenchDataMode(
-    import.meta.env.VITE_AGENTHUB_DATA_MODE || (import.meta.env.PROD ? 'approved-real' : 'auto'),
-    dataModeOverride || undefined,
-  );
+  const dataMode = import.meta.env.PROD
+    ? 'approved-real'
+    : resolveWorkbenchDataMode(import.meta.env.VITE_AGENTHUB_DATA_MODE, dataModeOverride || undefined);
   const dataModeContract = getWorkbenchDataModeContract(dataMode);
   const realMode = dataModeContract.isRealDataMode;
   const webPlatform = useMemo(
@@ -98,17 +97,10 @@ function WebWorkbenchRoot() {
   const createAgentProfile = useCreateAgentProfile();
   const updateAgentProfile = useUpdateAgentProfile();
   const deleteAgentProfile = useDeleteAgentProfile();
-  const workbench = useWebWorkbenchModel(selectedConversationId, selectedProjectId);
+  const workbench = useWebWorkbenchModel(dataMode, selectedConversationId, selectedProjectId);
   const chatActions = workbench.chatActions;
   const agents = resolveWebWorkbenchAgents(agentList.data?.items, dataMode);
 
-  // Fetch real user profile from Hub (originates from TokenDance Account OIDC)
-  const userProfile = useQuery({
-    queryKey: webQueryKeys.authMe,
-    queryFn: () => createHubClient({ getToken: getAccessToken }).me(),
-    enabled: Boolean(getAccessToken()),
-    staleTime: 60_000,
-  });
   const agentLoadError = realMode && agentList.error
     ? errorMessage(agentList.error, t('error.agentProfile.load'))
     : undefined;
@@ -398,9 +390,9 @@ function WebWorkbenchRoot() {
         workbenchStatus={workbench.workbenchStatus}
         transcript={workbench.transcript}
         transcriptLoading={workbench.transcriptLoading}
-        userDisplayName={userProfile.data?.nickname || userProfile.data?.username}
-        userAvatarUrl={userProfile.data?.avatar_url}
-        currentUserId={userProfile.data?.id}
+        userDisplayName={user?.nickname || user?.username}
+        userAvatarUrl={user?.avatar_url}
+        currentUserId={user?.id}
         skillMarketItems={skillMarketItems}
         skillMarketLoading={hubReady && skillMarketQuery.isFetching}
         {...(hubReady && skillMarketQuery.error
