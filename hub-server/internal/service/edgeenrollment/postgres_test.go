@@ -15,6 +15,7 @@ import (
 	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/model"
 	"github.com/agenthub/hub-server/internal/repository"
+	"github.com/agenthub/hub-server/internal/service/device"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	"gorm.io/driver/postgres"
@@ -404,4 +405,47 @@ func TestPostgresDistinctIdentityEnrollmentsCannotExceedOwnerQuota(t *testing.T)
 func TestPostgresBoundedEnrollmentPruningKeepsRevokedCredentialMarkers(t *testing.T) {
 	s, auth := postgresService(t)
 	assertBoundedEnrollmentPruning(t, s, auth)
+}
+
+func TestPostgresLegacyAndPairedRegistrationsShareOwnerQuota(t *testing.T) {
+	t.Setenv("AGENTHUB_MAX_CLOUD_EDGE_DEVICES", "2")
+	s, auth := postgresService(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	legacy := device.NewService(s.db, nil)
+	const workers = 8
+	ready := make(chan struct{})
+	errors := make(chan error, workers)
+	var wg sync.WaitGroup
+	for i := range workers {
+		start, err := s.Start(ctx, startInput())
+		require.NoError(t, err)
+		_, err = s.Confirm(ctx, auth, start.UserCode)
+		require.NoError(t, err)
+		wg.Go(func() {
+			<-ready
+			var err error
+			if i%2 == 0 {
+				_, err = s.Exchange(ctx, start.EnrollmentID, start.PollSecret)
+			} else {
+				_, err = legacy.Register(ctx, uuid.NewString(), auth.UserID, "cloud_edge", "fixture", nil)
+			}
+			errors <- err
+		})
+	}
+	close(ready)
+	wg.Wait()
+	close(errors)
+	wins := 0
+	for err := range errors {
+		if err == nil {
+			wins++
+		} else {
+			require.ErrorIs(t, err, errcode.DeviceLimitExceeded)
+		}
+	}
+	require.Equal(t, 2, wins)
+	count, err := repository.CountDevicesByUserAndType(s.db, auth.UserID, "cloud_edge")
+	require.NoError(t, err)
+	require.EqualValues(t, 2, count)
 }

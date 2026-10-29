@@ -140,8 +140,7 @@ func lockOwnerAndCheckDeviceQuota(tx *gorm.DB, userID, deviceID string) error {
 	// This also serializes different Account identities bound to the same
 	// owner. NO KEY UPDATE permits unrelated device/task foreign-key KEY SHARE
 	// checks, avoiding an owner/device inversion with in-flight task writes.
-	var owner model.User
-	if err := tx.Select("id").Clauses(clause.Locking{Strength: "NO KEY UPDATE"}).Where("id = ?", userID).Take(&owner).Error; err != nil {
+	if err := repository.LockDeviceOwner(tx, userID); err != nil {
 		return err
 	}
 	limit := config.MaxCloudEdgeDevicesPerUser()

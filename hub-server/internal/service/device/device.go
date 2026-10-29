@@ -38,10 +38,6 @@ func NewService(db *gorm.DB, registrar desktopTargetRegistrar) *Service {
 // The handler layer should not construct model.Device directly — all DB logic
 // lives here.
 func (s *Service) Register(ctx context.Context, deviceID, userID, deviceType, appVersion string, capabilities []string) (*model.Device, error) {
-	if err := s.enforceCloudEdgeQuota(deviceID, userID, deviceType); err != nil {
-		return nil, err
-	}
-
 	capsBytes, _ := json.Marshal(capabilities)
 
 	device := &model.Device{
@@ -53,7 +49,22 @@ func (s *Service) Register(ctx context.Context, deviceID, userID, deviceType, ap
 		LastActiveAt: time.Now(),
 	}
 
-	if err := repository.UpsertDevice(s.db, device); err != nil {
+	db := s.db.WithContext(ctx)
+	var err error
+	if deviceType == deviceTypeCloudEdge {
+		err = db.Transaction(func(tx *gorm.DB) error {
+			if err := repository.LockDeviceOwner(tx, userID); err != nil {
+				return err
+			}
+			if err := enforceCloudEdgeQuota(tx, deviceID, userID); err != nil {
+				return err
+			}
+			return repository.UpsertDevice(tx, device)
+		})
+	} else {
+		err = repository.UpsertDevice(db, device)
+	}
+	if err != nil {
 		if errors.Is(err, repository.ErrDeviceOwnershipMismatch) {
 			return nil, errcode.ErrBadRequest
 		}
@@ -75,22 +86,19 @@ func (s *Service) Register(ctx context.Context, deviceID, userID, deviceType, ap
 // (upsert refresh) is never blocked — only brand-new device rows count
 // against the cap. Frequency abuse is handled separately by the route-level
 // rate limiter (#2185).
-func (s *Service) enforceCloudEdgeQuota(deviceID, userID, deviceType string) error {
-	if deviceType != deviceTypeCloudEdge {
-		return nil
-	}
+func enforceCloudEdgeQuota(tx *gorm.DB, deviceID, userID string) error {
 	limit := config.MaxCloudEdgeDevicesPerUser()
 	if limit <= 0 {
 		return nil
 	}
-	exists, err := repository.DeviceExistsForUser(s.db, deviceID, userID, deviceType)
+	exists, err := repository.DeviceExistsForUser(tx, deviceID, userID, deviceTypeCloudEdge)
 	if err != nil {
 		return err
 	}
 	if exists {
 		return nil // upsert refresh of an owned device, not a new registration
 	}
-	count, err := repository.CountDevicesByUserAndType(s.db, userID, deviceType)
+	count, err := repository.CountDevicesByUserAndType(tx, userID, deviceTypeCloudEdge)
 	if err != nil {
 		return err
 	}

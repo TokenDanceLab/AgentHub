@@ -11,6 +11,14 @@ import (
 
 var ErrDeviceOwnershipMismatch = errors.New("device id belongs to a different user or device type")
 
+// LockDeviceOwner serializes quota checks and device insertion across legacy
+// registration and paired enrollment. Use inside the insertion transaction.
+// NO KEY UPDATE permits unrelated FK checks on this owner while it is locked.
+func LockDeviceOwner(tx *gorm.DB, userID string) error {
+	var owner model.User
+	return tx.Select("id").Clauses(clause.Locking{Strength: "NO KEY UPDATE"}).Where("id = ?", userID).Take(&owner).Error
+}
+
 func UpsertDevice(db *gorm.DB, device *model.Device) error {
 	result := db.Clauses(clause.OnConflict{
 		Columns: []clause.Column{{Name: "id"}},
