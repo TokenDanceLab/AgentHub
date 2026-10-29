@@ -166,11 +166,11 @@ describe('AgentHubWorkbench', () => {
     fireEvent.change(screen.getByLabelText('@Agent'), {
       target: { value: 'builder' },
     });
-    fireEvent.change(screen.getByLabelText('执行目标'), {
+    fireEvent.change(screen.getByLabelText('执行设备'), {
       target: { value: 'target-local-edge-1' },
     });
     expect(screen.getByLabelText('@Agent')).toHaveValue('builder');
-    expect(screen.getByLabelText('执行目标')).toHaveValue('target-local-edge-1');
+    expect(screen.getByLabelText('执行设备')).toHaveValue('target-local-edge-1');
     expect(screen.getByRole('button', { name: '发送消息' })).toBeDisabled();
     fireEvent.change(screen.getByRole('textbox', { name: '输入框' }), {
       target: { value: 'Start the Web main chain' },
@@ -287,7 +287,7 @@ describe('AgentHubWorkbench', () => {
       target: { value: 'Run the remote task' },
     });
 
-    expect(screen.getByLabelText('执行目标')).toHaveValue('');
+    expect(screen.getByLabelText('执行设备')).toHaveValue('');
 
     expect(screen.getByRole('button', { name: '发送消息' })).toBeDisabled();
     expect(platform.submittedIntents).toEqual([]);
