@@ -1,6 +1,6 @@
 # AGENTS.md — AgentHub 项目总规则唯一入口
 
-> 最后更新：2026-10-18
+> 最后更新：2026-10-29
 >
 > 根级 Agent 规则只写硬边界、工作流和 owner 指针；实现细节、CI 长表和发布步骤在各自 owner 文档。
 
@@ -37,9 +37,9 @@
 
 ## 3. 生态与真实性边界
 
-- 登录只接 TokenDance ID；TokenDance ID 证明身份，Hub 用本地 membership/resource/action 做授权。第三方绑定归身份系统，不在 AgentHub 复制第二套登录。
+- 登录只接 TokenDance Account；Account 证明身份，Hub 用本地 membership/resource/action 做授权。第三方绑定归身份系统，不在 AgentHub 复制第二套登录。TokenDance ID 已退役，不作为现役 issuer。
 - TokenDance API/Gateway key 不是 ID token，不得暴露给浏览器、Agent context、sandbox 或公开日志。
-- Feishu/Lark 是协作入口，不是第二身份系统；身份绑定归 TokenDance ID。
+- Feishu/Lark 是协作入口，不是第二身份系统；身份绑定归 TokenDance Account。
 - stub/demo/fixture/readiness-only 不得冒充真实登录、真实模型/API、packaged Desktop 或生产发布。
 
 ## 4. 前端边界
