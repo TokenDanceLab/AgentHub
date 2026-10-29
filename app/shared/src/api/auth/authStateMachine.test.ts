@@ -11,7 +11,6 @@ import {
 } from './index';
 import type {
   BrowserOIDCPending,
-  HubAuth,
   HubAuthState,
   HubTokenSource,
   OidcCallbackResult,
@@ -105,7 +104,7 @@ function createAuth(
   ports: HubAuthPorts,
   client: HubClient,
   injectedClient?: HubClient,
-): { auth: HubAuth; createClient: HubClientFactory } {
+): { auth: ReturnType<typeof createHubAuthCore>; createClient: HubClientFactory } {
   const createClient = vi.fn(() => client) as unknown as HubClientFactory;
   const auth = createHubAuthCore(ports, { client: injectedClient, createClient });
   return { auth, createClient };
@@ -139,6 +138,24 @@ function makePending(state: string, createdAt = Date.now()): BrowserOIDCPending 
     issuer: ACCOUNT_ISSUER,
     createdAt,
   };
+}
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (error: unknown) => void;
+  const promise = new Promise<T>((accept, fail) => { resolve = accept; reject = fail; });
+  return { promise, resolve, reject };
+}
+
+const bob = { id: 'user-2', username: 'bob', nickname: 'Bob', avatar_url: '' };
+const loginTokens = (user = alice) => ({
+  access_token: `access-${user.username}`, refresh_token: `refresh-${user.username}`, expires_in: 3600, user,
+});
+
+function beginBrowserLogin(ports: HubAuthPorts, auth: ReturnType<typeof createHubAuthCore>, name: string) {
+  ports.pendingStorage.save(makePending(name));
+  pushBrowserCallback(`code-${name}`, name);
+  return auth.tryAutoLogin();
 }
 
 // ── PKCE ──────────────────────────────────────────
@@ -345,6 +362,241 @@ describe('createHubAuthCore', () => {
 });
 
 // ── Browser callback path (Web / Desktop dev mode) ─
+
+describe('native auth operation generations and credential ordering', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+    window.history.replaceState({}, '', '/');
+  });
+
+  it.each(['storage', 'profile', 'refresh'] as const)('does not restore an invalidated session after a late %s response', async (stage) => {
+    const { ports, memory, sessionSync } = createFakePorts();
+    memory.access = 'old-access';
+    memory.refresh = 'old-refresh';
+    memory.source = 'account';
+    const loaded = deferred<string | null>();
+    const profile = deferred<typeof alice>();
+    const refreshed = deferred<ReturnType<typeof loginTokens>>();
+    const client = createFakeClient({
+      me: stage === 'profile' ? vi.fn(() => profile.promise) : vi.fn().mockRejectedValue(new Error('expired')),
+      refresh: vi.fn(() => refreshed.promise),
+    });
+    if (stage === 'storage') ports.tokenStorage.loadAccessToken = vi.fn(() => loaded.promise);
+    const { auth } = createAuth(ports, client);
+    const attempt = auth.tryAutoLogin();
+    await vi.waitFor(() => expect(stage === 'storage' ? ports.tokenStorage.loadAccessToken : stage === 'profile' ? client.me : client.refresh).toHaveBeenCalled());
+    const invalidated = auth.invalidate();
+    expect(auth.getState()).toMatchObject({ token: null, user: null, tokenSource: null, isAuthenticated: false });
+    expect(sessionSync.clear).toHaveBeenCalledOnce();
+    loaded.resolve('old-access');
+    profile.resolve(alice);
+    refreshed.resolve(loginTokens());
+    await invalidated;
+    await expect(attempt).resolves.toBe(false);
+    expect(memory).toMatchObject({ access: null, refresh: null, source: null });
+    expect(sessionSync.setAuthenticated).not.toHaveBeenCalled();
+  });
+
+  it.each(['success', 'terminal-error'] as const)('ignores a replaced refresh %s without overwriting or clearing the new login', async (result) => {
+    const { ports, memory, sessionSync } = createFakePorts();
+    memory.access = 'old-access';
+    memory.refresh = 'old-refresh';
+    const refreshed = deferred<ReturnType<typeof loginTokens>>();
+    const client = createFakeClient({
+      me: vi.fn().mockRejectedValue(new Error('expired')),
+      refresh: vi.fn(() => refreshed.promise),
+      oidcCallback: vi.fn().mockResolvedValue(loginTokens(bob)),
+    });
+    const { auth } = createAuth(ports, client);
+    const oldAttempt = auth.tryAutoLogin();
+    await vi.waitFor(() => expect(client.refresh).toHaveBeenCalledOnce());
+    await expect(beginBrowserLogin(ports, auth, 'new-login')).resolves.toBe(true);
+    if (result === 'success') refreshed.resolve(loginTokens(alice));
+    else refreshed.reject(new AppError({ error: { code: 'auth_refresh_invalid', message: 'revoked' } }, 401));
+    await expect(oldAttempt).resolves.toBe(false);
+    expect(auth.getState()).toMatchObject({ token: 'access-bob', refreshToken: 'refresh-bob', user: bob, isAuthenticated: true });
+    expect(memory).toMatchObject({ access: 'access-bob', refresh: 'refresh-bob', source: 'account' });
+    expect(sessionSync.clear).not.toHaveBeenCalled();
+  });
+
+  it('does not persist a callback exchange response that arrives after revocation', async () => {
+    const { ports, memory, sessionSync } = createFakePorts();
+    const exchange = deferred<ReturnType<typeof loginTokens>>();
+    const client = createFakeClient({ oidcCallback: vi.fn(() => exchange.promise) });
+    const { auth } = createAuth(ports, client);
+    const login = beginBrowserLogin(ports, auth, 'old');
+    await vi.waitFor(() => expect(client.oidcCallback).toHaveBeenCalledOnce());
+    await auth.invalidate();
+    exchange.resolve(loginTokens());
+    await expect(login).resolves.toBe(false);
+    expect(memory).toMatchObject({ access: null, refresh: null, source: null });
+    expect(sessionSync.setAuthenticated).not.toHaveBeenCalled();
+  });
+
+  it('does not commit an older native login after a newer native login completes', async () => {
+    const { ports, memory, sessionSync } = createFakePorts();
+    const exchange = deferred<ReturnType<typeof loginTokens>>();
+    ports.callbackChannel.start = vi.fn()
+      .mockResolvedValueOnce({ redirectUri: '', callback: Promise.resolve({ code: 'old-code', state: 'old', iss: ACCOUNT_ISSUER }) })
+      .mockResolvedValueOnce({ redirectUri: '', callback: Promise.resolve({ code: 'new-code', state: 'new', iss: ACCOUNT_ISSUER }) });
+    const client = createFakeClient({
+      oidcAuthorize: vi.fn()
+        .mockResolvedValueOnce({ state: 'old', authorization_url: `${ACCOUNT_ISSUER}/authorize`, issuer: ACCOUNT_ISSUER })
+        .mockResolvedValueOnce({ state: 'new', authorization_url: `${ACCOUNT_ISSUER}/authorize`, issuer: ACCOUNT_ISSUER }),
+      oidcCallback: vi.fn().mockImplementationOnce(() => exchange.promise).mockResolvedValueOnce(loginTokens(bob)),
+    });
+    const { auth } = createAuth(ports, client);
+    const oldLogin = auth.loginWithAccount();
+    await vi.waitFor(() => expect(client.oidcCallback).toHaveBeenCalledOnce());
+    await auth.loginWithAccount();
+    exchange.resolve(loginTokens());
+    await oldLogin;
+    expect(memory).toMatchObject({ access: 'access-bob', refresh: 'refresh-bob', source: 'account', pending: null });
+    expect(auth.getState()).toMatchObject({ user: bob, token: 'access-bob', isAuthenticated: true });
+    expect(sessionSync.setAuthenticated).toHaveBeenCalledExactlyOnceWith(bob.id, bob.username);
+  });
+
+  it('leaves the newer pending callback intact when a replaced native callback arrives', async () => {
+    const { ports, memory } = createFakePorts();
+    const oldCallback = deferred<OidcCallbackResult>();
+    const newCallback = deferred<OidcCallbackResult>();
+    ports.callbackChannel.start = vi.fn()
+      .mockResolvedValueOnce({ redirectUri: '', callback: oldCallback.promise })
+      .mockResolvedValueOnce({ redirectUri: '', callback: newCallback.promise });
+    const client = createFakeClient({
+      oidcAuthorize: vi.fn()
+        .mockResolvedValueOnce({ state: 'old', authorization_url: `${ACCOUNT_ISSUER}/authorize`, issuer: ACCOUNT_ISSUER })
+        .mockResolvedValueOnce({ state: 'new', authorization_url: `${ACCOUNT_ISSUER}/authorize`, issuer: ACCOUNT_ISSUER }),
+      oidcCallback: vi.fn().mockResolvedValue(loginTokens(bob)),
+    });
+    const { auth } = createAuth(ports, client);
+    const oldLogin = auth.loginWithAccount();
+    await vi.waitFor(() => expect(memory.pending?.state).toBe('old'));
+    const newLogin = auth.loginWithAccount();
+    await vi.waitFor(() => expect(memory.pending?.state).toBe('new'));
+    oldCallback.resolve({ code: 'old-code', state: 'old', iss: ACCOUNT_ISSUER });
+    await oldLogin;
+    expect(memory.pending?.state).toBe('new');
+    expect(client.oidcCallback).not.toHaveBeenCalled();
+    newCallback.resolve({ code: 'new-code', state: 'new', iss: ACCOUNT_ISSUER });
+    await newLogin;
+    expect(auth.getState().user).toEqual(bob);
+  });
+
+  it('drains an uncancellable old credential write, then revocation, then the new login', async () => {
+    const { ports, memory, sessionSync } = createFakePorts();
+    const saving = deferred<undefined>();
+    ports.tokenStorage.saveAccessToken = vi.fn(async (token) => {
+      if (token === 'access-alice') await saving.promise;
+      memory.access = token;
+    });
+    const client = createFakeClient({ oidcCallback: vi.fn().mockResolvedValueOnce(loginTokens()).mockResolvedValueOnce(loginTokens(bob)) });
+    const { auth } = createAuth(ports, client);
+    const oldLogin = beginBrowserLogin(ports, auth, 'old');
+    await vi.waitFor(() => expect(ports.tokenStorage.saveAccessToken).toHaveBeenCalledWith('access-alice'));
+    const invalidated = auth.invalidate();
+    const newLogin = beginBrowserLogin(ports, auth, 'new');
+    await vi.waitFor(() => expect(client.oidcCallback).toHaveBeenCalledTimes(2));
+    expect(auth.getState().isAuthenticated).toBe(false);
+    saving.resolve(undefined);
+    await invalidated;
+    await expect(oldLogin).resolves.toBe(false);
+    await expect(newLogin).resolves.toBe(true);
+    expect(memory).toMatchObject({ access: 'access-bob', refresh: 'refresh-bob', source: 'account' });
+    expect(sessionSync.setAuthenticated).toHaveBeenCalledExactlyOnceWith(bob.id, bob.username);
+  });
+
+  it('waits for every clear to settle even after one rejects, without deleting the newer credentials', async () => {
+    const { ports, memory, sessionSync } = createFakePorts();
+    memory.access = 'old-access';
+    const clearing = deferred<undefined>();
+    ports.tokenStorage.clearAccessToken = vi.fn(async () => { await clearing.promise; memory.access = null; });
+    ports.tokenStorage.clearRefreshToken = vi.fn().mockRejectedValue(new Error('keychain unavailable'));
+    const client = createFakeClient({ oidcCallback: vi.fn().mockResolvedValue(loginTokens(bob)) });
+    const { auth } = createAuth(ports, client);
+    await auth.tryAutoLogin();
+    const invalidated = auth.invalidate().catch((error: unknown) => error);
+    expect(auth.getState().isAuthenticated).toBe(false);
+    expect(sessionSync.clear).toHaveBeenCalledOnce();
+    const login = beginBrowserLogin(ports, auth, 'new');
+    await vi.waitFor(() => expect(client.oidcCallback).toHaveBeenCalledOnce());
+    expect(memory.access).toBe('old-access');
+    expect(auth.getState().isAuthenticated).toBe(false);
+    clearing.resolve(undefined);
+    expect(await invalidated).toBeInstanceOf(Error);
+    await expect(login).resolves.toBe(true);
+    expect(memory).toMatchObject({ access: 'access-bob', refresh: 'refresh-bob', source: 'account' });
+  });
+
+  it('removes a superseded partial write even when the replacement login fails before persisting', async () => {
+    const { ports, memory } = createFakePorts();
+    const saving = deferred<undefined>();
+    ports.tokenStorage.saveRefreshToken = vi.fn(async (token) => { await saving.promise; memory.refresh = token; });
+    const client = createFakeClient({
+      oidcCallback: vi.fn().mockResolvedValueOnce(loginTokens()).mockRejectedValueOnce(new Error('new exchange failed')),
+    });
+    const { auth } = createAuth(ports, client);
+    const oldLogin = beginBrowserLogin(ports, auth, 'old');
+    await vi.waitFor(() => expect(ports.tokenStorage.saveRefreshToken).toHaveBeenCalledOnce());
+    await expect(beginBrowserLogin(ports, auth, 'new')).rejects.toMatchObject({ code: 'tokenExchangeFailed' });
+    saving.resolve(undefined);
+    await expect(oldLogin).resolves.toBe(false);
+    expect(memory).toMatchObject({ access: null, refresh: null, source: null });
+    expect(auth.getState()).toMatchObject({ token: null, user: null, isAuthenticated: false });
+  });
+
+  it('publishes invalidation immediately and blocks auto-restore when durable cleanup fails', async () => {
+    const { ports, memory } = createFakePorts();
+    memory.access = 'old-access';
+    memory.refresh = 'old-refresh';
+    ports.tokenStorage.clearAccessToken = vi.fn().mockRejectedValue(new Error('keychain unavailable'));
+    const client = createFakeClient();
+    const { auth } = createAuth(ports, client);
+    await auth.tryAutoLogin();
+    const listener = vi.fn();
+    auth.subscribe(listener);
+    const invalidated = auth.invalidate();
+    expect(listener).toHaveBeenCalledWith(expect.objectContaining({ token: null, user: null, isAuthenticated: false }));
+    await expect(invalidated).rejects.toThrow('keychain unavailable');
+    window.history.replaceState({}, '', '/');
+    await expect(auth.tryAutoLogin()).resolves.toBe(false);
+    expect(client.me).toHaveBeenCalledOnce();
+    expect(auth.getState().isAuthenticated).toBe(false);
+  });
+
+  it('does not run delayed logout cleanup after a newer login', async () => {
+    const { ports, memory } = createFakePorts();
+    memory.access = 'old-access';
+    const remote = deferred<undefined>();
+    const client = createFakeClient({ request: vi.fn(() => remote.promise), oidcCallback: vi.fn().mockResolvedValue(loginTokens(bob)) });
+    const { auth } = createAuth(ports, client);
+    await auth.tryAutoLogin();
+    const logout = auth.logout();
+    expect(auth.getState().isAuthenticated).toBe(false);
+    await expect(beginBrowserLogin(ports, auth, 'new')).resolves.toBe(true);
+    remote.resolve(undefined);
+    await logout;
+    expect(memory).toMatchObject({ access: 'access-bob', refresh: 'refresh-bob', source: 'account' });
+    expect(auth.getState().user).toEqual(bob);
+  });
+
+  it('does not publish or persist an old login profile after a replacement login', async () => {
+    const { ports, memory, sessionSync } = createFakePorts();
+    const profile = deferred<typeof alice>();
+    const client = createFakeClient({
+      me: vi.fn(() => profile.promise),
+      oidcCallback: vi.fn().mockResolvedValueOnce({ ...loginTokens(), user: undefined }).mockResolvedValueOnce(loginTokens(bob)),
+    });
+    const { auth } = createAuth(ports, client);
+    const oldLogin = beginBrowserLogin(ports, auth, 'old');
+    await vi.waitFor(() => expect(client.me).toHaveBeenCalledOnce());
+    await expect(beginBrowserLogin(ports, auth, 'new')).resolves.toBe(true);
+    profile.resolve(alice);
+    await expect(oldLogin).resolves.toBe(false);
+    expect(memory).toMatchObject({ access: 'access-bob', refresh: 'refresh-bob', source: 'account' });
+    expect(sessionSync.setAuthenticated).toHaveBeenCalledExactlyOnceWith(bob.id, bob.username);
+  });
+});
 
 describe('browser OIDC callback handling', () => {
   beforeEach(() => {
@@ -556,7 +808,7 @@ describe('loginWithAccount', () => {
   });
 
   it('wraps authorize failures as startFailed', async () => {
-    const { ports, resolveCallback } = localServerPorts();
+    const { ports } = localServerPorts();
     const client = createFakeClient({
       oidcAuthorize: vi.fn().mockRejectedValue(new Error('hub unavailable')),
     });
