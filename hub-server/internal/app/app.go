@@ -24,6 +24,8 @@ import (
 	"github.com/agenthub/hub-server/internal/service/contact"
 	"github.com/agenthub/hub-server/internal/service/device"
 	"github.com/agenthub/hub-server/internal/service/document"
+	"github.com/agenthub/hub-server/internal/service/edgedevice"
+	"github.com/agenthub/hub-server/internal/service/edgeenrollment"
 	"github.com/agenthub/hub-server/internal/service/message"
 	"github.com/agenthub/hub-server/internal/service/messagereaction"
 	"github.com/agenthub/hub-server/internal/service/notification"
@@ -72,6 +74,8 @@ type App struct {
 	NotificationService    *notification.Service
 	DeviceService          *device.Service
 	DocumentService        *document.Service
+	EdgeEnrollmentService  *edgeenrollment.Service
+	EdgeDeviceService      *edgedevice.Service
 
 	// Account OIDC BFF (optional until configured).
 	OIDCService *oidc.Service

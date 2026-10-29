@@ -60,6 +60,9 @@ func SetupRoutes(r *gin.Engine, cfg *config.Config, authMW *middleware.AuthMiddl
 	// is registered separately below with upload-specific limits.
 	guardBody := middleware.BodyLimit(config.DefaultRequestBodyLimit)
 	guardTimeout := middleware.Timeout(config.DefaultRequestTimeout)
+	if deviceHandler != nil {
+		setupPairedEdgeRoutes(r, authMW, cacheClient, deviceHandler.Paired, agentHandler)
+	}
 
 	if healthHandler != nil {
 		r.GET("/health", guardBody, guardTimeout, healthHandler.Check)

@@ -20,6 +20,7 @@ type DeviceService interface {
 }
 
 type DeviceHandler struct {
+	Paired        *EdgeEnrollmentHandler
 	deviceService DeviceService
 	jwtSecret     string
 	jwtTTL        time.Duration

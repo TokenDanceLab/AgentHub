@@ -31,6 +31,8 @@ import (
 	"github.com/agenthub/hub-server/internal/service/contact"
 	"github.com/agenthub/hub-server/internal/service/device"
 	"github.com/agenthub/hub-server/internal/service/document"
+	"github.com/agenthub/hub-server/internal/service/edgedevice"
+	"github.com/agenthub/hub-server/internal/service/edgeenrollment"
 	"github.com/agenthub/hub-server/internal/service/executiontarget"
 	"github.com/agenthub/hub-server/internal/service/mcpserver"
 	"github.com/agenthub/hub-server/internal/service/message"
@@ -214,6 +216,9 @@ func (a *App) initServices(ctx context.Context) error {
 	// constructs transport clients.
 	edgeDispatchClient := outboundhttp.NewClient(a.Config.Edge.Timeout)
 	a.AgentService = agent.NewService(a.DB, a.bus, a.mgr, a.CacheClient, a.RelayService, a.Config.Edge, edgeDispatchClient, a.Config.JWT.Secret)
+	a.EdgeEnrollmentService = edgeenrollment.New(a.DB, a.Config.AccountOIDC.ClientID)
+	a.EdgeDeviceService = edgedevice.New(a.DB, a.EdgeEnrollmentService)
+	a.AgentService.SetPairedDeviceService(a.EdgeDeviceService)
 
 	// Agent Profile service
 	agentProfileSvc := agentprofile.NewService(a.DB)
@@ -283,6 +288,7 @@ func (a *App) initHandlers(_ context.Context) error {
 	a.AuthHandler = handler.NewAuthHandler(a.AuthService)
 	a.DeviceHandler = handler.NewDeviceHandler(a.DeviceService)
 	a.DeviceHandler.SetJWTConfig(a.Config.JWT.Secret, a.Config.JWT.AccessTTL)
+	a.DeviceHandler.Paired = handler.NewEdgeEnrollmentHandler(a.EdgeEnrollmentService, a.EdgeDeviceService, a.Config.AccountOIDC.ClientID)
 	a.ContactHandler = handler.NewContactHandler(a.ContactService)
 	a.SessionHandler = handler.NewSessionHandler(a.SessionService)
 	a.MessageHandler = handler.NewMessageHandler(messageServiceWithReactions{

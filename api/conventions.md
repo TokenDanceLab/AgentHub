@@ -119,7 +119,7 @@ REST 错误使用统一 envelope：
 
 限流中间件（`hub-server/internal/middleware/global_rate_limit.go`、`rate_limit.go`、`ws_rate_limit.go`）依赖 Redis。Redis 故障时的行为由配置决定：
 
-- **认证路径**（`/client/auth/*`）一律 fail-closed：返回 503 `rate_limit_unavailable`，绝不放行。
+- **认证路径**（`/client/auth/*`、`/edge/enrollments/*`、`/web/edge-enrollments/*`）一律 fail-closed：返回 503 `rate_limit_unavailable`，绝不放行。设备配对的短码查询、确认与交换同样属于凭据签发边界。
 - **非认证路径**：默认 fail-open，放行并写 warn 日志、置响应头 `X-Rate-Limit-Degraded: true`；若显式配置 `AGENTHUB_RATE_LIMIT_FAIL_OPEN=false`，则 fail-closed 返回 503 `rate_limit_unavailable`。
 
 客户端遇到 503 `rate_limit_unavailable` 时应区分：认证路径下不要无限重试（会一直 503）；非认证路径下若带 `X-Rate-Limit-Degraded` 表示限流已降级放行，可继续业务请求。

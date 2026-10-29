@@ -770,6 +770,7 @@ func TestOnRouteSetReplaysTargetQueueOnlyForConnectedDevice(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.NoError(t, db.Exec(`CREATE TABLE pending_agent_tasks (
+		cancel_requested_at DATETIME, cancel_applied_at DATETIME, cancel_error TEXT DEFAULT '',
 		id TEXT PRIMARY KEY,
 		agent_instance_id TEXT NOT NULL,
 		triggered_by_user_id TEXT NOT NULL,
@@ -841,6 +842,7 @@ func TestOnRouteSetKeepsPendingTargetQueueWhenDeliveryBufferFull(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.NoError(t, db.Exec(`CREATE TABLE pending_agent_tasks (
+		cancel_requested_at DATETIME, cancel_applied_at DATETIME, cancel_error TEXT DEFAULT '',
 		id TEXT PRIMARY KEY,
 		agent_instance_id TEXT NOT NULL,
 		triggered_by_user_id TEXT NOT NULL,
@@ -895,6 +897,7 @@ func TestOnRouteSetDoesNotReplayTargetQueueWhenDispatchStateMissing(t *testing.T
 	})
 	require.NoError(t, err)
 	require.NoError(t, db.Exec(`CREATE TABLE pending_agent_tasks (
+		cancel_requested_at DATETIME, cancel_applied_at DATETIME, cancel_error TEXT DEFAULT '',
 		id TEXT PRIMARY KEY,
 		agent_instance_id TEXT NOT NULL,
 		triggered_by_user_id TEXT NOT NULL,
@@ -955,6 +958,7 @@ func TestPublishExpiredTaskTimeoutSkipsStaleTerminalTask(t *testing.T) {
 		display_name TEXT NOT NULL
 	)`).Error)
 	require.NoError(t, db.Exec(`CREATE TABLE pending_agent_tasks (
+		cancel_requested_at DATETIME, cancel_applied_at DATETIME, cancel_error TEXT DEFAULT '',
 		id TEXT PRIMARY KEY,
 		agent_instance_id TEXT NOT NULL,
 		triggered_by_user_id TEXT NOT NULL,

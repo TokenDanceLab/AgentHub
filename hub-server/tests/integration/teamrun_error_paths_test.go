@@ -248,6 +248,7 @@ func errPathTeamDB(t *testing.T) *gorm.DB {
 		)`,
 		// Required by teamRunBudgetExceeded: ListPendingTasksByIDs
 		`CREATE TABLE pending_agent_tasks (
+			cancel_requested_at DATETIME, cancel_applied_at DATETIME, cancel_error TEXT DEFAULT '',
 			id TEXT PRIMARY KEY,
 			triggered_by_user_id TEXT NOT NULL,
 			edge_device_id TEXT DEFAULT '',
