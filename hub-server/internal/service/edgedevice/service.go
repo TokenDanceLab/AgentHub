@@ -204,55 +204,7 @@ func (s *Service) Poll(ctx context.Context, p *edgeenrollment.Principal) (*PollR
 		if err := s.enrollment.ValidatePrincipalTx(tx, p); err != nil {
 			return err
 		}
-		var tasks []model.PendingAgentTask
-		if err := ownedTasks(tx, p).
-			Where("pending_agent_tasks.cancel_requested_at IS NOT NULL AND pending_agent_tasks.cancel_applied_at IS NULL").
-			Where("pending_agent_tasks.status IN ?", []string{"queued", "dispatched", "running", "failed", "timeout"}).
-			Where("EXISTS (SELECT 1 FROM delivery_outbox o WHERE o.task_id = pending_agent_tasks.id AND o.transport = 'edge_poll' AND o.edge_device_id = ? AND (o.next_retry_at IS NULL OR o.next_retry_at <= ?))", p.DeviceID, now).
-			Clauses(clause.Locking{Strength: "UPDATE", Options: "SKIP LOCKED"}).Order("pending_agent_tasks.created_at ASC").Limit(batchSize).Find(&tasks).Error; err != nil {
-			return err
-		}
-		for _, task := range tasks {
-			if err := tx.Model(&outboxRow{}).Where("task_id = ? AND edge_device_id = ? AND transport = 'edge_poll'", task.ID, p.DeviceID).
-				Updates(map[string]any{"next_retry_at": now.Add(controlLease), "updated_at": now}).Error; err != nil {
-				return err
-			}
-			result.Controls = append(result.Controls, Control{ControlID: task.ID, TaskID: task.ID, RunID: task.EdgeRunID, Kind: "cancel"})
-		}
-		tasks = nil
-		if err := ownedTasks(tx, p).
-			Where("pending_agent_tasks.cancel_requested_at IS NULL AND pending_agent_tasks.status IN ? AND pending_agent_tasks.expire_at > ?", []string{"queued", "dispatched"}, now).
-			Where("EXISTS (SELECT 1 FROM delivery_outbox o WHERE o.task_id = pending_agent_tasks.id AND o.transport = 'edge_poll' AND o.edge_device_id = ? AND o.status IN ? AND (o.next_retry_at IS NULL OR o.next_retry_at <= ?))", p.DeviceID, []string{"pending", "sent", "retrying"}, now).
-			Clauses(clause.Locking{Strength: "UPDATE", Options: "SKIP LOCKED"}).Order("pending_agent_tasks.created_at ASC").Limit(batchSize).Find(&tasks).Error; err != nil {
-			return err
-		}
-		for _, task := range tasks {
-			var row outboxRow
-			if err := tx.Where("task_id = ? AND edge_device_id = ? AND transport = 'edge_poll' AND paired_credential_hash = ? AND status IN ?", task.ID, p.DeviceID, p.CredentialHash, []string{"pending", "sent", "retrying"}).Order("created_at ASC").Take(&row).Error; err != nil {
-				return err
-			}
-			var payload dispatch.Payload
-			if err := json.Unmarshal([]byte(row.Payload), &payload); err != nil {
-				return errcode.ErrBadRequest.WithMessage("invalid paired delivery payload")
-			}
-			if payload.TaskID != task.ID || payload.TargetID != p.TargetID || payload.EdgeDeviceID != p.DeviceID || payload.TriggerUserID != p.UserID || payload.DeliveryID != row.DeliveryID {
-				return errcode.AuthDeviceMismatch
-			}
-			req, err := BuildRunRequest(p, payload)
-			if err != nil {
-				return err
-			}
-			if err := tx.Model(&outboxRow{}).Where("id = ?", row.ID).Updates(map[string]any{"status": "sent", "next_retry_at": now.Add(deliveryLease), "updated_at": now}).Error; err != nil {
-				return err
-			}
-			if task.Status == model.TaskStatusQueued {
-				if err := tx.Model(&model.PendingAgentTask{}).Where("id = ?", task.ID).Updates(map[string]any{"status": model.TaskStatusDispatched, "dispatched_at": now}).Error; err != nil {
-					return err
-				}
-			}
-			result.Deliveries = append(result.Deliveries, Delivery{DeliveryID: row.DeliveryID, TaskID: task.ID, RunRequest: req})
-		}
-		return nil
+		return pollTasksTx(tx, p, now, result)
 	})
 	if err != nil {
 		return nil, err
@@ -265,11 +217,67 @@ func (s *Service) Poll(ctx context.Context, p *edgeenrollment.Principal) (*PollR
 	return result, nil
 }
 
+func pollTasksTx(tx *gorm.DB, p *edgeenrollment.Principal, now time.Time, result *PollResult) error {
+	var tasks []model.PendingAgentTask
+	if err := ownedTasks(tx, p).
+		Where("pending_agent_tasks.cancel_requested_at IS NOT NULL AND pending_agent_tasks.cancel_applied_at IS NULL").
+		Where("pending_agent_tasks.status IN ?", []string{"queued", "dispatched", "running", "failed", "timeout"}).
+		Where("EXISTS (SELECT 1 FROM delivery_outbox o WHERE o.task_id = pending_agent_tasks.id AND o.transport = 'edge_poll' AND o.edge_device_id = ? AND (o.next_retry_at IS NULL OR o.next_retry_at <= ?))", p.DeviceID, now).
+		Clauses(clause.Locking{Strength: "UPDATE", Options: "SKIP LOCKED"}).Order("pending_agent_tasks.created_at ASC").Limit(batchSize).Find(&tasks).Error; err != nil {
+		return err
+	}
+	for _, task := range tasks {
+		if err := tx.Model(&outboxRow{}).Where("task_id = ? AND edge_device_id = ? AND transport = 'edge_poll'", task.ID, p.DeviceID).
+			Updates(map[string]any{"next_retry_at": now.Add(controlLease), "updated_at": now}).Error; err != nil {
+			return err
+		}
+		result.Controls = append(result.Controls, Control{ControlID: task.ID, TaskID: task.ID, RunID: task.EdgeRunID, Kind: "cancel"})
+	}
+	tasks = nil
+	if err := ownedTasks(tx, p).
+		Where("pending_agent_tasks.cancel_requested_at IS NULL AND pending_agent_tasks.status IN ? AND pending_agent_tasks.expire_at > ?", []string{"queued", "dispatched"}, now).
+		Where("EXISTS (SELECT 1 FROM delivery_outbox o WHERE o.task_id = pending_agent_tasks.id AND o.transport = 'edge_poll' AND o.edge_device_id = ? AND o.status IN ? AND (o.next_retry_at IS NULL OR o.next_retry_at <= ?))", p.DeviceID, []string{"pending", "sent", "retrying"}, now).
+		Clauses(clause.Locking{Strength: "UPDATE", Options: "SKIP LOCKED"}).Order("pending_agent_tasks.created_at ASC").Limit(batchSize).Find(&tasks).Error; err != nil {
+		return err
+	}
+	for _, task := range tasks {
+		var row outboxRow
+		if err := tx.Where("task_id = ? AND edge_device_id = ? AND transport = 'edge_poll' AND paired_credential_hash = ? AND status IN ?", task.ID, p.DeviceID, p.CredentialHash, []string{"pending", "sent", "retrying"}).Order("created_at ASC").Take(&row).Error; err != nil {
+			return err
+		}
+		var payload dispatch.Payload
+		if err := json.Unmarshal([]byte(row.Payload), &payload); err != nil {
+			return errcode.ErrBadRequest.WithMessage("invalid paired delivery payload")
+		}
+		if payload.TaskID != task.ID || payload.TargetID != p.TargetID || payload.EdgeDeviceID != p.DeviceID || payload.TriggerUserID != p.UserID || payload.DeliveryID != row.DeliveryID {
+			return errcode.AuthDeviceMismatch
+		}
+		req, err := BuildRunRequest(p, payload)
+		if err != nil {
+			return err
+		}
+		if err := tx.Model(&outboxRow{}).Where("id = ?", row.ID).Updates(map[string]any{"status": "sent", "next_retry_at": now.Add(deliveryLease), "updated_at": now}).Error; err != nil {
+			return err
+		}
+		if task.Status == model.TaskStatusQueued {
+			if err := tx.Model(&model.PendingAgentTask{}).Where("id = ?", task.ID).Updates(map[string]any{"status": model.TaskStatusDispatched, "dispatched_at": now}).Error; err != nil {
+				return err
+			}
+		}
+		result.Deliveries = append(result.Deliveries, Delivery{DeliveryID: row.DeliveryID, TaskID: task.ID, RunRequest: req})
+	}
+	return nil
+}
+
+func validControlAck(controlID string, ack ControlAck) bool {
+	return controlID != "" && ack.TaskID == controlID && (ack.Status == "applied" || ack.Status == "failed") && len(ack.Error) <= 1024 && len(ack.RunID) <= 128
+}
+
 func (s *Service) AckControl(ctx context.Context, p *edgeenrollment.Principal, controlID string, ack ControlAck) error {
 	if err := s.validate(ctx, p); err != nil {
 		return err
 	}
-	if ack.TaskID != controlID || controlID == "" || (ack.Status != "applied" && ack.Status != "failed") || len(ack.Error) > 1024 || len(ack.RunID) > 128 {
+	if !validControlAck(controlID, ack) {
 		return errcode.ErrBadRequest
 	}
 	var cancelled *model.PendingAgentTask
@@ -313,6 +321,11 @@ func (s *Service) AckControl(ctx context.Context, p *edgeenrollment.Principal, c
 	if err != nil {
 		return err
 	}
+	s.publishCancelled(ctx, cancelled)
+	return nil
+}
+
+func (s *Service) publishCancelled(ctx context.Context, cancelled *model.PendingAgentTask) {
 	if cancelled != nil && s.cancelPublisher != nil {
 		if err := s.cancelPublisher(ctx, cancelled); err != nil {
 			// The authoritative state is already committed. A transient realtime
@@ -320,7 +333,6 @@ func (s *Service) AckControl(ctx context.Context, p *edgeenrollment.Principal, c
 			slog.Warn("paired cancellation event publish failed", "task_id", cancelled.ID, "error", err)
 		}
 	}
-	return nil
 }
 
 // RequestCancel persists intent even for an offline/revoked device. It never

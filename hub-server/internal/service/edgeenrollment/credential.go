@@ -63,69 +63,7 @@ func (s *Service) Exchange(ctx context.Context, enrollmentID, pollSecret string)
 	}
 	var result ExchangeResult
 	err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		var row model.EdgeEnrollment
-		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ?", enrollmentID).Take(&row).Error; err != nil {
-			return err
-		}
-		if subtle.ConstantTimeCompare([]byte(row.PollSecretHash), []byte(digest(pollSecret))) != 1 || !row.ExpiresAt.After(s.now()) || row.ExchangedAt != nil {
-			return ErrInvalid
-		}
-		if row.ConfirmedAt == nil {
-			result = ExchangeResult{Status: "pending", ExpiresAt: row.ExpiresAt}
-			return nil
-		}
-		if row.UserID == nil || row.UserIdentityID == nil {
-			return ErrInvalid
-		}
-		auth := Authorizer{UserID: *row.UserID, IdentityID: *row.UserIdentityID, Generation: row.Generation, OIDCClientID: row.OIDCClientID}
-		if err := s.checkIdentity(tx, auth, true); err != nil {
-			return err
-		}
-		if err := lockOwnerAndCheckDeviceQuota(tx, auth.UserID, row.DeviceID); err != nil {
-			return err
-		}
-		now := s.now()
-		// ON CONFLICT plus the subsequent lock serializes even the first claim
-		// from different enrollments of the same previously unknown device.
-		device := model.Device{ID: row.DeviceID, UserID: auth.UserID, DeviceType: deviceType, Capabilities: `[]`, LastActiveAt: now}
-		if err := tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&device).Error; err != nil {
-			return err
-		}
-		device = model.Device{}
-		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ?", row.DeviceID).Take(&device).Error; err != nil {
-			return err
-		}
-		if device.UserID != auth.UserID || device.DeviceType != deviceType {
-			return ErrConflict
-		}
-		target, err := pairedTarget(tx, row, auth.UserID)
-		if err != nil {
-			return err
-		}
-		// Locks can wait across the enrollment deadline; measure again at
-		// issuance instead of relying on the pre-lock admission timestamp.
-		now = s.now()
-		if !row.ExpiresAt.After(now) {
-			return ErrInvalid
-		}
-		token, err := secret()
-		if err != nil {
-			return err
-		}
-		credential := model.EdgeDeviceCredential{DeviceID: row.DeviceID, TargetID: target.ID, UserID: auth.UserID,
-			UserIdentityID: auth.IdentityID, OIDCClientID: auth.OIDCClientID, Generation: auth.Generation,
-			CredentialHash: digest(token), RuntimeID: row.RuntimeID, WorkspaceRoot: row.WorkspaceRoot,
-			CreatedAt: now, ExpiresAt: now.Add(CredentialTTL)}
-		if err := tx.Save(&credential).Error; err != nil {
-			return err
-		}
-		row.ExchangedAt = &now
-		if err := tx.Save(&row).Error; err != nil {
-			return err
-		}
-		result = ExchangeResult{Status: "enrolled", DeviceID: row.DeviceID, TargetID: target.ID, Credential: token,
-			ExpiresAt: credential.ExpiresAt, RuntimeID: row.RuntimeID, WorkspaceRoot: row.WorkspaceRoot}
-		return nil
+		return s.exchangeTx(tx, enrollmentID, pollSecret, &result)
 	})
 	if err != nil {
 		if repository.IsUniqueViolation(err) {
@@ -134,6 +72,72 @@ func (s *Service) Exchange(ctx context.Context, enrollmentID, pollSecret string)
 		return nil, storageError(err)
 	}
 	return &result, nil
+}
+
+func (s *Service) exchangeTx(tx *gorm.DB, enrollmentID, pollSecret string, result *ExchangeResult) error {
+	var row model.EdgeEnrollment
+	if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ?", enrollmentID).Take(&row).Error; err != nil {
+		return err
+	}
+	if subtle.ConstantTimeCompare([]byte(row.PollSecretHash), []byte(digest(pollSecret))) != 1 || !row.ExpiresAt.After(s.now()) || row.ExchangedAt != nil {
+		return ErrInvalid
+	}
+	if row.ConfirmedAt == nil {
+		*result = ExchangeResult{Status: "pending", ExpiresAt: row.ExpiresAt}
+		return nil
+	}
+	if row.UserID == nil || row.UserIdentityID == nil {
+		return ErrInvalid
+	}
+	auth := Authorizer{UserID: *row.UserID, IdentityID: *row.UserIdentityID, Generation: row.Generation, OIDCClientID: row.OIDCClientID}
+	if err := s.checkIdentity(tx, auth, true); err != nil {
+		return err
+	}
+	if err := lockOwnerAndCheckDeviceQuota(tx, auth.UserID, row.DeviceID); err != nil {
+		return err
+	}
+	now := s.now()
+	// ON CONFLICT plus the subsequent lock serializes even the first claim
+	// from different enrollments of the same previously unknown device.
+	device := model.Device{ID: row.DeviceID, UserID: auth.UserID, DeviceType: deviceType, Capabilities: `[]`, LastActiveAt: now}
+	if err := tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&device).Error; err != nil {
+		return err
+	}
+	device = model.Device{}
+	if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ?", row.DeviceID).Take(&device).Error; err != nil {
+		return err
+	}
+	if device.UserID != auth.UserID || device.DeviceType != deviceType {
+		return ErrConflict
+	}
+	target, err := pairedTarget(tx, row, auth.UserID)
+	if err != nil {
+		return err
+	}
+	// Locks can wait across the enrollment deadline; measure again at
+	// issuance instead of relying on the pre-lock admission timestamp.
+	now = s.now()
+	if !row.ExpiresAt.After(now) {
+		return ErrInvalid
+	}
+	token, err := secret()
+	if err != nil {
+		return err
+	}
+	credential := model.EdgeDeviceCredential{DeviceID: row.DeviceID, TargetID: target.ID, UserID: auth.UserID,
+		UserIdentityID: auth.IdentityID, OIDCClientID: auth.OIDCClientID, Generation: auth.Generation,
+		CredentialHash: digest(token), RuntimeID: row.RuntimeID, WorkspaceRoot: row.WorkspaceRoot,
+		CreatedAt: now, ExpiresAt: now.Add(CredentialTTL)}
+	if err := tx.Save(&credential).Error; err != nil {
+		return err
+	}
+	row.ExchangedAt = &now
+	if err := tx.Save(&row).Error; err != nil {
+		return err
+	}
+	*result = ExchangeResult{Status: "enrolled", DeviceID: row.DeviceID, TargetID: target.ID, Credential: token,
+		ExpiresAt: credential.ExpiresAt, RuntimeID: row.RuntimeID, WorkspaceRoot: row.WorkspaceRoot}
+	return nil
 }
 
 func lockOwnerAndCheckDeviceQuota(tx *gorm.DB, userID, deviceID string) error {

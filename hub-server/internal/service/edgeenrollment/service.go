@@ -129,7 +129,7 @@ func normalizeCode(value string) (string, error) {
 		return "", ErrInvalid
 	}
 	for _, c := range value {
-		if !(c >= 'A' && c <= 'Z' || c >= '2' && c <= '7') {
+		if !strings.ContainsRune("ABCDEFGHIJKLMNOPQRSTUVWXYZ234567", c) {
 			return "", ErrInvalid
 		}
 	}

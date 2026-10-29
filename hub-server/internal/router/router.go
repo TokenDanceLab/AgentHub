@@ -23,6 +23,20 @@ import (
 // file at exactly MaxSize would exceed a body limit of exactly MaxSize.
 const uploadMultipartHeadroom int64 = 1 << 20 // 1 MiB
 
+func pairedHandler(device *handler.DeviceHandler) *handler.EdgeEnrollmentHandler {
+	if device == nil {
+		return nil
+	}
+	return device.Paired
+}
+
+func legacyCallbackMiddleware(device *handler.DeviceHandler) gin.HandlerFunc {
+	if h := pairedHandler(device); h != nil {
+		return h.LegacyCallback
+	}
+	return func(c *gin.Context) { c.Next() }
+}
+
 func setupPairedEdgeRoutes(r *gin.Engine, auth *middleware.AuthMiddleware, cacheClient *cache.Client, h *handler.EdgeEnrollmentHandler, agent *handler.AgentHandler) {
 	if h == nil {
 		return
@@ -95,9 +109,7 @@ func SetupRoutes(r *gin.Engine, cfg *config.Config, authMW *middleware.AuthMiddl
 	// is registered separately below with upload-specific limits.
 	guardBody := middleware.BodyLimit(config.DefaultRequestBodyLimit)
 	guardTimeout := middleware.Timeout(config.DefaultRequestTimeout)
-	if deviceHandler != nil {
-		setupPairedEdgeRoutes(r, authMW, cacheClient, deviceHandler.Paired, agentHandler)
-	}
+	setupPairedEdgeRoutes(r, authMW, cacheClient, pairedHandler(deviceHandler), agentHandler)
 
 	if healthHandler != nil {
 		r.GET("/health", guardBody, guardTimeout, healthHandler.Check)
@@ -304,10 +316,7 @@ func SetupRoutes(r *gin.Engine, cfg *config.Config, authMW *middleware.AuthMiddl
 		// AGENTHUB_RATE_LIMIT_FAIL_OPEN (default fail-open). Re-registering an
 		// existing device_id still counts against the frequency window.
 		edge.POST("/devices/register", middleware.RateLimit(cacheClient, config.AuthRegisterRateLimit, config.AuthRateLimitWindow, middleware.IPKey), deviceHandler.Register)
-		legacyCallback := func(c *gin.Context) { c.Next() }
-		if deviceHandler != nil && deviceHandler.Paired != nil {
-			legacyCallback = deviceHandler.Paired.LegacyCallback
-		}
+		legacyCallback := legacyCallbackMiddleware(deviceHandler)
 		edge.POST("/agent-tasks/:id/ack", legacyCallback, agentHandler.TaskAck)
 		edge.POST("/agent-tasks/:id/stream", legacyCallback, agentHandler.TaskStream)
 		edge.POST("/agent-tasks/:id/done", legacyCallback, agentHandler.TaskDone)

@@ -340,14 +340,7 @@ func (a *App) startServer(ctx context.Context) error {
 				case <-a.bg.Ctx().Done():
 					return nil
 				case <-ticker.C:
-					if err := a.AuthService.PruneExpiredSessions(a.bg.Ctx()); err != nil {
-						slog.Warn("auth session cleanup unavailable")
-					}
-					if a.EdgeEnrollmentService != nil {
-						if err := a.EdgeEnrollmentService.PruneExpiredEnrollments(a.bg.Ctx()); err != nil {
-							slog.Warn("edge enrollment cleanup unavailable")
-						}
-					}
+					a.pruneExpiredCredentials(a.bg.Ctx())
 				}
 			}
 		})
@@ -446,6 +439,17 @@ func (a sessionAuditAdapter) RecordPrivilegedAction(ctx context.Context, in sess
 		AuthBasis:    in.AuthBasis,
 		Reason:       in.Reason,
 	})
+}
+
+func (a *App) pruneExpiredCredentials(ctx context.Context) {
+	if err := a.AuthService.PruneExpiredSessions(ctx); err != nil {
+		slog.Warn("auth session cleanup unavailable")
+	}
+	if a.EdgeEnrollmentService != nil {
+		if err := a.EdgeEnrollmentService.PruneExpiredEnrollments(ctx); err != nil {
+			slog.Warn("edge enrollment cleanup unavailable")
+		}
+	}
 }
 
 // executionTargetAuditAdapter satisfies executiontarget.PrivilegedActionAuditor.
