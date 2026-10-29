@@ -14,7 +14,8 @@ export function transcriptMessages(blocks: TranscriptBlock[]): ThreadMessageLike
       id: block.id,
       role,
       createdAt: block.createdAt ? new Date(block.createdAt) : undefined,
-      metadata: { custom: { author: block.author, blockId: block.id } },
+      metadata: { custom: { author: block.author, blockId: block.id,
+        ...(block.kind === 'text' ? { badgeLabel: block.badgeLabel } : {}) } },
       content: [],
     };
     switch (block.kind) {

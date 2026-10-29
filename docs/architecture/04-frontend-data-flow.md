@@ -99,6 +99,10 @@ The platform query cache owns optimistic message insertion and server ID reconci
 
 Production Web selects real data mode once at the root. Its model receives that value directly, and the existing auth state supplies the user profile; neither stale demo preferences nor a second profile request can change the authenticated data source.
 
+The conversation sidebar uses the same assistant-ui thread-list primitives. Web creates private conversations with a contact or an owner-only group for an Agent conversation. Rename follows Hub owner permission; archive updates the current member's setting; delete removes the current user's membership, not other users' history. An empty-workspace placeholder has no mutation actions. Unsupported actions remain hidden.
+
+Web history loads backward using `before_seq` and merges by server message ID and `client_msg_id`. Refresh keeps already loaded older pages, while confirmed server rows replace optimistic rows. Switching conversation remounts its chat runtime and restores its own draft; changing only the split layout preserves the host region. Native and Web share Markdown rendering for human and Agent messages.
+
 ## Realtime And Cache Flow
 
 Hub realtime events follow this pattern:

@@ -127,7 +127,7 @@ async function captureTheme(browser, theme) {
     await page.waitForFunction(
       () => {
         const log = document.querySelector('[role="log"]');
-        return Boolean(log) && log.querySelectorAll('.row-hd').length > 0;
+        return Boolean(log) && log.querySelectorAll('[data-slot="tool-group-trigger"]').length > 0;
       },
       undefined,
       { timeout: 20_000 },
@@ -168,7 +168,7 @@ async function captureTheme(browser, theme) {
       return { exists: true, width: Math.round(rect.width), height: Math.round(rect.height) };
     };
     const log = document.querySelector('[role="log"]');
-    const cardHeaders = log ? Array.from(log.querySelectorAll('.row-hd')) : [];
+    const cardHeaders = log ? Array.from(log.querySelectorAll('[data-slot="tool-group-trigger"]')) : [];
     const firstCard = cardHeaders.length > 0 ? cardHeaders[0].closest('[data-block-id]') ?? cardHeaders[0] : null;
     return {
       viewport: { width: window.innerWidth, height: window.innerHeight },
@@ -181,7 +181,7 @@ async function captureTheme(browser, theme) {
       streamingEnded: {
         typingIndicator: Boolean(document.querySelector('.typingIndicator')),
       },
-      composer: measure(document.querySelector('textarea')),
+      composer: measure(document.querySelector('textarea[data-composer-input]')),
       // #1998: the demo builder transcript carries a goal arc
       // (create_goal + update_goal complete), so the goal banner must be
       // projected in the chat header surface.

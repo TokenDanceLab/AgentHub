@@ -1,4 +1,5 @@
 "use client";
+import { useAssistantText } from '../text';
 
 import {
   memo,
@@ -101,7 +102,8 @@ function ToolGroupTrigger({
   count: number;
   active?: boolean;
 }) {
-  const label = `${count} tool ${count === 1 ? "call" : "calls"}`;
+  const t = useAssistantText();
+  const label = `${count} ${t(count === 1 ? 'tool call' : 'tool calls')}`;
 
   return (
     <CollapsibleTrigger

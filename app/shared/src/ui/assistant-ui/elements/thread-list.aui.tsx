@@ -234,7 +234,7 @@ const ThreadListItemGroups: FC<{ searchQuery?: string }> = ({
         data-slot="aui_thread-list-empty"
         className="text-muted-foreground px-2.5 py-4 text-sm"
       >
-        No threads found
+        <AssistantText>No threads found</AssistantText>
       </div>
     );
   }
@@ -451,7 +451,9 @@ const ThreadListItemRename: FC<{
 const ThreadListItemMore: FC<{ onRename: () => void }> = ({ onRename }) => {
   const { canRename, canDelete, canArchive, archived } = useContext(ThreadListCapabilitiesContext);
   const mayRename = useAuiState((state) => state.threadListItem.custom?.canRename !== false);
-  if (!canRename && !canDelete && !canArchive) return null;
+  const mayDelete = useAuiState((state) => state.threadListItem.custom?.canDelete !== false);
+  const mayArchive = useAuiState((state) => state.threadListItem.custom?.canArchive !== false);
+  if (!(canRename && mayRename) && !(canDelete && mayDelete) && !(canArchive && mayArchive)) return null;
   return (
     <ThreadListItemMorePrimitive.Root sharedFocusGroup>
       <ThreadListItemMorePrimitive.Trigger asChild>
@@ -480,7 +482,7 @@ const ThreadListItemMore: FC<{ onRename: () => void }> = ({ onRename }) => {
           <PencilIcon className="size-4" />
           <AssistantText>Rename</AssistantText>
         </ThreadListItemMorePrimitive.Item>}
-        {canArchive && <ThreadListItemPrimitive.Archive asChild>
+        {canArchive && mayArchive && <ThreadListItemPrimitive.Archive asChild>
           <ThreadListItemMorePrimitive.Item
             data-slot="aui_thread-list-item-more-item"
             className="hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground flex cursor-pointer items-center gap-2 rounded-lg px-2.5 py-1.5 text-sm outline-none select-none"
@@ -489,7 +491,7 @@ const ThreadListItemMore: FC<{ onRename: () => void }> = ({ onRename }) => {
             <AssistantText>{archived ? "Unarchive" : "Archive"}</AssistantText>
           </ThreadListItemMorePrimitive.Item>
         </ThreadListItemPrimitive.Archive>}
-        {canDelete && <ThreadListItemPrimitive.Delete asChild>
+        {canDelete && mayDelete && <ThreadListItemPrimitive.Delete asChild>
           <ThreadListItemMorePrimitive.Item
             data-slot="aui_thread-list-item-more-item"
             className="text-destructive hover:bg-destructive/10 hover:text-destructive focus:bg-destructive/10 focus:text-destructive flex cursor-pointer items-center gap-2 rounded-lg px-2.5 py-1.5 text-sm outline-none select-none"

@@ -18,6 +18,10 @@ export type Locale = 'zh' | 'en'
 export const chatviewResources = {
   zh: {
     'newConversation.agent': '新建 Agent 对话',
+    'composer.messageOnly': '仅发送消息',
+    'composer.executionTarget': '执行设备',
+    'composer.selectTarget': '选择执行设备',
+    'composer.noExecutionTarget': '没有可用的执行设备。请在设备页连接设备后重试。',
     // ═══ App shell ═══
     'app.dm.title': '单聊模式',
     'app.dm.desc': '你 ↔ Builder · 仅头像 · 所有卡片类型',
@@ -928,6 +932,10 @@ export const chatviewResources = {
 
   en: {
     'newConversation.agent': 'New agent conversation',
+    'composer.messageOnly': 'Message only',
+    'composer.executionTarget': 'Execution device',
+    'composer.selectTarget': 'Choose an execution device',
+    'composer.noExecutionTarget': 'No execution device is available. Connect a device on the Devices page and try again.',
     // ═══ App shell ═══
     'app.dm.title': 'DM Mode',
     'app.dm.desc': '1-on-1 chat · avatar only · all card types',

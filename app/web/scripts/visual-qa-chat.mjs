@@ -468,9 +468,9 @@ async function captureTheme(browser, theme, scene, vp = { width: 1440, height: 8
           const log = document.querySelector('[role="log"]');
           if (!log) return false;
           const copyBtn = Array.from(log.querySelectorAll('button')).find((b) =>
-            /^(复制|Copy)$/.test((b.getAttribute('aria-label') || '').trim()),
+            /^(复制|Copy)$/.test((b.getAttribute('aria-label') || b.textContent || '').trim()),
           );
-          const card = log.querySelector(`[data-block-id="call-${callId}"]`);
+          const card = log.querySelector('[data-slot="tool-group-trigger"]');
           return Boolean(copyBtn) && Boolean(card);
         },
         { callId: TOOL_CALL_ID },
@@ -518,11 +518,11 @@ async function captureTheme(browser, theme, scene, vp = { width: 1440, height: 8
     // hook for fenced blocks; the wrapper is the header's parent.
     const copyBtn = log
       ? Array.from(log.querySelectorAll('button')).find((b) =>
-          /^(复制|Copy)$/.test((b.getAttribute('aria-label') || '').trim()),
+          /^(复制|Copy)$/.test((b.getAttribute('aria-label') || b.textContent || '').trim()),
         )
       : null;
     const codeBlockWrapper = copyBtn ? copyBtn.closest('div')?.parentElement : null;
-    const toolCard = log ? log.querySelector(`[data-block-id="call-${callId}"]`) : null;
+    const toolCard = log ? log.querySelector('[data-slot="tool-group-trigger"]')?.closest('[data-block-id]') : null;
     const buttons = Array.from(document.querySelectorAll('button'));
     const named = (re) =>
       buttons.some((b) => re.test(b.textContent || '') || re.test(b.getAttribute('aria-label') || ''));
@@ -533,7 +533,7 @@ async function captureTheme(browser, theme, scene, vp = { width: 1440, height: 8
         document.querySelector('[data-testid="agenthub-workbench"]')?.getAttribute('data-data-mode') ?? '',
       workbenchShell: Boolean(document.querySelector('[data-testid="agenthub-workbench"]')),
       chatLog: measure(log),
-      userMessage: { count: log ? log.querySelectorAll('.user-bubble').length : 0 },
+      userMessage: { count: log ? log.querySelectorAll('[data-slot="aui_user-message-root"]').length : 0 },
       codeBlock: measure(codeBlockWrapper),
       toolCard: measure(toolCard),
       streamingEnded: {
@@ -541,7 +541,7 @@ async function captureTheme(browser, theme, scene, vp = { width: 1440, height: 8
         sendVisible: named(/^(?:Send message|发送消息)$/),
         stopVisible: named(/^(?:Stop|停止)/),
       },
-      composer: measure(document.querySelector('textarea')),
+      composer: measure(document.querySelector('textarea[data-composer-input]')),
       // #1998: goal banner geometry — exists only in the goal scene.
       goalBanner: measure(document.querySelector('section[data-goal-status]')),
       goalStatus: document.querySelector('section[data-goal-status]')?.getAttribute('data-goal-status') ?? '',

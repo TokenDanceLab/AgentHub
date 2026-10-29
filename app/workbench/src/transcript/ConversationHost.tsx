@@ -310,7 +310,7 @@ export const ConversationHost = React.memo(function ConversationHost(props: Conv
         }}
         selectedIds={props.selectedBlockIds} selectionMode={props.selectionMode}
         hasEarlier={props.hasEarlierMessages} onLoadEarlier={props.loadEarlierMessages}
-        isLoading={props.transcriptLoading} isDisabled={!props.activeConversation}
+        isLoading={props.transcriptLoading} isDisabled={!props.activeConversation || props.currentConversationId === 'hub-empty-workspace'}
         isSendDisabled={Boolean(selectedAgent && props.composerExecutionTargets && !props.selectedExecutionTargetId)}
         isRunning={props.isAgentRunning} onCancel={props.onCancelRun}
         onEvidenceAction={props.onBlockAction}
@@ -333,6 +333,9 @@ export const ConversationHost = React.memo(function ConversationHost(props: Conv
               <option value="">{t('composer.selectTarget', { defaultValue: '选择执行设备' })}</option>
               {props.composerExecutionTargets.map((target) => <option key={target.id} value={target.id}>{target.label}</option>)}
             </select>}
+            {selectedAgent && props.composerExecutionTargets?.length === 0 && <p role="status" className="text-muted-foreground text-xs">
+              {t('composer.noExecutionTarget')}
+            </p>}
           </div>}
         </>} />
     </div>

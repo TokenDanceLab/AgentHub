@@ -116,9 +116,9 @@ test.describe('Web stubbed Hub fenced-code transcript (#1971)', () => {
     // Markdown CodeBlock wrapper in dev builds carries a readable
     // `codeBlockWrapper` CSS-module class; the lazy highlighter or its
     // <pre><code> fallback both live inside that wrapper).
-    const humanBlock = page.locator('[class*="codeBlockWrapper"]', { hasText: 'print("hello fenced")' });
+    const humanBlock = page.getByRole('log').locator('pre code', { hasText: 'print("hello fenced")' });
     await expect(humanBlock).toBeVisible();
-    const agentBlock = page.locator('[class*="codeBlockWrapper"]', { hasText: 'return 42' });
+    const agentBlock = page.getByRole('log').locator('pre code', { hasText: 'return 42' });
     await expect(agentBlock).toBeVisible();
     // The preamble paragraph and the code block are distinct nodes.
     await expect(page.getByText('print("hello fenced")')).toBeVisible();

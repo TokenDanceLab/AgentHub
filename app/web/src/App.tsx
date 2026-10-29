@@ -153,8 +153,7 @@ function WebWorkbenchRoot() {
     }
   }, [hubClientForConversations, sessionQueryClient]);
 
-  // Sidebar "新建会话" — the Hub has no blank-session API (sessions
-  // are always peer-bounded), so the direct entry opens the contact picker
+  // Sidebar "新建会话" opens the contact / owner-only agent group picker
   // and creates through the same real createPrivateSession chain the
   // Contacts page uses. Errors stay visible in the modal (never swallowed;
   // the legacy onNavigateToConversation catch → undefined is NOT copied).

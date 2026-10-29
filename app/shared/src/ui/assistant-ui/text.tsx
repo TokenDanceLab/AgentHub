@@ -2,6 +2,7 @@ import { useTranslation } from 'react-i18next';
 import { useCallback } from 'react';
 
 const zh: Record<string, string> = {
+  'Approve': '允许', 'Profile': '资料卡', 'tool call': '次工具调用', 'tool calls': '次工具调用',
   'New Thread': '新建对话', 'No threads found': '没有匹配的对话', 'Search threads': '搜索对话',
   'Rename': '重命名', 'Delete': '删除', 'Archive': '归档', 'Unarchive': '取消归档',
   'More options': '更多选项', 'Active conversations': '当前对话', 'Archived conversations': '已归档对话',
