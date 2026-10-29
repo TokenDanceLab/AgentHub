@@ -21,6 +21,7 @@ func (a *App) setupRouter() (*gin.Engine, error) {
 	r.Use(middleware.CustomRecovery())
 	authMW := middleware.NewAuthMiddleware(a.Config, middleware.AuthDependencies{
 		BlacklistChecker: a.CacheClient,
+		Sessions:         a.AuthService,
 		PermissionAudit:  a.auditPermissionDecision,
 	})
 	if err := router.SetupRoutes(r, a.Config, authMW, a.Config.JWT.Secret, a.CacheClient,

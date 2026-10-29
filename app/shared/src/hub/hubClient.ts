@@ -9,6 +9,8 @@ import type {
   HubOidcAuthorizeResponse,
   HubOidcCallbackRequest,
   HubOidcCallbackResponse,
+  HubBrowserSession,
+  HubBrowserCallbackRequest,
   HubSearchResult,
   HubFriendRequest,
   HubContactInfo,
@@ -53,11 +55,13 @@ import {
   resolveHubClientTransportOptions,
 } from './hubClientTransportUtils';
 import { createHubClientExtendedApi } from './hubClientApiExtended';
+import { withHubAuthTransport } from './hubClientAuthTransport';
 
 // ── Public type / envelope re-exports (extracted #810) ──
 export * from './hubClientPublicReexports';
 
 export function createHubClient(opts: HubClientOptions = {}) {
+  opts = withHubAuthTransport(opts);
   const runtime = resolveHubClientRuntime(opts);
   const { request, requestWithFallback, uploadMultipart } =
     createHubClientTransport(resolveHubClientTransportOptions(runtime, opts));
@@ -77,6 +81,13 @@ export function createHubClient(opts: HubClientOptions = {}) {
       invokePathInitRequest((path, init) => request<HubOidcAuthorizeResponse>(path, init), hubPayload.buildOidcAuthorizeRequest(body)),
     oidcCallback: (body: HubOidcCallbackRequest) =>
       invokePathInitRequest((path, init) => request<HubOidcCallbackResponse>(path, init), hubPayload.buildOidcCallbackPathInit(body)),
+    browserAuthorize: (deviceId: string) =>
+      request<HubOidcAuthorizeResponse>('/client/auth/browser/authorize', hubPayload.buildJsonPostInit({ device_id: deviceId })),
+    browserCallback: (body: HubBrowserCallbackRequest) =>
+      request<HubBrowserSession>('/client/auth/browser/callback', hubPayload.buildJsonPostInit(body)),
+    browserSession: () => request<HubBrowserSession>('/client/auth/browser/session'),
+    browserLogout: () => request<void>('/client/auth/browser/logout', { method: 'POST' }),
+    browserLogoutAccount: () => request<{ logout_url: string }>('/client/auth/browser/logout/account', { method: 'POST' }),
 
     searchUser: (targetUserId: string) =>
       request<HubSearchResult>(hubPayload.buildSearchUserPath(targetUserId)),

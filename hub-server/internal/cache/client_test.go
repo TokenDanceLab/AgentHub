@@ -1455,3 +1455,44 @@ func TestCheckRateLimit_SetsTTLAtomically(t *testing.T) {
 	assert.Greater(t, ttl, time.Duration(0), "ratelimit key must carry a TTL after the first call")
 	assert.LessOrEqual(t, ttl, 60*time.Second)
 }
+
+func TestCheckRateLimit_SteadyTrafficDoesNotExtendWindow(t *testing.T) {
+	c, mr := testClient(t)
+	ctx := t.Context()
+
+	count, exceeded, err := c.CheckRateLimit(ctx, "steady-probe", 2)
+	require.NoError(t, err)
+	require.Equal(t, int64(1), count)
+	require.False(t, exceeded)
+
+	for i := 0; i < 4; i++ {
+		mr.FastForward(20 * time.Second)
+		count, exceeded, err = c.CheckRateLimit(ctx, "steady-probe", 2)
+		require.NoError(t, err)
+		if i < 2 {
+			require.Equal(t, int64(i+2), count)
+			require.Equal(t, i == 1, exceeded)
+			require.Equal(t, time.Duration(40-i*20)*time.Second, mr.TTL("ratelimit:steady-probe"))
+		} else {
+			require.Equal(t, int64(i-1), count)
+			require.False(t, exceeded, "continued requests must recover when the original window expires")
+		}
+	}
+}
+
+func TestCheckRateLimit_RepairsKeyWithoutExpiry(t *testing.T) {
+	c, mr := testClient(t)
+	ctx := t.Context()
+	require.NoError(t, c.rdb.Set(ctx, "ratelimit:legacy-window", 100, 0).Err())
+
+	_, exceeded, err := c.CheckRateLimit(ctx, "legacy-window", 100)
+	require.NoError(t, err)
+	require.True(t, exceeded)
+	require.Equal(t, time.Minute, mr.TTL("ratelimit:legacy-window"))
+
+	mr.FastForward(time.Minute)
+	count, exceeded, err := c.CheckRateLimit(ctx, "legacy-window", 100)
+	require.NoError(t, err)
+	require.Equal(t, int64(1), count)
+	require.False(t, exceeded)
+}

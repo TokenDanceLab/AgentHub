@@ -12,8 +12,19 @@ export interface HubResponseEnvelope<T = unknown> {
 
 export type HubEnvelope<T = unknown> = HubResponseEnvelope<T>;
 
+/** Browser sessions never expose a bearer credential to JavaScript. */
+export type HubAuthTransport =
+  | { kind: 'bearer'; getToken: () => string | null | undefined }
+  | {
+    kind: 'browser-session';
+    origin: string;
+    getCsrfToken: () => string | null;
+    onUnauthorized?: () => void;
+  };
+
 export interface HubClientOptions {
   baseUrl?: string;
+  authTransport?: HubAuthTransport;
   getToken?: () => string | null | undefined;
   fetch?: typeof fetch;
   /** Request timeout in milliseconds. Default: 30000 (30s). */
@@ -93,6 +104,18 @@ export interface HubOidcCallbackRequest {
 export interface HubOidcCallbackResponse extends HubAuthResponse {
   // Desktop/Web auth layers historically require a user object on callback success.
   user?: HubUserProfile;
+}
+
+export interface HubBrowserSession {
+  user: HubUserProfile;
+  expires_at: string;
+  csrf_token: string;
+}
+
+export interface HubBrowserCallbackRequest {
+  code: string;
+  state: string;
+  iss: string;
 }
 
 export type HubContactType = 'user' | 'agent' | string;

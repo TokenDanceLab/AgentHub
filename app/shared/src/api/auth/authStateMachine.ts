@@ -59,7 +59,7 @@ export interface HubAuthCoreOptions {
   createClient: HubClientFactory;
 }
 
-export function createHubAuthCore(ports: HubAuthPorts, options: HubAuthCoreOptions): HubAuth {
+export function createHubAuthCore(ports: HubAuthPorts, options: HubAuthCoreOptions): HubAuth & { invalidate: () => Promise<void> } {
   const { createClient } = options;
   const { deviceIdentity, tokenStorage, pendingStorage, callbackChannel, redirectOpener, sessionSync } = ports;
 
@@ -85,63 +85,105 @@ export function createHubAuthCore(ports: HubAuthPorts, options: HubAuthCoreOptio
     listeners.forEach((fn) => fn(snapshot));
   }
 
-  function getToken(): string | null {
-    return state.token;
-  }
-
-  // Client used for authed calls (me/logout); picks up the live token via getToken.
-  const authedClient = (): HubClient => options.client ?? createClient({ getToken });
+  // An in-flight request belongs to its captured credential, not a newer login.
+  const authedClient = (token: string): HubClient => options.client ?? createClient({ getToken: () => token });
   // Client used for public calls (authorize/refresh).
   const publicClient = (): HubClient => options.client ?? createClient();
 
-  let authClient: HubClient = authedClient();
+  let generation = 0;
+  let restoreBlocked = false;
+  const isCurrent = (attempt: number) => generation === attempt;
+
+  // Keychain writes cannot be cancelled. Drain every older write/clear before
+  // persisting a newer login, even when one of the storage operations fails.
+  let credentialQueue: Promise<void> = Promise.resolve();
+  function withCredentials<T>(operation: () => Promise<T>): Promise<T> {
+    const result = credentialQueue.then(operation);
+    credentialQueue = result.then(() => {}, () => {});
+    return result;
+  }
+
+  async function clearStoredCredentials() {
+    // Mobile ports update one shared credential blob. Even within the outer
+    // queue these operations must remain sequential to avoid lost updates.
+    const failures: unknown[] = [];
+    for (const clear of [
+      () => tokenStorage.saveTokenSource(null),
+      () => tokenStorage.clearAccessToken(),
+      () => tokenStorage.clearRefreshToken(),
+    ]) {
+      try { await clear(); } catch (error) { failures.push(error); }
+    }
+    if (failures.length) throw failures[0];
+  }
+
+  async function persistCredentials(attempt: number, token: string, refreshToken: string | null, source: HubTokenSource) {
+    try {
+      return await withCredentials(async () => {
+        if (!isCurrent(attempt)) return false;
+        try {
+          await tokenStorage.saveRefreshToken(refreshToken);
+          if (!isCurrent(attempt)) return false;
+          await tokenStorage.saveAccessToken(token);
+          if (!isCurrent(attempt)) return false;
+          tokenStorage.saveTokenSource(source);
+          return true;
+        } finally {
+          // A superseding login can fail before writing anything. Remove this
+          // attempt's partial writes while still owning the queue, never after
+          // a newer credential commit has been allowed to start.
+          if (!isCurrent(attempt)) await clearStoredCredentials();
+        }
+      });
+    } catch (error) {
+      if (isCurrent(attempt)) await clearSession().catch(() => {});
+      throw error;
+    }
+  }
 
   async function completeLogin(
+    attempt: number,
     token: string,
     refreshToken: string | null,
     source: HubTokenSource,
     user?: HubTokenResponse['user'],
   ) {
-    await tokenStorage.saveRefreshToken(refreshToken);
-    state.token = token;
-    state.refreshToken = refreshToken;
-    state.tokenSource = source;
-    await tokenStorage.saveAccessToken(token);
-    tokenStorage.saveTokenSource(source);
-
-    authClient = authedClient();
+    if (!isCurrent(attempt)) return false;
+    let profile = user ?? null;
     // If the user profile is already available (OIDC callback), use it directly.
-    if (user) {
-      state.user = user;
-    } else {
+    if (!profile) {
       try {
-        state.user = await authClient.me();
+        profile = await authedClient(token).me();
       } catch {
         // Will be refreshed on next auto-login attempt.
       }
     }
-    state.isAuthenticated = true;
-    sessionSync.setAuthenticated(state.user?.id ?? null, state.user?.username ?? null);
-    notify();
+    if (!isCurrent(attempt) || !await persistCredentials(attempt, token, refreshToken, source)) return false;
+    if (!isCurrent(attempt)) return false;
+    Object.assign(state, { token, refreshToken, tokenSource: source, user: profile });
+    markAuthenticated();
+    return true;
   }
 
   function markAuthenticated() {
+    restoreBlocked = false;
     state.isAuthenticated = true;
     sessionSync.setAuthenticated(state.user?.id ?? null, state.user?.username ?? null);
     notify();
   }
 
   async function clearSession() {
+    generation += 1;
+    restoreBlocked = true;
     state.token = null;
     state.refreshToken = null;
     state.user = null;
     state.isAuthenticated = false;
     state.tokenSource = null;
-    tokenStorage.saveTokenSource(null);
-    await tokenStorage.clearAccessToken();
-    await tokenStorage.clearRefreshToken();
     sessionSync.clear();
     notify();
+    pendingStorage.clear();
+    await withCredentials(clearStoredCredentials);
   }
 
   /**
@@ -191,7 +233,7 @@ export function createHubAuthCore(ports: HubAuthPorts, options: HubAuthCoreOptio
   }
 
   /** Browser-redirect callback path shared by Web and Desktop dev mode. */
-  async function handleBrowserCallback(browserCallback: OidcCallbackResult): Promise<boolean> {
+  async function handleBrowserCallback(browserCallback: OidcCallbackResult, attempt: number): Promise<boolean> {
     const pending = pendingStorage.load();
     pendingStorage.clear();
     if (!pending) {
@@ -220,15 +262,18 @@ export function createHubAuthCore(ports: HubAuthPorts, options: HubAuthCoreOptio
         pending.deviceId,
         pending.redirectUri,
       );
-      await completeLogin(
+      if (!isCurrent(attempt)) return false;
+      const completed = await completeLogin(
+        attempt,
         tokenResp.access_token,
         tokenResp.refresh_token,
         'account',
         tokenResp.user ?? undefined,
       );
-      callbackChannel.leaveCallbackRoute();
-      return true;
+      if (isCurrent(attempt)) callbackChannel.leaveCallbackRoute();
+      return completed;
     } catch (err) {
+      if (!isCurrent(attempt)) return false;
       callbackChannel.leaveCallbackRoute();
       const detail = err instanceof Error ? err.message : 'Unknown error';
       throw oidcErrorFromExchangeFailure(err, detail);
@@ -236,6 +281,7 @@ export function createHubAuthCore(ports: HubAuthPorts, options: HubAuthCoreOptio
   }
 
   return {
+    invalidate: clearSession,
     getState: () => snapshot,
 
     subscribe(fn: (s: HubAuthState) => void) {
@@ -247,14 +293,19 @@ export function createHubAuthCore(ports: HubAuthPorts, options: HubAuthCoreOptio
 
     // ── TokenDance Account OIDC PKCE login ──
     async loginWithAccount() {
+      const attempt = ++generation;
+      restoreBlocked = true;
+      pendingStorage.clear();
       // 1. Generate PKCE parameters.
       const codeVerifier = generateCodeVerifier();
       const codeChallenge = await computeCodeChallenge(codeVerifier);
+      if (!isCurrent(attempt)) return;
       const deviceId = deviceIdentity.getOrCreateDeviceId();
 
       // 2. Start the platform callback channel; browser mode may navigate away
       //    after the redirect opens (callback promise never settles there).
       const { redirectUri, callback } = await callbackChannel.start();
+      if (!isCurrent(attempt)) return;
 
       // 3. Call Hub to get the authorization URL and server-generated state.
       let authorizeResp: { state: string; authorization_url: string; issuer: string };
@@ -276,11 +327,13 @@ export function createHubAuthCore(ports: HubAuthPorts, options: HubAuthCoreOptio
         }
         authorizeResp = await publicClient().oidcAuthorize(authorizeBody);
       } catch (err) {
+        if (!isCurrent(attempt)) return;
         const detail = err instanceof Error ? err.message : 'Unknown error';
         const oidcErr = new OidcError('startFailed', `Failed to start OIDC login: ${detail}`, detail);
         oidcErr.cause = err;
         throw oidcErr;
       }
+      if (!isCurrent(attempt)) return;
 
       const { state: serverState, authorization_url: authUrl, issuer } = authorizeResp;
       if (!issuer) {
@@ -302,9 +355,11 @@ export function createHubAuthCore(ports: HubAuthPorts, options: HubAuthCoreOptio
 
       // 4. Open the authorization URL (navigates away in browser mode).
       await redirectOpener.open(authUrl);
+      if (!isCurrent(attempt)) return;
 
       // 5. Local-callback-server mode (Tauri): wait for the callback.
       const callbackResult = await callback;
+      if (!isCurrent(attempt)) return;
       pendingStorage.clear();
 
       // 6. Validate state matches (CSRF protection).
@@ -327,6 +382,7 @@ export function createHubAuthCore(ports: HubAuthPorts, options: HubAuthCoreOptio
           redirectUri,
         );
       } catch (err) {
+        if (!isCurrent(attempt)) return;
         const detail = err instanceof Error ? err.message : 'Unknown error';
         const oidcErr = oidcErrorFromExchangeFailure(err, detail);
         oidcErr.cause = err;
@@ -335,6 +391,7 @@ export function createHubAuthCore(ports: HubAuthPorts, options: HubAuthCoreOptio
 
       // 8. Store tokens and update auth state.
       await completeLogin(
+        attempt,
         tokenResp.access_token,
         tokenResp.refresh_token,
         'account',
@@ -343,48 +400,53 @@ export function createHubAuthCore(ports: HubAuthPorts, options: HubAuthCoreOptio
     },
 
     async logout() {
-      if (state.token) {
-        await authClient.request('/client/auth/logout', { method: 'POST' }).catch(() => {});
-      }
-      await clearSession();
+      const remote = state.token
+        ? authedClient(state.token).request('/client/auth/logout', { method: 'POST' }).catch(() => {})
+        : Promise.resolve();
+      await Promise.all([clearSession(), remote]);
     },
 
     async tryAutoLogin() {
       // Browser-redirect mode: process the OIDC callback landing on this page.
       const browserCallback = callbackChannel.readBrowserCallback();
+      if (!browserCallback && restoreBlocked) return false;
+      const attempt = ++generation;
       if (browserCallback) {
-        return handleBrowserCallback(browserCallback);
+        restoreBlocked = true;
+        return handleBrowserCallback(browserCallback, attempt);
       }
 
       // Restore the access token from platform storage.
-      if (!state.token) {
-        const stored = await tokenStorage.loadAccessToken();
-        if (stored) {
-          state.token = stored;
-          state.tokenSource = tokenStorage.loadTokenSource();
-        }
-      }
-      if (!state.token) return false;
-      authClient = authedClient();
+      await credentialQueue;
+      if (!isCurrent(attempt)) return false;
+      const token = state.token ?? await tokenStorage.loadAccessToken();
+      if (!isCurrent(attempt) || !token) return false;
+      const source = state.tokenSource ?? tokenStorage.loadTokenSource();
       try {
-        state.user = await authClient.me();
+        const user = await authedClient(token).me();
+        if (!isCurrent(attempt)) return false;
+        Object.assign(state, { token, tokenSource: source, user });
         markAuthenticated();
         return true;
       } catch (authErr) {
+        if (!isCurrent(attempt)) return false;
         const refreshToken = state.refreshToken ?? (await tokenStorage.loadRefreshToken());
+        if (!isCurrent(attempt)) return false;
         if (refreshToken) {
           try {
             const refreshClient = publicClient();
             const res = await refreshClient.refresh(refreshToken);
-            state.token = res.access_token;
-            state.refreshToken = res.refresh_token;
-            await tokenStorage.saveAccessToken(res.access_token);
-            await tokenStorage.saveRefreshToken(res.refresh_token);
-            authClient = authedClient();
-            state.user = await authClient.me();
+            if (!isCurrent(attempt) || !await persistCredentials(attempt, res.access_token, res.refresh_token, source)) return false;
+            if (!isCurrent(attempt)) return false;
+            // Preserve a rotated refresh credential even if /me is transiently unavailable.
+            Object.assign(state, { token: res.access_token, refreshToken: res.refresh_token, tokenSource: source });
+            const user = await authedClient(res.access_token).me();
+            if (!isCurrent(attempt)) return false;
+            state.user = user;
             markAuthenticated();
             return true;
           } catch (refreshErr) {
+            if (!isCurrent(attempt)) return false;
             if (isTerminalHubAuthError(refreshErr)) {
               await clearSession();
             }

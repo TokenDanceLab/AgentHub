@@ -10,6 +10,7 @@ import { type Transport } from '@shared/transport';
 import type { TransportStatus } from '@shared/transport';
 import { useConnectionStore } from '@/stores/connectionStore';
 import { useHubStore } from '@/stores/hubStore';
+import { setBrowserCsrfToken } from '@/api/browserSessionRuntime';
 import { useToastStore } from '@shared/ui/toast';
 import {
   AGENT_STREAM_LIVE_BATCH_WINDOW_MS,
@@ -48,6 +49,23 @@ describe('webHubRealtime', () => {
     expect(invalidateQueries).toHaveBeenCalledWith({
       queryKey: ['web-v4', 'hub-messages', 'hub-session-nested'],
     });
+  });
+
+  it('marks a loaded older page recalled in the same cache without touching other sessions', () => {
+    const queryClient = new QueryClient();
+    const older = { id: 'old-message', session_id: 'session-a', seq_id: 2, content: 'older text' };
+    const latest = { id: 'new-message', session_id: 'session-a', seq_id: 100, content: 'latest text' };
+    queryClient.setQueryData(['web-v4', 'hub-messages', 'session-a'], [older, latest]);
+    queryClient.setQueryData(['web-v4', 'hub-messages', 'session-b'], [older]);
+    invalidateWebWorkbenchHubQueries(queryClient, HUB_EVENTS.MESSAGE_RECALL, {
+      message: { session_id: 'session-a', message_id: 'old-message' },
+    });
+    expect(queryClient.getQueryData(['web-v4', 'hub-messages', 'session-a'])).toEqual([{ ...older, recalled: true }, latest]);
+    expect(queryClient.getQueryData(['web-v4', 'hub-messages', 'session-b'])).toEqual([older]);
+    invalidateWebWorkbenchHubQueries(queryClient, HUB_EVENTS.MESSAGE_RECALL, { session_id: 'missing', message_id: 'unknown' });
+    expect(queryClient.getQueryState(['web-v4', 'hub-messages', 'missing'])).toBeUndefined();
+    invalidateWebWorkbenchHubQueries(queryClient, HUB_EVENTS.MESSAGE_RECALL, { session_id: 'session-a', message_id: 'unknown' });
+    expect(queryClient.getQueryData(['web-v4', 'hub-messages', 'session-a'])).toEqual([{ ...older, recalled: true }, latest]);
   });
 
   it('invalidates all Hub messages when agent task events omit a session id', () => {
@@ -882,5 +900,30 @@ describe('device.kicked feedback (#1816)', () => {
     expect(useHubStore.getState().showAuthModal).toBe(false);
 
     harness.unmount();
+  });
+
+  it('closes the browser transport and clears session state on auth.revoked', async () => {
+    useHubStore.getState().setAuthenticated(true, 'user-1', 'alice');
+    const harness = mountKickedHarness();
+    act(() => harness.deliver({ type: 'auth.revoked', payload: { reason: 'session_revoked' } }));
+    expect(harness.closeSpy).toHaveBeenCalled();
+    await waitFor(() => expect(useHubStore.getState().authenticated).toBe(false));
+    expect(useHubStore.getState().showAuthModal).toBe(true);
+    harness.unmount();
+  });
+
+  it('does not let a retired socket revoke a newer browser identity', () => {
+    setBrowserCsrfToken('old-session-proof');
+    useHubStore.getState().setAuthenticated(true, 'user-old', 'old');
+    const harness = mountKickedHarness();
+    act(() => {
+      setBrowserCsrfToken('new-session-proof');
+      useHubStore.getState().setAuthenticated(true, 'user-new', 'new');
+      harness.deliver({ type: HUB_EVENTS.AUTH_REVOKED, payload: { reason: 'session_revoked' } });
+    });
+    expect(useHubStore.getState().authenticated).toBe(true);
+    expect(useHubStore.getState().userId).toBe('user-new');
+    harness.unmount();
+    setBrowserCsrfToken(null);
   });
 });

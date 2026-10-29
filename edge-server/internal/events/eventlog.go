@@ -40,10 +40,11 @@ type EventLog struct {
 	mu          sync.Mutex
 	f           *os.File
 	path        string
-	maxSize     int64           // max file size in bytes before truncation; 0 = unlimited
-	index       map[int64]int64 // seq → byte offset of the start of that line
-	orderedSeq  []int64         // distinct keys of index, sorted ascending; binary-searched by ReadFrom
-	indexedSize int64           // file size at last index build, to detect external changes
+	maxSize     int64            // max file size in bytes before truncation; 0 = unlimited
+	index       map[int64]int64  // seq → byte offset of the start of that line
+	orderedSeq  []int64          // distinct keys of index, sorted ascending; binary-searched by ReadFrom
+	indexedSize int64            // file size at last index build, to detect external changes
+	now         func() time.Time // instance-local test clock; nil uses time.Now
 
 	// Invariant: orderedSeq is sorted ascending and holds exactly the keys of
 	// index, so len(orderedSeq) == len(index). It is not positionally
@@ -333,9 +334,13 @@ func (l *EventLog) truncateLocked() {
 	// Timed because the whole body runs under l.mu: this is the bus freeze an
 	// operator needs to be able to see. Both counters are written once
 	// per truncation, not per event, so they add nothing to the Append path.
-	truncateStarted := time.Now()
+	now := l.now
+	if now == nil {
+		now = time.Now
+	}
+	truncateStarted := now()
 	defer func() {
-		elapsed := time.Since(truncateStarted).Nanoseconds()
+		elapsed := now().Sub(truncateStarted).Nanoseconds()
 		l.truncateNanos.Add(elapsed)
 		l.truncateLastNanos.Store(elapsed)
 	}()

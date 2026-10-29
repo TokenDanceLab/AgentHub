@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { hubQueryKeys } from '@shared/stores/queryKeys';
 import type { TokenUsagePageTeam } from '@agenthub/workbench';
 import { createHubClient } from './hubClient';
-import { getAccessToken } from '@/hooks/useAuth';
+import { isHubAuthenticated } from '@/hooks/useAuth';
 import { useHubStore } from '@/stores/hubStore';
 
 /* ═══════════════════════════════════════════════════════════════════════
@@ -20,9 +20,9 @@ export function useTokenUsageBoard(enabled: boolean) {
   return useQuery<TokenUsagePageTeam[]>({
     queryKey: hubQueryKeys.agentTeams.usageBoard,
     queryFn: async () => {
-      const token = getAccessToken();
-      if (!token) throw new Error('Hub session is required');
-      const client = createHubClient({ getToken: () => token });
+      const authenticated = isHubAuthenticated();
+      if (!authenticated) throw new Error('Hub session is required');
+      const client = createHubClient();
       const teams = await client.listAgentTeams();
       return Promise.all(
         teams.map(async (team) => {

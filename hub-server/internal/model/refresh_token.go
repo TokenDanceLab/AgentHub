@@ -16,6 +16,7 @@ type RefreshToken struct {
 	// UserIdentityID pins the refresh chain to the exact external identity
 	// that authenticated it. Null legacy rows are intentionally unusable.
 	UserIdentityID *string   `gorm:"column:user_identity_id;type:uuid;index:idx_refresh_tokens_user_identity_id" json:"-"`
+	OIDCClientID   string    `gorm:"column:oidc_client_id;size:255;not null;default:''" json:"-"`
 	TokenHash      string    `gorm:"type:varchar(128);uniqueIndex;not null" json:"-"`
 	ExpiresAt      time.Time `gorm:"not null" json:"expires_at"`
 	Revoked        bool      `gorm:"not null;default:false" json:"revoked"`

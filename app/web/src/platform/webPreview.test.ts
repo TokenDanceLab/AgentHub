@@ -7,17 +7,12 @@ import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import type { AttachmentRef } from '@shared/composer';
 
 vi.mock('@/hooks/useAuth', () => ({
-  getAccessToken: vi.fn(() => 'web-token'),
-}));
-
-vi.mock('./webAuthTokenRefresh', () => ({
-  getCachedRefreshedAccessToken: vi.fn(() => null),
-  refreshWebHubAccessTokenOnce: vi.fn(async () => null),
+  getAccessToken: vi.fn(() => null),
 }));
 
 import { resolveWebAttachmentImageUrl } from './webPreview';
 import { getAccessToken } from '@/hooks/useAuth';
-import { refreshWebHubAccessTokenOnce } from './webAuthTokenRefresh';
+import { setBrowserCsrfToken } from '@/api/browserSessionRuntime';
 
 const fetchImpl = vi.fn();
 const createObjectURL = vi.fn(() => 'blob:web-object-url');
@@ -47,12 +42,11 @@ beforeAll(() => {
 afterEach(() => {
   fetchImpl.mockReset();
   createObjectURL.mockClear();
-  vi.mocked(getAccessToken).mockReturnValue('web-token');
-  vi.mocked(refreshWebHubAccessTokenOnce).mockResolvedValue(null);
+  vi.mocked(getAccessToken).mockReturnValue(null);
 });
 
 describe('resolveWebAttachmentImageUrl (#1938)', () => {
-  it('fetches the Hub attachment endpoint with the Bearer token and returns an object URL', async () => {
+  it('fetches the Hub attachment endpoint with browser cookies and no bearer', async () => {
     fetchImpl.mockResolvedValue(imageResponse());
 
     await expect(resolveWebAttachmentImageUrl(makeRef())).resolves.toBe('blob:web-object-url');
@@ -61,28 +55,18 @@ describe('resolveWebAttachmentImageUrl (#1938)', () => {
     const [url, init] = fetchImpl.mock.calls[0]!;
     // Web resolves against Hub only: the request URL is the Hub attachment path.
     expect(String(url)).toMatch(/\/client\/attachments\/att-web-1$/);
-    expect((init?.headers as Record<string, string>).Authorization).toBe('Bearer web-token');
+    expect((init?.headers as Record<string, string>).Authorization).toBeUndefined();
   });
 
-  it('retries once through the refresh hook after a 401', async () => {
-    fetchImpl
-      .mockResolvedValueOnce(imageResponse(401))
-      .mockResolvedValueOnce(imageResponse());
-    vi.mocked(refreshWebHubAccessTokenOnce).mockResolvedValue('web-token-fresh');
-
-    await expect(resolveWebAttachmentImageUrl(makeRef('att-web-401'))).resolves.toBe(
-      'blob:web-object-url',
-    );
-
-    expect(refreshWebHubAccessTokenOnce).toHaveBeenCalledTimes(1);
-    expect(fetchImpl).toHaveBeenCalledTimes(2);
-    const retryHeaders = fetchImpl.mock.calls[1]?.[1]?.headers as Record<string, string>;
-    expect(retryHeaders.Authorization).toBe('Bearer web-token-fresh');
+  it('revokes cached attachment URLs when the session changes', async () => {
+    fetchImpl.mockResolvedValue(imageResponse());
+    await resolveWebAttachmentImageUrl(makeRef('att-private'));
+    setBrowserCsrfToken(null);
+    expect(revokeObjectURL).toHaveBeenCalledWith('blob:web-object-url');
   });
 
   it('degrades to undefined when the session cannot be recovered', async () => {
     fetchImpl.mockResolvedValue(imageResponse(401));
-    vi.mocked(refreshWebHubAccessTokenOnce).mockResolvedValue(null);
 
     await expect(resolveWebAttachmentImageUrl(makeRef('att-web-dead'))).resolves.toBeUndefined();
     expect(fetchImpl).toHaveBeenCalledTimes(1);

@@ -79,6 +79,7 @@ func setupSharedSQLite(t *testing.T) *gorm.DB {
 			device_type TEXT NOT NULL DEFAULT '',
 			device_id TEXT NOT NULL DEFAULT '',
 			user_identity_id TEXT,
+			oidc_client_id TEXT NOT NULL DEFAULT '',
 			token_hash TEXT NOT NULL UNIQUE,
 			expires_at DATETIME NOT NULL,
 			revoked INTEGER NOT NULL DEFAULT 0,

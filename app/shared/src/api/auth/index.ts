@@ -6,6 +6,8 @@
  */
 
 export { createHubAuthCore } from './authStateMachine';
+export { createBrowserSessionAuth } from './browserSessionAuth';
+export type { BrowserSessionAuth, BrowserSessionAuthPorts } from './browserSessionAuth';
 export type { HubAuthCoreOptions } from './authStateMachine';
 export { generateCodeVerifier, computeCodeChallenge, base64UrlEncode } from './pkce';
 export { OidcError } from './types';

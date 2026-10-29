@@ -1585,8 +1585,8 @@ jobs:
         timeout-minutes: 15
         working-directory: ./app/web
         # Vite dev server + all Hub calls are stubbed via Playwright routes;
-        # playwright.config.ts pins VITE_HUB_URL to hub.test.invalid so any
-        # un-stubbed Hub call fails closed. No real Hub/Edge/login required.
+        # Same-origin API routes use an unbound local proxy as the fallback,
+        # so un-stubbed calls fail closed. No real Hub/Edge/login required.
         run: pnpm test:e2e:stubbed-hub -- --retries=1
         env:
           CI: 'true'

@@ -35,6 +35,9 @@ export interface AttachmentImageUrlResolverDeps {
   fetchImpl?: typeof fetch;
   /** Max cached object URLs before FIFO eviction revokes the oldest. */
   cacheLimit?: number;
+  /** Cookie consumers scope cached blobs to the current authenticated session. */
+  getSessionKey?: () => string | number;
+  onSessionChange?: (reset: () => void) => void;
 }
 
 const DEFAULT_CACHE_LIMIT = 64;
@@ -58,6 +61,14 @@ export function createAttachmentObjectUrlResolver(
   /** Map insertion order doubles as the FIFO eviction queue. */
   const urlCache = new Map<string, string>();
   const inflight = new Map<string, Promise<string | undefined>>();
+  let sessionKey = deps.getSessionKey?.();
+  const reset = () => {
+    for (const url of urlCache.values()) URL.revokeObjectURL(url);
+    urlCache.clear();
+    inflight.clear();
+    sessionKey = deps.getSessionKey?.();
+  };
+  deps.onSessionChange?.(reset);
 
   function evictIfNeeded(): void {
     while (urlCache.size > cacheLimit) {
@@ -78,6 +89,8 @@ export function createAttachmentObjectUrlResolver(
   return async function resolveAttachmentObjectUrl(
     attachment: AttachmentRef,
   ): Promise<string | undefined> {
+    if (sessionKey !== deps.getSessionKey?.()) reset();
+    const expectedSession = sessionKey;
     const id = attachment.id?.trim();
     if (!id || !baseUrl) return undefined;
 
@@ -100,6 +113,7 @@ export function createAttachmentObjectUrlResolver(
         }
         if (!res.ok) return undefined;
         const blob = await res.blob();
+        if (expectedSession !== deps.getSessionKey?.()) return undefined;
         // Hub echoes the stored mime; reject bytes the caller's gate does
         // not accept so the row degrades honestly instead of rendering a
         // broken/mismatched preview.

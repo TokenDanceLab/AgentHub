@@ -7,7 +7,7 @@ import { useToastStore } from '@shared/ui/toast';
 import { hubQueryKeys, webQueryKeys } from '@shared/stores/queryKeys';
 
 const tryAutoLoginMock = vi.hoisted(() => vi.fn());
-const getAccessTokenMock = vi.hoisted(() => vi.fn());
+const isHubAuthenticatedMock = vi.hoisted(() => vi.fn());
 
 // Raw-key visible copy is provided by the key-echo default language of the
 // web test i18next instance (Issue #1717) — no react-i18next mock here.
@@ -16,7 +16,7 @@ vi.mock('@/hooks/useAuth', () => ({
   useAuth: () => ({
     tryAutoLogin: tryAutoLoginMock,
   }),
-  getAccessToken: getAccessTokenMock,
+  isHubAuthenticated: isHubAuthenticatedMock,
 }));
 
 function createWrapper() {
@@ -39,9 +39,9 @@ describe('useWebAuth', () => {
     useHubStore.getState().clear();
     useToastStore.setState({ toasts: [] });
     tryAutoLoginMock.mockReset();
-    getAccessTokenMock.mockReset();
+    isHubAuthenticatedMock.mockReset();
     tryAutoLoginMock.mockResolvedValue(false);
-    getAccessTokenMock.mockReturnValue(null);
+    isHubAuthenticatedMock.mockReturnValue(false);
   });
 
   afterEach(() => {
@@ -111,7 +111,7 @@ describe('useWebAuth', () => {
 
   it('ensureAuth fails closed without Hub session: opens modal + error toast', async () => {
     useHubStore.getState().setAuthenticated(false);
-    getAccessTokenMock.mockReturnValue(null);
+    isHubAuthenticatedMock.mockReturnValue(false);
     tryAutoLoginMock.mockResolvedValueOnce(false);
     const { wrapper } = createWrapper();
     const { useWebAuth } = await import('./useWebAuth');
@@ -136,7 +136,7 @@ describe('useWebAuth', () => {
 
   it('ensureAuth fails closed when store says authenticated but token is missing', async () => {
     useHubStore.getState().setAuthenticated(true, 'user-1', 'alice');
-    getAccessTokenMock.mockReturnValue(null);
+    isHubAuthenticatedMock.mockReturnValue(false);
     tryAutoLoginMock.mockResolvedValueOnce(true);
     const { wrapper } = createWrapper();
     const { useWebAuth } = await import('./useWebAuth');
@@ -155,7 +155,7 @@ describe('useWebAuth', () => {
 
   it('ensureAuth allows the action when Hub session and token are present', async () => {
     useHubStore.getState().setAuthenticated(true, 'user-1', 'alice');
-    getAccessTokenMock.mockReturnValue('hub-access');
+    isHubAuthenticatedMock.mockReturnValue(true);
     tryAutoLoginMock.mockResolvedValueOnce(true);
     const { wrapper } = createWrapper();
     const { useWebAuth } = await import('./useWebAuth');
@@ -181,12 +181,12 @@ describe('useWebAuth OIDC callback errors (#1816)', () => {
     useHubStore.getState().clear();
     useToastStore.setState({ toasts: [] });
     tryAutoLoginMock.mockReset();
-    getAccessTokenMock.mockReset();
-    getAccessTokenMock.mockReturnValue(null);
+    isHubAuthenticatedMock.mockReset();
+    isHubAuthenticatedMock.mockReturnValue(false);
   });
 
   it('surfaces OidcError from the callback path as an error toast and reopens the auth modal', async () => {
-    const { OidcError } = await import('@/api/hubAuth');
+    const { OidcError } = await import('@shared/api/auth');
     tryAutoLoginMock.mockRejectedValueOnce(
       new OidcError('stateMismatch', 'OIDC state mismatch', 'bad state'),
     );
@@ -208,7 +208,7 @@ describe('useWebAuth OIDC callback errors (#1816)', () => {
   });
 
   it('maps tokenExchangeFailed with detail through the oidc i18n key', async () => {
-    const { OidcError } = await import('@/api/hubAuth');
+    const { OidcError } = await import('@shared/api/auth');
     tryAutoLoginMock.mockRejectedValueOnce(
       new OidcError('tokenExchangeFailed', 'Token exchange failed: boom', 'boom'),
     );

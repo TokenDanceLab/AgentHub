@@ -26,6 +26,7 @@ AgentHub 让你像在 IM 群聊里协作一样，把真人好友、Builder、Rev
 - **Diff / Preview / Approval** — 代码变更内联展示，审批流可控
 - **三端客户端** — Tauri Desktop + Web + Expo React Native Mobile（Desktop/Web 主线；Mobile 是装配中的 fixture/边界验证 lane，**非 release candidate** —— 发布链路的 `build-mobile` 受 `RELEASE_MOBILE_ENABLED` 门控、默认关闭）
 - **Hub-Edge 分布式** — 本地执行不依赖 Hub；Hub 提供多端同步、远程查看和审计
+- **Account 身份与产品会话分离** — Web 同源 HttpOnly 会话、CSRF 和局部/Account 全局退出；Desktop 保留 native Hub token。服务端配置、迁移和撤销边界见 [身份契约](docs/architecture/06-auth-identity.md)，实际运行激活需独立验收。
 
 ## 技术栈
 

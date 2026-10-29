@@ -54,7 +54,8 @@ import {
   useCreateGroupSession,
   useListFriendRequests,
 } from '@/api/contactQueries';
-import { getAccessToken } from '@/hooks/useAuth';
+import { isHubAuthenticated } from '@/hooks/useAuth';
+import { getBrowserSessionGeneration } from '@/api/browserSessionRuntime';
 import { useHubStore } from '@/stores/hubStore';
 import {
   resolveWebWorkbenchConversations,
@@ -88,7 +89,7 @@ import {
 } from './webWorkbenchTranscript';
 import { errorMessage } from '@shared/errors';
 
-const hubClient = createHubClient({ getToken: getAccessToken });
+const hubClient = createHubClient();
 
 /**
  * Resolve the active Hub session id for transcript queries (#1972).
@@ -141,7 +142,7 @@ export function useWebWorkbenchModel(dataMode: WorkbenchDataMode, selectedConver
   const dataModeContract = getWorkbenchDataModeContract(dataMode);
   const authenticated = useHubStore((state) => state.authenticated);
   const realMode = dataModeContract.isRealDataMode;
-  const hubReady = dataModeContract.allowsHubData && authenticated && Boolean(getAccessToken());
+  const hubReady = dataModeContract.allowsHubData && authenticated;
   const queryClient = useQueryClient();
   const [liveRuntimeEvents, setLiveRuntimeEvents] = useState<HubRuntimeEventTranscriptInput[]>([]);
 
@@ -240,10 +241,12 @@ export function useWebWorkbenchModel(dataMode: WorkbenchDataMode, selectedConver
   const hasEarlierMessages = Boolean(activeHubSessionId && oldestSequence && oldestSequence > 1 && !historyExhausted[activeHubSessionId]);
   const loadEarlierMessages = useCallback(async () => {
     if (!activeHubSessionId) return;
+    const generation = getBrowserSessionGeneration();
     const key = webQueryKeys.messages.of(activeHubSessionId);
     const before = oldestMessageSequence(queryClient.getQueryData<HubMessage[]>(key));
     if (!before || before <= 1) return;
     const earlier = await hubClient.getMessages(activeHubSessionId, { before_seq: before, limit: 80 });
+    if (generation !== getBrowserSessionGeneration()) return;
     queryClient.setQueryData<HubMessage[]>(key, (current = []) => mergeMessageHistory(current, earlier));
     if (earlier.length < 80) setHistoryExhausted((current) => ({ ...current, [activeHubSessionId]: true }));
   }, [activeHubSessionId, queryClient]);
@@ -347,29 +350,29 @@ export function useWebWorkbenchModel(dataMode: WorkbenchDataMode, selectedConver
     },
   });
 
-  const projects = useHubWorkspaceProjects({ enabled: hubReady, getToken: getAccessToken });
+  const projects = useHubWorkspaceProjects({ enabled: hubReady, isAuthenticated: isHubAuthenticated });
   const selectedProjectDetailId = hubReady
     ? selectedProjectId ?? projects.data?.items[0]?.id
     : undefined;
   const selectedProject = useHubWorkspaceProject({
     projectId: selectedProjectDetailId,
     enabled: Boolean(selectedProjectDetailId),
-    getToken: getAccessToken,
+    isAuthenticated: isHubAuthenticated,
   });
   const selectedProjectThreads = useHubWorkspaceProjectThreads({
     projectId: selectedProjectDetailId,
     enabled: hubReady && Boolean(selectedProjectDetailId),
-    getToken: getAccessToken,
+    isAuthenticated: isHubAuthenticated,
   });
   const selectedProjectThreadId = selectedProjectThreads.data?.[0]?.id;
   const selectedProjectThreadMessages = useHubWorkspaceProjectThreadMessages({
     projectId: selectedProjectDetailId,
     threadId: selectedProjectThreadId,
     enabled: hubReady && Boolean(selectedProjectDetailId) && Boolean(selectedProjectThreadId),
-    getToken: getAccessToken,
+    isAuthenticated: isHubAuthenticated,
   });
-  const createProject = useCreateHubWorkspaceProject({ getToken: getAccessToken });
-  const updateProject = useUpdateHubWorkspaceProject({ getToken: getAccessToken });
+  const createProject = useCreateHubWorkspaceProject({ isAuthenticated: isHubAuthenticated });
+  const updateProject = useUpdateHubWorkspaceProject({ isAuthenticated: isHubAuthenticated });
   const decideApproval = useMutation({
     mutationFn: (action: ApprovalDecisionAction) => decideWebApprovalWithHubClient(hubClient, action),
     onSettled: () => {

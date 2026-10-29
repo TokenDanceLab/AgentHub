@@ -14,7 +14,7 @@ describe('hubStore auth storage', () => {
     sessionStorage.clear();
   });
 
-  it('hydrates tab-scoped user metadata and clears the legacy localStorage user key', async () => {
+  it('starts signed out despite legacy bearer storage and clears saved user metadata', async () => {
     sessionStorage.setItem(TOKEN_KEY, 'hub-access');
     sessionStorage.setItem(USER_KEY, JSON.stringify({ userId: 'u_1', username: 'alice' }));
     localStorage.setItem(USER_KEY, JSON.stringify({ userId: 'legacy', username: 'legacy' }));
@@ -22,21 +22,19 @@ describe('hubStore auth storage', () => {
     const { useHubStore } = await loadStore();
     const state = useHubStore.getState();
 
-    expect(state.authenticated).toBe(true);
-    expect(state.userId).toBe('u_1');
-    expect(state.username).toBe('alice');
+    expect(state.authenticated).toBe(false);
+    expect(state.userId).toBeNull();
+    expect(state.username).toBeNull();
     expect(localStorage.getItem(USER_KEY)).toBeNull();
   });
 
-  it('stores user metadata in sessionStorage only when authentication changes', async () => {
+  it('keeps authenticated user metadata in memory only', async () => {
     const { useHubStore } = await loadStore();
 
     useHubStore.getState().setAuthenticated(true, 'u_2', 'bob');
 
-    expect(JSON.parse(sessionStorage.getItem(USER_KEY) || '{}')).toEqual({
-      userId: 'u_2',
-      username: 'bob',
-    });
+    expect(sessionStorage.getItem(USER_KEY)).toBeNull();
+    expect(useHubStore.getState()).toMatchObject({ authenticated: true, userId: 'u_2', username: 'bob' });
     expect(localStorage.getItem(USER_KEY)).toBeNull();
 
     useHubStore.getState().clear();

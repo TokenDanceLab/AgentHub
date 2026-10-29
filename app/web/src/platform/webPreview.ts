@@ -8,9 +8,14 @@ import {
 import type { AttachmentRef } from '@shared/composer';
 import type { EvidenceRef } from '@shared/transcript';
 import type { MediaKind } from '@shared/ui/mediaPreview';
-import { HUB_URL } from '@/config';
 import { getAccessToken } from '@/hooks/useAuth';
-import { getCachedRefreshedAccessToken, refreshWebHubAccessTokenOnce } from './webAuthTokenRefresh';
+import { getBrowserSessionGeneration, onBrowserSessionChange, invalidateBrowserSession } from '@/api/browserSessionRuntime';
+
+const previewFetch: typeof fetch = async (input, init) => {
+  const result = await fetch(input, { ...init, credentials: 'same-origin', redirect: 'error' });
+  if (result.status === 401) invalidateBrowserSession();
+  return result;
+};
 
 export function canOpenWebEvidencePreview(evidence: EvidenceRef): boolean {
   return Boolean(resolveEvidencePreviewTarget(evidence));
@@ -60,17 +65,18 @@ let webAttachmentImageResolver: AttachmentImageUrlResolver | undefined;
 /**
  * PreviewPort.resolveAttachmentImageUrl for Web (#1938). Web is Hub-only
  * (root AGENTS boundary): image bytes are fetched from the Hub attachment
- * endpoint with the web access token — 401 triggers the single-flight
- * refresh hook and one retry — and surfaced to the transcript as a blob:
+ * endpoint with same-origin cookies and surfaced as a session-scoped blob:
  * object URL. Web never reaches a Local Edge for attachment content.
  */
 export function resolveWebAttachmentImageUrl(
   attachment: AttachmentRef,
 ): Promise<string | undefined> {
   webAttachmentImageResolver ??= createAttachmentImageUrlResolver({
-    hubBaseUrl: HUB_URL,
-    getToken: () => getCachedRefreshedAccessToken() ?? getAccessToken(),
-    refreshAccessTokenOnce: refreshWebHubAccessTokenOnce,
+    hubBaseUrl: window.location.origin,
+    getToken: getAccessToken,
+    fetchImpl: previewFetch,
+    getSessionKey: getBrowserSessionGeneration,
+    onSessionChange: onBrowserSessionChange,
   });
   return webAttachmentImageResolver(attachment);
 }
@@ -80,8 +86,7 @@ let webAttachmentMediaResolver: AttachmentMediaUrlResolver | undefined;
 /**
  * PreviewPort.resolveAttachmentMediaUrl for Web (#1939). Same Hub-only
  * boundary as the image resolver (#1938): audio/video bytes are fetched
- * from the Hub attachment endpoint with the web access token — 401 triggers
- * the single-flight refresh hook and one retry — and surfaced to the
+ * from the Hub attachment endpoint with same-origin cookies and surfaced to the
  * transcript as a blob: object URL. Web never reaches a Local Edge for
  * attachment content.
  */
@@ -90,9 +95,11 @@ export function resolveWebAttachmentMediaUrl(
   kind: MediaKind,
 ): Promise<string | undefined> {
   webAttachmentMediaResolver ??= createAttachmentMediaUrlResolver({
-    hubBaseUrl: HUB_URL,
-    getToken: () => getCachedRefreshedAccessToken() ?? getAccessToken(),
-    refreshAccessTokenOnce: refreshWebHubAccessTokenOnce,
+    hubBaseUrl: window.location.origin,
+    getToken: getAccessToken,
+    fetchImpl: previewFetch,
+    getSessionKey: getBrowserSessionGeneration,
+    onSessionChange: onBrowserSessionChange,
   });
   return webAttachmentMediaResolver(attachment, kind);
 }

@@ -7,13 +7,13 @@ import type {
   ExecutionTargetTrustLevel,
   ExecutionTargetType,
 } from './hubClient';
-import { getAccessToken } from '@/hooks/useAuth';
+import { isHubAuthenticated } from '@/hooks/useAuth';
 import { useHubStore } from '@/stores/hubStore';
 import { hubQueryKeys } from '@shared/stores/queryKeys';
 
 export interface UseHubExecutionTargetsOptions {
   enabled: boolean;
-  getToken?: () => string | null;
+  isAuthenticated?: () => boolean;
 }
 
 export interface ExecutionTargetInventoryItem
@@ -109,12 +109,12 @@ function normalizeExecutionTarget(target: ExecutionTarget): ExecutionTargetInven
 
 export async function fetchExecutionTargets(
   preferHub: boolean,
-  getToken: () => string | null = getAccessToken,
+  isAuthenticated: () => boolean = isHubAuthenticated,
 ): Promise<ExecutionTargetInventoryResponse> {
-  const token = getToken();
-  if (!preferHub || !token) return emptyExecutionTargets;
+  const authenticated = isAuthenticated();
+  if (!preferHub || !authenticated) return emptyExecutionTargets;
 
-  const client = createHubClient({ getToken: () => token });
+  const client = createHubClient();
   const items: ExecutionTargetInventoryItem[] = [];
   let page: ExecutionTargetListResponse['page'] = { hasMore: false };
   let pageCursor: string | undefined;
@@ -179,26 +179,26 @@ export function summarizeExecutionTargets(targets: ExecutionTargetInventoryItem[
 export function useHubExecutionTargets(enabledOrOptions: boolean | UseHubExecutionTargetsOptions) {
   const hubAuthenticated = useHubStore((s) => s.authenticated);
   const options = typeof enabledOrOptions === 'boolean'
-    ? { enabled: enabledOrOptions, preferHub: hubAuthenticated, getToken: getAccessToken }
-    : { enabled: enabledOrOptions.enabled, preferHub: enabledOrOptions.enabled, getToken: enabledOrOptions.getToken ?? getAccessToken };
+    ? { enabled: enabledOrOptions, preferHub: hubAuthenticated, isAuthenticated: isHubAuthenticated }
+    : { enabled: enabledOrOptions.enabled, preferHub: enabledOrOptions.enabled, isAuthenticated: enabledOrOptions.isAuthenticated ?? isHubAuthenticated };
 
   return useQuery<ExecutionTargetInventoryResponse>({
     queryKey: hubQueryKeys.executionTargets.list(options.preferHub ? 'hub' : 'signed-out'),
-    queryFn: () => fetchExecutionTargets(options.preferHub, options.getToken),
+    queryFn: () => fetchExecutionTargets(options.preferHub, options.isAuthenticated),
     enabled: options.enabled,
     refetchInterval: options.preferHub ? 10_000 : false,
     placeholderData: (prev) => prev,
   });
 }
 
-export function usePingHubExecutionTarget(options: { getToken?: () => string | null } = {}) {
+export function usePingHubExecutionTarget(options: { isAuthenticated?: () => boolean } = {}) {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (targetId: string) => {
-      const token = (options.getToken ?? getAccessToken)();
-      if (!token) throw new Error('Hub session is required');
-      const client = createHubClient({ getToken: () => token });
+      const authenticated = (options.isAuthenticated ?? isHubAuthenticated)();
+      if (!authenticated) throw new Error('Hub session is required');
+      const client = createHubClient();
       await client.pingExecutionTarget(targetId);
     },
     onSuccess: () => {

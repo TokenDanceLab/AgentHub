@@ -123,10 +123,7 @@ func SetupRoutes(r *gin.Engine, cfg *config.Config, authMW *middleware.AuthMiddl
 			auth.POST("/refresh", middleware.RateLimit(cacheClient, config.AuthLoginRateLimit, config.AuthRateLimitWindow, middleware.IPKey), authHandler.Refresh)
 
 			// Account OIDC (the only external auth entry point)
-			if oidcHandler != nil {
-				auth.POST("/oidc/authorize", middleware.RateLimit(cacheClient, config.AuthLoginRateLimit, config.AuthRateLimitWindow, middleware.IPKey), oidcHandler.PostOIDCAuthorize)
-				auth.POST("/oidc/callback", middleware.RateLimit(cacheClient, config.AuthLoginRateLimit, config.AuthRateLimitWindow, middleware.IPKey), oidcHandler.PostOIDCCallback)
-			}
+			registerAccountAuthRoutes(auth, authMW, cacheClient, oidcHandler)
 		}
 
 		authProtected := client.Group("/auth")
@@ -422,4 +419,29 @@ func SetupRoutes(r *gin.Engine, cfg *config.Config, authMW *middleware.AuthMiddl
 		}
 	}
 	return nil
+}
+
+// registerAccountAuthRoutes keeps OIDC and its optional browser surface under
+// the existing /client/auth group, with the same middleware and enablement.
+func registerAccountAuthRoutes(auth *gin.RouterGroup, authMW *middleware.AuthMiddleware, cacheClient *cache.Client, oidcHandler *handler.OIDCHandler) {
+	if oidcHandler == nil {
+		return
+	}
+	auth.POST("/oidc/authorize", middleware.RateLimit(cacheClient, config.AuthLoginRateLimit, config.AuthRateLimitWindow, middleware.IPKey), oidcHandler.PostOIDCAuthorize)
+	auth.POST("/oidc/callback", middleware.RateLimit(cacheClient, config.AuthLoginRateLimit, config.AuthRateLimitWindow, middleware.IPKey), oidcHandler.PostOIDCCallback)
+	browser := oidcHandler.Browser
+	if browser == nil {
+		return
+	}
+	auth.POST("/oidc/backchannel-logout", browser.BackchannelLogout)
+	if !browser.Enabled() {
+		return
+	}
+	auth.POST("/browser/authorize", middleware.RateLimit(cacheClient, config.AuthLoginRateLimit, config.AuthRateLimitWindow, middleware.IPKey), browser.Authorize)
+	auth.POST("/browser/callback", middleware.RateLimit(cacheClient, config.AuthLoginRateLimit, config.AuthRateLimitWindow, middleware.IPKey), browser.Callback)
+	auth.GET("/browser/logout/account/callback", browser.AccountLogoutCallback)
+	protected := auth.Group("/browser", authMW.Handler(), authMW.RequireHubSession())
+	protected.GET("/session", browser.Session)
+	protected.POST("/logout", browser.Logout)
+	protected.POST("/logout/account", browser.AccountLogout)
 }

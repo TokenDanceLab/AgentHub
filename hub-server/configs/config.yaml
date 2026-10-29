@@ -65,6 +65,14 @@ account_oidc:
   http_timeout: 10s
   max_response_body_bytes: 65536
 
+# Optional same-origin browser sessions. Set exact registered URLs in deployment.
+browser_session:
+  origin: ""
+  redirect_uri: ""
+  post_logout_redirect_uri: ""
+  secure: true
+  ttl: 12h
+
 # Outbound HTTP egress policy (#1540). Default-deny: an empty allowlist
 # refuses every dial to loopback/private/link-local/metadata networks, so
 # hub-initiated execution-target pings fail closed until an administrator

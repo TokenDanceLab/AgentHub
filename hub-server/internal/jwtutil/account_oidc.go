@@ -22,6 +22,8 @@ import (
 
 var ErrIDTokenSubjectMissing = errors.New("id token subject is missing")
 
+var ErrAccountKeysUnavailable = errors.New("account signing keys unavailable")
+
 // AccountOIDCClaims contains the minimal ID-token claims Hub consumes. Profile
 // attributes are deliberately read from UserInfo, not treated as ID-token
 // guarantees.
@@ -248,7 +250,7 @@ func validateExpectedTokenClaims(expectedIssuer, expectedAudience, expectedNonce
 
 func (v *AccountOIDCVerifier) signingKey(ctx context.Context, tokenString string) (*rsa.PublicKey, error) {
 	if err := v.cache.fetchJWKS(ctx); err != nil {
-		return nil, err
+		return nil, ErrAccountKeysUnavailable
 	}
 
 	unverified, _, err := jwt.NewParser().ParseUnverified(tokenString, &AccountOIDCClaims{})
@@ -264,7 +266,7 @@ func (v *AccountOIDCVerifier) signingKey(ctx context.Context, tokenString string
 	if !ok {
 		v.cache.invalidate()
 		if err := v.cache.fetchJWKS(ctx); err != nil {
-			return nil, fmt.Errorf("jwks refresh failed")
+			return nil, ErrAccountKeysUnavailable
 		}
 		pubKey, ok = v.cache.key(kid)
 		if !ok {

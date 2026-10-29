@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { getAccessToken } from '@/hooks/useAuth';
+import { isHubAuthenticated } from '@/hooks/useAuth';
 import {
   createWorkspaceProjectThread,
   fetchWorkspaceProjectThreadMessages,
@@ -12,7 +12,7 @@ import {
 } from './projectQueries';
 
 vi.mock('@/hooks/useAuth', () => ({
-  getAccessToken: vi.fn(),
+  isHubAuthenticated: vi.fn(),
 }));
 
 
@@ -40,14 +40,14 @@ describe('web project queries', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
-    vi.mocked(getAccessToken).mockReturnValue(null);
+    vi.mocked(isHubAuthenticated).mockReturnValue(false);
   });
 
-  it('lists Hub workspace projects through /web/projects when a Hub session token is available', async () => {
-    vi.mocked(getAccessToken).mockReturnValue('hub-access');
+  it('lists Hub workspace projects through /web/projects when a Hub browser session is authenticated', async () => {
+    vi.mocked(isHubAuthenticated).mockReturnValue(true);
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-      expect(String(input)).toBe('http://localhost:8080/web/projects?pageSize=200');
-      expect(getHeader(init, 'Authorization')).toBe('Bearer hub-access');
+      expect(String(input)).toBe('/web/projects?pageSize=200');
+      expect(getHeader(init, 'Authorization')).toBeNull();
       return new Response(
         JSON.stringify({
           code: 'ok',
@@ -83,7 +83,7 @@ describe('web project queries', () => {
   // two pin the walk and the honest cap; the shape mirrors
   // executionTargetQueries.test.ts so the front end keeps one paging idiom.
   it('walks cursor pages so projects past the first page are visible', async () => {
-    vi.mocked(getAccessToken).mockReturnValue('hub-access');
+    vi.mocked(isHubAuthenticated).mockReturnValue(true);
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(new Response(
         JSON.stringify({
@@ -116,15 +116,15 @@ describe('web project queries', () => {
     const res = await fetchWorkspaceProjects(true);
 
     expect(fetchMock).toHaveBeenCalledTimes(2);
-    expect(String(fetchMock.mock.calls[0]?.[0])).toBe('http://localhost:8080/web/projects?pageSize=200');
+    expect(String(fetchMock.mock.calls[0]?.[0])).toBe('/web/projects?pageSize=200');
     expect(String(fetchMock.mock.calls[1]?.[0]))
-      .toBe('http://localhost:8080/web/projects?pageSize=200&pageCursor=cur-1');
+      .toBe('/web/projects?pageSize=200&pageCursor=cur-1');
     expect(res.items.map((item) => item.name)).toEqual(['Page 1 Project', 'Page 2 Project']);
     expect(res.page.hasMore).toBe(false);
   });
 
   it('reports hasMore=true after exhausting the maximum cursor pages', async () => {
-    vi.mocked(getAccessToken).mockReturnValue('hub-access');
+    vi.mocked(isHubAuthenticated).mockReturnValue(true);
     const fetchMock = vi.fn(async () => new Response(
       JSON.stringify({
         code: 'ok',
@@ -161,7 +161,7 @@ describe('web project queries', () => {
   });
 
   it('gets, creates, and updates Hub workspace projects through the owner-scoped contract', async () => {
-    vi.mocked(getAccessToken).mockReturnValue('hub-access');
+    vi.mocked(isHubAuthenticated).mockReturnValue(true);
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
       if (url.endsWith('/web/projects/project%2Fid') && !init?.method) {
@@ -214,14 +214,14 @@ describe('web project queries', () => {
       description: 'Updated from Web',
     });
 
-    expect(fetchMock.mock.calls[0]?.[0]).toBe('http://localhost:8080/web/projects/project%2Fid');
-    expect(getHeader(getCallInit(fetchMock.mock.calls, 0), 'Authorization')).toBe('Bearer hub-access');
-    expect(fetchMock.mock.calls[1]?.[0]).toBe('http://localhost:8080/web/projects');
+    expect(fetchMock.mock.calls[0]?.[0]).toBe('/web/projects/project%2Fid');
+    expect(getHeader(getCallInit(fetchMock.mock.calls, 0), 'Authorization')).toBeNull();
+    expect(fetchMock.mock.calls[1]?.[0]).toBe('/web/projects');
     expect(getCallInit(fetchMock.mock.calls, 1).method).toBe('POST');
     expect(getCallInit(fetchMock.mock.calls, 1).body).toBe(
       JSON.stringify({ name: 'Created Project', description: 'Created from Web' }),
     );
-    expect(fetchMock.mock.calls[2]?.[0]).toBe('http://localhost:8080/web/projects/project%2Fid');
+    expect(fetchMock.mock.calls[2]?.[0]).toBe('/web/projects/project%2Fid');
     expect(getCallInit(fetchMock.mock.calls, 2).method).toBe('PATCH');
     expect(getCallInit(fetchMock.mock.calls, 2).body).toBe(
       JSON.stringify({ name: 'Updated Project', description: 'Updated from Web' }),
@@ -232,7 +232,7 @@ describe('web project queries', () => {
   });
 
   it('fetches and sends Project Group @Agent messages through Hub project thread routes', async () => {
-    vi.mocked(getAccessToken).mockReturnValue('hub-access');
+    vi.mocked(isHubAuthenticated).mockReturnValue(true);
     const a2aContent = {
       text: '@Reviewer 请审查这个切片',
       metadata: {
@@ -327,22 +327,22 @@ describe('web project queries', () => {
     });
 
     expect(fetchMock.mock.calls[0]?.[0]).toBe(
-      'http://localhost:8080/web/projects/project%2Fid/threads',
+      '/web/projects/project%2Fid/threads',
     );
-    expect(getHeader(getCallInit(fetchMock.mock.calls, 0), 'Authorization')).toBe('Bearer hub-access');
+    expect(getHeader(getCallInit(fetchMock.mock.calls, 0), 'Authorization')).toBeNull();
     expect(fetchMock.mock.calls[1]?.[0]).toBe(
-      'http://localhost:8080/web/projects/project%2Fid/threads',
+      '/web/projects/project%2Fid/threads',
     );
     expect(getCallInit(fetchMock.mock.calls, 1).method).toBe('POST');
     expect(getCallInit(fetchMock.mock.calls, 1).body).toBe(
       JSON.stringify({ name: '新项目群' }),
     );
     expect(fetchMock.mock.calls[2]?.[0]).toBe(
-      'http://localhost:8080/web/projects/project%2Fid/threads/thread%2Fid/messages?limit=80',
+      '/web/projects/project%2Fid/threads/thread%2Fid/messages?limit=80',
     );
-    expect(getHeader(getCallInit(fetchMock.mock.calls, 2), 'Authorization')).toBe('Bearer hub-access');
+    expect(getHeader(getCallInit(fetchMock.mock.calls, 2), 'Authorization')).toBeNull();
     expect(fetchMock.mock.calls[3]?.[0]).toBe(
-      'http://localhost:8080/web/projects/project%2Fid/threads/thread%2Fid/messages',
+      '/web/projects/project%2Fid/threads/thread%2Fid/messages',
     );
     expect(getCallInit(fetchMock.mock.calls, 3).method).toBe('POST');
     expect(getCallInit(fetchMock.mock.calls, 3).body).toBe(
@@ -375,7 +375,7 @@ describe('web project queries', () => {
   });
 
   it('surfaces 401 unauthorized from project list as AppError (fail-closed)', async () => {
-    vi.mocked(getAccessToken).mockReturnValue('stale-token');
+    vi.mocked(isHubAuthenticated).mockReturnValue(true);
     vi.stubGlobal('fetch', vi.fn(async () => new Response(
       JSON.stringify({ code: 'unauthorized', message: 'bad token' }),
       { status: 401, statusText: 'Unauthorized', headers: { 'Content-Type': 'application/json' } },
@@ -389,7 +389,7 @@ describe('web project queries', () => {
   });
 
   it('surfaces 404 from project detail as AppError', async () => {
-    vi.mocked(getAccessToken).mockReturnValue('hub-access');
+    vi.mocked(isHubAuthenticated).mockReturnValue(true);
     vi.stubGlobal('fetch', vi.fn(async () => new Response(
       JSON.stringify({ code: 'NOT_FOUND', message: 'project missing' }),
       { status: 404, statusText: 'Not Found', headers: { 'Content-Type': 'application/json' } },
@@ -402,7 +402,7 @@ describe('web project queries', () => {
   });
 
   it('surfaces 500 from project list as AppError', async () => {
-    vi.mocked(getAccessToken).mockReturnValue('hub-access');
+    vi.mocked(isHubAuthenticated).mockReturnValue(true);
     vi.stubGlobal('fetch', vi.fn(async () => new Response(
       JSON.stringify({ code: 'INTERNAL_ERROR', message: 'hub down' }),
       { status: 500, statusText: 'Internal Server Error', headers: { 'Content-Type': 'application/json' } },

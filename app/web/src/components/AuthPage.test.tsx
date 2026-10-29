@@ -53,7 +53,7 @@ describe('LoginForm', () => {
   // web test i18next instance echoes keys / honors defaultValue, so the
   // assertions pin the resolved key instead of the raw transport string.
   it('localizes OidcError codes instead of echoing the transport message', async () => {
-    const { OidcError } = await import('@/api/hubAuth');
+    const { OidcError } = await import('@shared/api/auth');
     mockLoginWithTokenDance.mockRejectedValueOnce(
       new OidcError('startFailed', 'Failed to start OIDC login: fetch failed', 'fetch failed'),
     );
@@ -121,7 +121,7 @@ describe('AuthPage', () => {
     expect(screen.getByText('auth.advancedSettings')).toBeInTheDocument();
   });
 
-  it('toggles the advanced settings and persists the Hub URL', async () => {
+  it('shows the same-origin Hub endpoint as read-only in advanced settings', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn().mockResolvedValue({ ok: true, status: 200 }),
@@ -133,8 +133,8 @@ describe('AuthPage', () => {
     const input = await screen.findByLabelText('auth.hubUrl');
     expect(input).toBeInTheDocument();
 
-    fireEvent.change(input, { target: { value: 'http://hub.example:8080' } });
-    expect(localStorage.getItem('agenthub_hub_url')).toBe('http://hub.example:8080');
+    expect(input).toHaveValue(window.location.origin);
+    expect(input).toHaveAttribute('readonly');
   });
 
   it('reports the Hub connection status from the health endpoint', async () => {

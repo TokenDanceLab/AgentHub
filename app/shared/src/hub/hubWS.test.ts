@@ -232,6 +232,21 @@ describe('createHubWS', () => {
     expect(t._closed).toBe(true);
   });
 
+  it.each([false, true])('closes revoked sessions without reconnect, authenticated=%s', (authenticated) => {
+    t = mockTransport();
+    const revoked = vi.fn();
+    h = createHubWS({ url: 'ws://hub.example/client/ws', getToken: token(), transport: t, onAuthRevoked: revoked });
+    const message = vi.fn();
+    h.on(HUB_EVENTS.MESSAGE_NEW, message);
+    h.connect();
+    if (authenticated) t._deliverMessage({ type: HUB_EVENTS.AUTH_OK });
+    t._deliverMessage({ type: HUB_EVENTS.AUTH_REVOKED, payload: { reason: 'session_revoked' } });
+    expect(revoked).toHaveBeenCalledOnce();
+    expect(t._closed).toBe(true);
+    t._deliverMessage({ type: HUB_EVENTS.MESSAGE_NEW, payload: { id: 'late' } });
+    expect(message).not.toHaveBeenCalled();
+  });
+
   it('reconnect keeps protocol path URL (no query token by default)', () => {
     let currentToken = 'first-token';
     t = mockTransport();

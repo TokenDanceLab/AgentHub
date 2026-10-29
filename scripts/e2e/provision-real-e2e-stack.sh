@@ -64,12 +64,8 @@ done
 info "validating external Account discovery and Hub OIDC contract"
 ACCOUNT_ISSUER="$ISSUER" HUB_BASE_URL="$HUB_BASE_URL" WEB_CALLBACK_URL="$WEB_CALLBACK_URL" \
 python3 - <<'PYEOF'
-import base64
-import hashlib
 import json
 import os
-import secrets
-import string
 import sys
 import urllib.error
 import urllib.parse
@@ -159,29 +155,27 @@ if not isinstance(keys, list) or not any(
 ):
     fail("Account JWKS must contain an RSA signing key")
 
-# Starting authorization is read-only and proves that Hub is configured with
-# the external client/issuer. It deliberately does not exchange a code.
-verifier = "".join(
-    secrets.choice(string.ascii_letters + string.digits + "-._~") for _ in range(64)
-)
-challenge = base64.urlsafe_b64encode(
-    hashlib.sha256(verifier.encode("utf-8")).digest()
-).rstrip(b"=").decode("ascii")
+# Begin the browser lane without exchanging a code. PKCE and redirect ownership
+# are server-side; the native authorize endpoint deliberately rejects Web now.
+web = urllib.parse.urlsplit(redirect_uri)
+browser_origin = web.scheme + "://" + web.netloc
+headers = {
+    "Content-Type": "application/json",
+    "User-Agent": user_agent,
+    "Origin": browser_origin,
+    "Host": web.netloc,
+}
 payload = json.dumps(
     {
-        "code_challenge": challenge,
-        "code_challenge_method": "S256",
-        "device_type": "web",
         "device_id": "00000000-0000-4000-8000-000000000002",
-        "redirect_uri": redirect_uri,
     }
 ).encode("utf-8")
 
 try:
     request = urllib.request.Request(
-        hub + "/client/auth/oidc/authorize",
+        hub + "/client/auth/browser/authorize",
         data=payload,
-        headers={"Content-Type": "application/json", "User-Agent": user_agent},
+        headers=headers,
         method="POST",
     )
     with urllib.request.urlopen(request, timeout=15) as response:
@@ -227,17 +221,13 @@ negative = json.dumps(
     {
         "code": "invalid-code",
         "state": "invalid-state",
-        "code_verifier": verifier,
-        "device_type": "web",
-        "device_id": "00000000-0000-4000-8000-000000000002",
-        "redirect_uri": redirect_uri,
     }
 ).encode("utf-8")
 try:
     request = urllib.request.Request(
-        hub + "/client/auth/oidc/callback",
+        hub + "/client/auth/browser/callback",
         data=negative,
-        headers={"Content-Type": "application/json", "User-Agent": user_agent},
+        headers=headers,
         method="POST",
     )
     urllib.request.urlopen(request, timeout=15)

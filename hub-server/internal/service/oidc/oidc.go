@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/redis/go-redis/v9"
 	"gorm.io/gorm"
 
 	"github.com/agenthub/hub-server/internal/cache"
@@ -198,6 +199,10 @@ func (s *Service) HandleCallback(
 	ctx context.Context,
 	code, state, codeVerifier, issuerParam, deviceType, deviceID, redirectURI string,
 ) (*CallbackResult, error) {
+	return s.handleCallback(ctx, code, state, codeVerifier, issuerParam, deviceType, deviceID, redirectURI, nil)
+}
+
+func (s *Service) handleCallback(ctx context.Context, code, state, codeVerifier, issuerParam, deviceType, deviceID, redirectURI string, browser *model.BrowserSession) (*CallbackResult, error) {
 	deviceType, deviceID, err := normalizeOIDCDevice(deviceType, deviceID)
 	if err != nil {
 		return nil, err
@@ -224,36 +229,24 @@ func (s *Service) HandleCallback(
 	if tokenResponse.IDToken == "" || tokenResponse.AccessToken == "" {
 		return nil, errcode.OIDCIDTokenInvalid
 	}
-	claims, err := verifier.ParseIDToken(
-		ctx,
-		tokenResponse.IDToken,
-		s.cfg.IssuerURL,
-		s.cfg.ClientID,
-		entry.Nonce,
-	)
+	claims, err := s.parseCallbackIDToken(ctx, verifier, tokenResponse.IDToken, entry.Nonce, browser != nil)
 	if err != nil {
-		if errors.Is(err, jwtutil.ErrIDTokenSubjectMissing) {
-			return nil, errcode.OIDCSubNotFound
-		}
-		slog.Warn("account_oidc.id_token.rejected",
-			"request_id", reqlog.GetRequestID(ctx),
-			"reason", "validation_failed",
-		)
-		return nil, errcode.OIDCIDTokenInvalid
-	}
-	if claims.Subject == "" {
-		return nil, errcode.OIDCSubNotFound
+		return nil, err
 	}
 	profile, err := s.fetchUserInfo(ctx, meta.UserInfoEndpoint, tokenResponse.AccessToken, claims.Subject)
 	if err != nil {
 		return nil, errcode.OIDCUserInfoInvalid
 	}
 
-	rawRefresh, err := jwtutil.GenerateRefreshToken()
-	if err != nil {
-		return nil, fmt.Errorf("generate refresh token: %w", err)
+	var rawRefresh string
+	if browser == nil {
+		rawRefresh, err = jwtutil.GenerateRefreshToken()
+		if err != nil {
+			return nil, fmt.Errorf("generate refresh token: %w", err)
+		}
 	}
-	user, err := repository.FindOrCreateAccountSession(s.db, repository.AccountSessionInput{
+	bound, err := repository.CreateBoundAccountSession(s.db.WithContext(ctx), repository.BoundAccountSessionInput{AccountSessionInput: repository.AccountSessionInput{
+		OIDCClientID:     s.cfg.ClientID,
 		Issuer:           s.cfg.IssuerURL,
 		Subject:          claims.Subject,
 		Name:             profile.Name,
@@ -262,20 +255,30 @@ func (s *Service) HandleCallback(
 		DeviceID:         deviceID,
 		RefreshTokenHash: jwtutil.HashRefreshToken(rawRefresh),
 		RefreshExpiresAt: time.Now().Add(s.jwtCfg.RefreshTTL),
-	})
+	}, ProofIssuedAt: claims.IssuedAt.Unix(), Browser: browser})
 	if err != nil {
+		if errors.Is(err, repository.ErrSessionRevoked) {
+			return nil, errcode.AuthInvalidToken
+		}
 		if errors.Is(err, repository.ErrOIDCIdentityRetired) {
 			return nil, errcode.OIDCIdentityRetired
 		}
 		return nil, fmt.Errorf("create Account Hub session: %w", err)
 	}
+	user := bound.User
+	if browser != nil {
+		return &CallbackResult{User: *user}, nil
+	}
 
-	accessToken, err := jwtutil.GenerateAccessToken(
+	accessToken, err := jwtutil.GenerateIdentityAccessToken(
 		user.ID,
 		deviceType,
 		deviceID,
+		bound.IdentityID,
+		bound.Generation,
 		s.jwtCfg.Secret,
 		s.jwtCfg.AccessTTL,
+		s.cfg.ClientID,
 	)
 	if err != nil {
 		if revokeErr := repository.RevokeRefreshTokensByUserDevice(s.db, user.ID, deviceID); revokeErr != nil {
@@ -301,6 +304,29 @@ func (s *Service) HandleCallback(
 	}, nil
 }
 
+// parseCallbackIDToken owns Account proof validation and its public error
+// classification for the native and browser callback contracts.
+func (s *Service) parseCallbackIDToken(ctx context.Context, verifier *jwtutil.AccountOIDCVerifier, raw, nonce string, browser bool) (*jwtutil.AccountOIDCClaims, error) {
+	claims, err := verifier.ParseIDToken(ctx, raw, s.cfg.IssuerURL, s.cfg.ClientID, nonce)
+	if err != nil {
+		if browser && errors.Is(err, jwtutil.ErrAccountKeysUnavailable) {
+			return nil, errcode.AuthUnavailable
+		}
+		if errors.Is(err, jwtutil.ErrIDTokenSubjectMissing) {
+			return nil, errcode.OIDCSubNotFound
+		}
+		slog.Warn("account_oidc.id_token.rejected",
+			"request_id", reqlog.GetRequestID(ctx),
+			"reason", "validation_failed",
+		)
+		return nil, errcode.OIDCIDTokenInvalid
+	}
+	if claims.Subject == "" {
+		return nil, errcode.OIDCSubNotFound
+	}
+	return claims, nil
+}
+
 func (s *Service) consumeCallbackState(
 	ctx context.Context,
 	state, codeVerifier, deviceType, deviceID, redirectURI string,
@@ -309,8 +335,11 @@ func (s *Service) consumeCallbackState(
 		return nil, errcode.OIDCInvalidState
 	}
 	entryJSON, err := s.cache.GetRDB().GetDel(ctx, oidcStateKey(state)).Result()
-	if err != nil {
+	if errors.Is(err, redis.Nil) {
 		return nil, errcode.OIDCInvalidState
+	}
+	if err != nil {
+		return nil, errcode.AuthUnavailable
 	}
 	var entry stateEntry
 	if err := json.Unmarshal([]byte(entryJSON), &entry); err != nil {

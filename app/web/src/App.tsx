@@ -24,6 +24,7 @@ import {
 } from '@/api/agentQueries';
 import { createHubClient } from '@/api/hubClient';
 import AuthPage from '@/components/AuthPage';
+import { LogoutDialog } from '@/components/LogoutDialog';
 import { StartConversationModal } from '@/components/StartConversationModal';
 import {
   createWebPlatform,
@@ -31,18 +32,19 @@ import {
 } from '@/platform/webPlatform';
 import { useWebWorkbenchModel } from '@/platform/useWebWorkbenchModel';
 import { useWebAuth } from '@/hooks/useWebAuth';
-import { getAccessToken, useAuth } from '@/hooks/useAuth';
+import { useAuth } from '@/hooks/useAuth';
 import { useHubStore } from '@/stores/hubStore';
 import { deriveWorkbenchConnectionStatus, useConnectionStore } from '@/stores/connectionStore';
 import { ToastContainer } from '@shared/ui/toast';
 import styles from './App.module.css';
 
 export default function App() {
+  const userId = useHubStore((state) => state.userId);
   return (
     <>
       <QueryClientProvider client={queryClient}>
         <ThemeProvider>
-          <WebWorkbenchRoot />
+          <WebWorkbenchRoot key={userId ?? 'signed-out'} />
         </ThemeProvider>
       </QueryClientProvider>
       <ToastContainer />
@@ -57,8 +59,9 @@ function WebWorkbenchRoot() {
   const [agentActionError, setAgentActionError] = useState<string | undefined>();
   const [savingAgentId, setSavingAgentId] = useState<string | undefined>();
   const [deletingAgentId, setDeletingAgentId] = useState<string | undefined>();
-  const { ensureAuth, authReady } = useWebAuth();
-  const { logout, user } = useAuth();
+  const [showLogoutDialog, setShowLogoutDialog] = useState(false);
+  const { ensureAuth, authReady, authUnavailable, retryAuth } = useWebAuth();
+  const { logout, logoutAccount, user, isAuthenticated } = useAuth();
   const sessionQueryClient = useQueryClient();
   const showAuthModal = useHubStore((state) => state.showAuthModal);
   const setShowAuthModal = useHubStore((state) => state.setShowAuthModal);
@@ -104,8 +107,8 @@ function WebWorkbenchRoot() {
   const agentLoadError = realMode && agentList.error
     ? errorMessage(agentList.error, t('error.agentProfile.load'))
     : undefined;
-  const hubClientForConversations = useMemo(() => createHubClient({ getToken: getAccessToken }), []);
-  const hubReady = !realMode ? false : Boolean(getAccessToken());
+  const hubClientForConversations = useMemo(() => createHubClient(), []);
+  const hubReady = !realMode ? false : isAuthenticated;
 
   // Fetch public Skills for the Skill Market tab
   const skillMarketQuery = useQuery({
@@ -297,7 +300,7 @@ function WebWorkbenchRoot() {
     // #1821: return the real promise — the workbench chrome awaits it, so a
     // failed regenerate shows an error toast and keeps the message visible
     // instead of silently soft-hiding it behind a fake "regenerating" toast.
-    return createHubClient({ getToken: getAccessToken })
+    return createHubClient()
       .regenerateAgentTask(taskId)
       .then(() => undefined);
   }, []);
@@ -305,7 +308,11 @@ function WebWorkbenchRoot() {
   if (realMode && !authReady) {
     return <div role="status">{t('loading', { ns: 'common' })}</div>;
   }
-  if (realMode && !getAccessToken()) {
+  if (realMode && !isAuthenticated) {
+    if (authUnavailable) return <div role="alert">
+      <p>{t('browserSession.unavailable', { ns: 'common' })}</p>
+      <button type="button" onClick={retryAuth}>{t('browserSession.retry', { ns: 'common' })}</button>
+    </div>;
     return <AuthPage onLoginSuccess={() => setShowAuthModal(false)} />;
   }
 
@@ -343,7 +350,7 @@ function WebWorkbenchRoot() {
         onAgentUpdate={handleAgentUpdate}
         onAgentDelete={handleAgentDelete}
         onAgentsRetry={handleAgentsRetry}
-        onLogout={handleLogout}
+        onLogout={() => setShowLogoutDialog(true)}
         onProjectCreate={workbench.projectsActions ? handleProjectCreate : undefined}
         onProjectUpdate={workbench.projectsActions ? handleProjectUpdate : undefined}
         onApprovalDecision={workbench.onApprovalDecision}
@@ -455,6 +462,8 @@ function WebWorkbenchRoot() {
         onStart={(member) => { void handleStartConversation(member); }}
         onStartAgent={() => { void handleStartAgentConversation(); }}
       />
+      <LogoutDialog open={showLogoutDialog} onClose={() => setShowLogoutDialog(false)}
+        onLogout={handleLogout} onLogoutAccount={logoutAccount} />
     </>
   );
 }

@@ -8,16 +8,18 @@ import { getPinMapStore } from '@shared/transcript';
 import { getAgentActivityStore } from '@shared/transcript/agentActivity';
 import { getMessageDelegationStore, getSubagentStreamStore } from '@agenthub/workbench';
 import { handleIncomingTyping } from '@shared/chatview/typingPresence';
-import { buildWSAuthProtocols, createHubWS, type HubWSHandle, type HubWSOptions } from '@shared/hub/hubWS';
+import { createHubWS, type HubWSHandle, type HubWSOptions } from '@shared/hub/hubWS';
 import { resyncMessagesAfterReconnect } from '@shared/hub/hubMessagesResync';
 import { webHubMessagesFamily } from '@/platform/webPlatformMessageHelpers';
 import { WebSocketTransport, type Transport, type TransportStatus } from '@shared/transport';
 import { HUB_WS_URL } from '@/config';
-import { createHubClient } from '@/api/hubClient';
+import { createHubClient, type HubMessage } from '@/api/hubClient';
 import { trackEventSeq, replayMissedEvents } from '@/api/runEventReplay';
 import { isDeviceKickedFrame, respondToDeviceKick } from '@/platform/webDeviceKicked';
 import { useConnectionStore } from '@/stores/connectionStore';
 import { getAccessToken } from '@/hooks/useAuth';
+import { resetWebHubSession } from './webAuthSessionReset';
+import { getBrowserSessionGeneration } from '@/api/browserSessionRuntime';
 
 type HubPayload = Record<string, unknown>;
 type CreateHubWS = (opts: HubWSOptions) => HubWSHandle;
@@ -33,11 +35,11 @@ type CreateWebRealtimeTransport = (options: {
 }) => Transport;
 
 /** Mirrors the transport the shared hubWS builds when none is injected. */
-const createDefaultWebRealtimeTransport: CreateWebRealtimeTransport = ({ url, getToken }) =>
+const createDefaultWebRealtimeTransport: CreateWebRealtimeTransport = ({ url }) =>
   new WebSocketTransport({
     url,
-    protocols: () => buildWSAuthProtocols(getToken()),
     maxRetries: 10,
+    offlineQueue: false,
   });
 
 const SESSION_EVENTS = new Set<string>([
@@ -145,6 +147,8 @@ export function useWebHubRealtime({
     if (!enabled) return undefined;
 
     let replaying = false;
+    const sessionGeneration = getBrowserSessionGeneration();
+    const sessionCurrent = () => sessionGeneration === getBrowserSessionGeneration();
     const hubClient = createHubClient({ getToken });
     const invalidation = createWebWorkbenchHubInvalidationScheduler(queryClient);
 
@@ -152,6 +156,7 @@ export function useWebHubRealtime({
     // event is retained; React batches the callbacks from one timer turn.
     let latestActivityPayload: unknown = null;
     const liveBatcher = createWebWorkbenchLiveEventBatcher((events) => {
+      if (!sessionCurrent()) return;
       for (const event of events) {
         onRuntimeEventRef.current?.(event);
       }
@@ -168,6 +173,12 @@ export function useWebHubRealtime({
     // device.kicked, which clears remaining listeners mid-emit (#1816).
     const transport = createTransport({ url: HUB_WS_URL, getToken });
     const unsubscribeDeviceKicked = transport.on('message', (raw: unknown) => {
+      if (!sessionCurrent()) return;
+      if (raw && typeof raw === 'object' && (raw as { type?: string }).type === HUB_EVENTS.AUTH_REVOKED) {
+        transport.close();
+        void resetWebHubSession();
+        return;
+      }
       if (isDeviceKickedFrame(raw)) {
         respondToDeviceKick(translateRef.current);
       }
@@ -193,6 +204,7 @@ export function useWebHubRealtime({
           hubClient,
           getActiveTaskId: () => runtimeTaskIdRef.current ?? undefined,
           onReplayEvents: (events, tid) => {
+            if (!sessionCurrent()) return;
             onReplayEventsRef.current?.(events, tid);
             replaying = false;
           },
@@ -200,6 +212,7 @@ export function useWebHubRealtime({
       },
     });
     const unsubscribe = socket.onAny((type, payload) => {
+      if (!sessionCurrent()) return;
       invalidation.notify(type, payload);
 
       // ── Pin state — feed MESSAGE_PIN / MESSAGE_UNPIN frames into the
@@ -383,6 +396,16 @@ export function invalidateWebWorkbenchHubQueries(
 
     if (MESSAGE_EVENTS.has(eventType) || AGENT_EVENTS.has(eventType)) {
       const sessionId = readSessionId(payload);
+      if (eventType === HUB_EVENTS.MESSAGE_RECALL && sessionId) {
+        const messageId = readString(payload, 'message_id', 'id')
+          ?? readString(readPayloadValue(payload, 'message'), 'message_id', 'id');
+        if (messageId) {
+          queryClient.setQueryData<HubMessage[]>(webQueryKeys.messages.of(sessionId), (current) => {
+            if (!current?.some((message) => message.id === messageId)) return current;
+            return current.map((message) => message.id === messageId ? { ...message, recalled: true } : message);
+          });
+        }
+      }
       void queryClient.invalidateQueries({
         queryKey: sessionId
           ? webQueryKeys.messages.of(sessionId)

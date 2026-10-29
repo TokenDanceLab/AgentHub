@@ -26,6 +26,11 @@ export default defineConfig(() => ({
     port: 5174,
     strictPort: true,
     host: '127.0.0.1',
+    proxy: Object.fromEntries(['/client', '/web', '/health'].map((route) => [route, {
+      target: process.env.AGENTHUB_WEB_DEV_PROXY_TARGET || 'http://127.0.0.1:8080',
+      ws: route === '/client',
+      changeOrigin: false,
+    }])),
     headers: {
       'X-Content-Type-Options': 'nosniff',
       'X-Frame-Options': 'DENY',

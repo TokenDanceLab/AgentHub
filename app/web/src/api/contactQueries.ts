@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { createHubClient } from './hubClient';
-import { getAccessToken } from '@/hooks/useAuth';
+import { isHubAuthenticated } from '@/hooks/useAuth';
 import { hubQueryKeys, webQueryKeys } from '@shared/stores/queryKeys';
 import type { FriendRequestInfo, SearchResult } from './hubClient';
 
@@ -16,111 +16,111 @@ export const sessionsQueryKey = webQueryKeys.sessions.root;
 // ── Async helpers ──────────────────────────────────────────
 
 export async function listFriendRequests(
-  getToken: () => string | null = getAccessToken,
+  isAuthenticated: () => boolean = isHubAuthenticated,
 ): Promise<FriendRequestInfo[]> {
-  const token = getToken();
-  if (!token) return [];
+  const authenticated = isAuthenticated();
+  if (!authenticated) return [];
 
-  const client = createHubClient({ getToken: () => token });
+  const client = createHubClient();
   return client.listFriendRequests();
 }
 
 export async function searchHubUser(
   query: string,
-  getToken: () => string | null = getAccessToken,
+  isAuthenticated: () => boolean = isHubAuthenticated,
 ): Promise<SearchResult> {
-  const token = getToken();
-  if (!token) throw new Error('Hub session is required');
+  const authenticated = isAuthenticated();
+  if (!authenticated) throw new Error('Hub session is required');
 
-  const client = createHubClient({ getToken: () => token });
+  const client = createHubClient();
   return client.searchUser(query);
 }
 
 export async function sendFriendRequest(
   params: { userId: string; message?: string },
-  getToken: () => string | null = getAccessToken,
+  isAuthenticated: () => boolean = isHubAuthenticated,
 ): Promise<void> {
-  const token = getToken();
-  if (!token) throw new Error('Hub session is required');
+  const authenticated = isAuthenticated();
+  if (!authenticated) throw new Error('Hub session is required');
 
-  const client = createHubClient({ getToken: () => token });
+  const client = createHubClient();
   await client.sendFriendRequest(params.userId, params.message);
 }
 
 export async function acceptFriendRequest(
   requestId: string,
-  getToken: () => string | null = getAccessToken,
+  isAuthenticated: () => boolean = isHubAuthenticated,
 ): Promise<void> {
-  const token = getToken();
-  if (!token) throw new Error('Hub session is required');
+  const authenticated = isAuthenticated();
+  if (!authenticated) throw new Error('Hub session is required');
 
-  const client = createHubClient({ getToken: () => token });
+  const client = createHubClient();
   await client.acceptFriendRequest(requestId);
 }
 
 export async function rejectFriendRequest(
   requestId: string,
-  getToken: () => string | null = getAccessToken,
+  isAuthenticated: () => boolean = isHubAuthenticated,
 ): Promise<void> {
-  const token = getToken();
-  if (!token) throw new Error('Hub session is required');
+  const authenticated = isAuthenticated();
+  if (!authenticated) throw new Error('Hub session is required');
 
-  const client = createHubClient({ getToken: () => token });
+  const client = createHubClient();
   await client.rejectFriendRequest(requestId);
 }
 
 export async function removeContact(
   userId: string,
-  getToken: () => string | null = getAccessToken,
+  isAuthenticated: () => boolean = isHubAuthenticated,
 ): Promise<void> {
-  const token = getToken();
-  if (!token) throw new Error('Hub session is required');
+  const authenticated = isAuthenticated();
+  if (!authenticated) throw new Error('Hub session is required');
 
-  const client = createHubClient({ getToken: () => token });
+  const client = createHubClient();
   await client.removeContact(userId);
 }
 
 export async function blockContact(
   userId: string,
-  getToken: () => string | null = getAccessToken,
+  isAuthenticated: () => boolean = isHubAuthenticated,
 ): Promise<void> {
-  const token = getToken();
-  if (!token) throw new Error('Hub session is required');
+  const authenticated = isAuthenticated();
+  if (!authenticated) throw new Error('Hub session is required');
 
-  const client = createHubClient({ getToken: () => token });
+  const client = createHubClient();
   await client.blockContact(userId);
 }
 
 export async function unblockContact(
   userId: string,
-  getToken: () => string | null = getAccessToken,
+  isAuthenticated: () => boolean = isHubAuthenticated,
 ): Promise<void> {
-  const token = getToken();
-  if (!token) throw new Error('Hub session is required');
+  const authenticated = isAuthenticated();
+  if (!authenticated) throw new Error('Hub session is required');
 
-  const client = createHubClient({ getToken: () => token });
+  const client = createHubClient();
   await client.unblockContact(userId);
 }
 
 export async function updateContactRemark(
   params: { userId: string; remark: string },
-  getToken: () => string | null = getAccessToken,
+  isAuthenticated: () => boolean = isHubAuthenticated,
 ): Promise<void> {
-  const token = getToken();
-  if (!token) throw new Error('Hub session is required');
+  const authenticated = isAuthenticated();
+  if (!authenticated) throw new Error('Hub session is required');
 
-  const client = createHubClient({ getToken: () => token });
+  const client = createHubClient();
   await client.updateContactRemark(params.userId, params.remark);
 }
 
 export async function createGroupSession(
   params: { name: string; memberIds: string[] },
-  getToken: () => string | null = getAccessToken,
+  isAuthenticated: () => boolean = isHubAuthenticated,
 ): Promise<{ sessionId: string; type: string; created: boolean }> {
-  const token = getToken();
-  if (!token) throw new Error('Hub session is required');
+  const authenticated = isAuthenticated();
+  if (!authenticated) throw new Error('Hub session is required');
 
-  const client = createHubClient({ getToken: () => token });
+  const client = createHubClient();
   const res = await client.createGroupSession({ name: params.name, member_ids: params.memberIds });
   return { sessionId: res.session_id, type: res.type, created: res.created };
 }

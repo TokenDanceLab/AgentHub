@@ -30,6 +30,11 @@ type Conn struct {
 	missedPong atomic.Int32
 	mu         sync.Mutex
 	sendMu     sync.Mutex
+	// sessionWriteMu serializes the final revocation frame with ordinary writes.
+	sessionWriteMu    sync.Mutex
+	sessionCheck      func(context.Context) error
+	sessionIdentityID string
+	sessionStopped    bool
 
 	// closed is set atomically before the Send channel is closed.  PushToConn
 	// and closeSend use sendMu so channel send and close never race.

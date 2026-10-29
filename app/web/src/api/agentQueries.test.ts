@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { getAccessToken } from '@/hooks/useAuth';
+import { isHubAuthenticated } from '@/hooks/useAuth';
 import {
   agentConfigToCreateAgentProfileRequest,
   agentConfigToUpdateAgentProfileRequest,
@@ -9,14 +9,14 @@ import {
 import { getAuthorization } from '@/__tests__/requestInitTestUtils';
 
 vi.mock('@/hooks/useAuth', () => ({
-  getAccessToken: vi.fn(),
+  isHubAuthenticated: vi.fn(),
 }));
 
 describe('web agent profile queries', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
-    vi.mocked(getAccessToken).mockReturnValue(null);
+    vi.mocked(isHubAuthenticated).mockReturnValue(false);
   });
 
   it('maps Hub AgentProfile runtime metadata into AgentInfo', () => {
@@ -90,11 +90,11 @@ describe('web agent profile queries', () => {
     expect(agent.provider).toBe('openai');
   });
 
-  it('fetches real Hub agent profiles when a Hub session token is available', async () => {
-    vi.mocked(getAccessToken).mockReturnValue('hub-access');
+  it('fetches real Hub agent profiles when a Hub browser session is authenticated', async () => {
+    vi.mocked(isHubAuthenticated).mockReturnValue(true);
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-      expect(String(input)).toBe('http://localhost:8080/web/agent-profiles?pageSize=200');
-      expect(getAuthorization(init)).toBe('Bearer hub-access');
+      expect(String(input)).toBe('/web/agent-profiles?pageSize=200');
+      expect(getAuthorization(init)).toBeNull();
       return new Response(
         JSON.stringify({
           code: 'ok',
@@ -134,7 +134,7 @@ describe('web agent profile queries', () => {
   // #2290 defect class: this call site used to ask for one page (pageSize 50)
   // and drop page.nextCursor, so the 51st agent profile never reached the list.
   it('walks cursor pages so agent profiles past the first page are visible', async () => {
-    vi.mocked(getAccessToken).mockReturnValue('hub-access');
+    vi.mocked(isHubAuthenticated).mockReturnValue(true);
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(new Response(
         JSON.stringify({
@@ -178,9 +178,9 @@ describe('web agent profile queries', () => {
 
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(String(fetchMock.mock.calls[0]?.[0]))
-      .toBe('http://localhost:8080/web/agent-profiles?pageSize=200');
+      .toBe('/web/agent-profiles?pageSize=200');
     expect(String(fetchMock.mock.calls[1]?.[0]))
-      .toBe('http://localhost:8080/web/agent-profiles?pageSize=200&pageCursor=cur-1');
+      .toBe('/web/agent-profiles?pageSize=200&pageCursor=cur-1');
     expect(res.items.map((agent) => agent.name)).toEqual(['Page 1 Agent', 'Page 2 Agent']);
     expect(res.page.hasMore).toBe(false);
   });
@@ -281,7 +281,7 @@ describe('web agent profile queries', () => {
   });
 
   it('surfaces 401 unauthorized from agent profile list as AppError (fail-closed)', async () => {
-    vi.mocked(getAccessToken).mockReturnValue('stale-token');
+    vi.mocked(isHubAuthenticated).mockReturnValue(true);
     vi.stubGlobal('fetch', vi.fn(async () => new Response(
       JSON.stringify({ code: 'unauthorized', message: 'bad token' }),
       { status: 401, statusText: 'Unauthorized', headers: { 'Content-Type': 'application/json' } },
@@ -298,7 +298,7 @@ describe('web agent profile queries', () => {
     ['NOT_FOUND', 404, 'Not Found', 'profiles missing'],
     ['INTERNAL_ERROR', 500, 'Internal Server Error', 'hub down'],
   ])('surfaces %s from agent profile list as AppError', async (code, status, statusText, message) => {
-    vi.mocked(getAccessToken).mockReturnValue('hub-access');
+    vi.mocked(isHubAuthenticated).mockReturnValue(true);
     vi.stubGlobal('fetch', vi.fn(async () => new Response(
       JSON.stringify({ code, message }),
       { status, statusText, headers: { 'Content-Type': 'application/json' } },

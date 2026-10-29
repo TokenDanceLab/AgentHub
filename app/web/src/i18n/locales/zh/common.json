@@ -1,4 +1,11 @@
 {
+  "browserSession.logoutTitle": "退出登录",
+  "browserSession.logoutDescription": "可以只退出当前 AgentHub，也可以同时退出用于登录词元跳动应用的 Account 浏览器会话。",
+  "browserSession.logoutLocal": "退出 AgentHub",
+  "browserSession.logoutAccount": "退出 AgentHub 和 Account",
+  "browserSession.logoutFailed": "暂时无法退出会话，请重试。",
+  "browserSession.unavailable": "暂时无法检查登录状态，请检查网络后重试。",
+  "browserSession.retry": "重新检查登录状态",
   "surface.status.realSnapshot.label": "真实快照",
   "surface.status.realSnapshot.description": "来自已验证的实时响应或保留的服务快照。",
   "surface.status.localSource.label": "本地来源",

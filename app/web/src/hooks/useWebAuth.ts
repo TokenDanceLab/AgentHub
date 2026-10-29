@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQueryClient } from '@tanstack/react-query';
-import { useAuth, getAccessToken } from '@/hooks/useAuth';
-import { OidcError } from '@/api/hubAuth';
+import { useAuth, isHubAuthenticated } from '@/hooks/useAuth';
+import { OidcError } from '@shared/api/auth';
 import { useHubStore } from '@/stores/hubStore';
 import { useToastStore } from '@shared/ui/toast';
 import { hubQueryKeys, webQueryKeys } from '@shared/stores/queryKeys';
@@ -21,10 +21,14 @@ export function useWebAuth() {
   const setShowAuthModal = useHubStore((s) => s.setShowAuthModal);
   const addToast = useToastStore((s) => s.addToast);
   const [authReady, setAuthReady] = useState(false);
+  const [authUnavailable, setAuthUnavailable] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
 
   // Auto-login on mount; refetch threads & agents once authenticated.
   useEffect(() => {
     let cancelled = false;
+    setAuthReady(false);
+    setAuthUnavailable(false);
     void tryAutoLogin()
       .then((authenticated) => {
         if (authenticated && !cancelled) {
@@ -37,6 +41,7 @@ export function useWebAuth() {
       })
       .catch((error: unknown) => {
         if (cancelled) return;
+        setAuthUnavailable(!(error instanceof OidcError));
         if (error instanceof OidcError) {
           // OIDC callback path (state mismatch / timeout / token exchange):
           // surface the localized error and reopen the login entry so the
@@ -59,7 +64,7 @@ export function useWebAuth() {
     return () => {
       cancelled = true;
     };
-  }, [addToast, queryClient, setShowAuthModal, t, tryAutoLogin]);
+  }, [addToast, queryClient, retryCount, setShowAuthModal, t, tryAutoLogin]);
 
   /**
    * Returns `true` when the user is authenticated.
@@ -67,7 +72,7 @@ export function useWebAuth() {
    * should abort the guarded operation.
    */
   const ensureAuth = useCallback((): boolean => {
-    if (!hubAuthenticated || !getAccessToken()) {
+    if (!hubAuthenticated || !isHubAuthenticated()) {
       setShowAuthModal(true);
       addToast({ type: 'error', message: t('webChat.signInRequired') });
       return false;
@@ -75,5 +80,5 @@ export function useWebAuth() {
     return true;
   }, [addToast, hubAuthenticated, setShowAuthModal, t]);
 
-  return { ensureAuth, authReady };
+  return { ensureAuth, authReady, authUnavailable, retryAuth: () => setRetryCount((value) => value + 1) };
 }

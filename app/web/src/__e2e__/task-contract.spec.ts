@@ -1,3 +1,4 @@
+import { BROWSER_FIXTURE_ORIGIN, browserSessionFixture, installBrowserSessionFixture, assertBrowserFixtureRequest } from './browserSessionFixture';
 import { expect, test } from '@playwright/test';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -9,10 +10,9 @@ import {
 import { fulfillExternalFontIfMatch } from '../../../e2e/fontBlocker';
 
 const ARTIFACT_DIR = path.resolve(process.cwd(), '.tmp', 'task-contract-replay');
-// Must match playwright.config.ts webServer VITE_HUB_URL: the fail-closed
-// reserved origin keeps every Hub call inside the route stub instead of
-// reaching localhost or production.
-const HUB_ORIGIN = 'https://hub.test.invalid';
+// Browser APIs share the app origin. The fixture proxy fails closed for any
+// request not handled by the Hub routes below.
+const HUB_ORIGIN = BROWSER_FIXTURE_ORIGIN;
 const WEB_E2E_PORT = Number(process.env.AGENTHUB_WEB_E2E_PORT ?? 5174);
 const WEB_E2E_APP_ORIGIN = `http://127.0.0.1:${WEB_E2E_PORT}`;
 const WEB_TASK_CONTRACT_SCENARIO = createE2EDataModeScenario({
@@ -58,9 +58,10 @@ test.describe('Web Hub task approval/artifact contract', () => {
       });
     });
 
-    await page.route(`${HUB_ORIGIN}/**`, async (route) => {
+    await page.route((url) => url.origin === HUB_ORIGIN && /^\/(?:client|web)(?:\/|$)/.test(url.pathname), async (route) => {
       const request = route.request();
       const url = new URL(request.url());
+      assertBrowserFixtureRequest(request);
       requested.endpoints.add(`${request.method()} ${url.pathname}`);
       requested.requests.push({ method: request.method(), url: request.url() });
 
@@ -68,13 +69,13 @@ test.describe('Web Hub task approval/artifact contract', () => {
         return route.fulfill({ status: 204 });
       }
 
-      if (url.pathname === '/client/auth/me') {
-        return route.fulfill(json(hubEnvelope({
+      if (url.pathname === '/client/auth/browser/session') {
+        return route.fulfill(json(hubEnvelope(browserSessionFixture({
           id: 'user-web-contract',
           username: 'web-contract',
           nickname: 'Web Contract',
           avatar_url: '',
-        })));
+        }))));
       }
 
       if (url.pathname === '/client/sessions') {
@@ -270,17 +271,13 @@ test.describe('Web Hub task approval/artifact contract', () => {
       return route.fulfill(json(hubEnvelope({})));
     });
 
+    await installBrowserSessionFixture(page);
     await page.addInitScript(() => {
       window.localStorage.setItem('agenthub.workbench.dataMode', 'approved-real');
       window.localStorage.setItem('agenthub.web.activeAgentTask.session-web-contract', JSON.stringify({
         taskId: 'task-web-contract',
         sessionId: 'session-web-contract',
         status: 'running',
-      }));
-      window.sessionStorage.setItem('agenthub_hub_token', 'stubbed-hub-token');
-      window.sessionStorage.setItem('agenthub_hub_user', JSON.stringify({
-        userId: 'user-web-contract',
-        username: 'web-contract',
       }));
     });
 

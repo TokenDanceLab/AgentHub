@@ -66,7 +66,7 @@ describe('useAuth', () => {
 
     act(() => {
       authHarness.setState({
-        token: 'hub-access',
+        token: null,
         isAuthenticated: true,
         tokenSource: 'account',
         user: {
@@ -79,9 +79,9 @@ describe('useAuth', () => {
     });
 
     expect(result.current.isAuthenticated).toBe(true);
-    expect(result.current.token).toBe('hub-access');
+    expect(result.current.token).toBeNull();
     expect(result.current.user?.username).toBe('alice');
-    expect(getAccessToken()).toBe('hub-access');
+    expect(getAccessToken()).toBeNull();
   });
 
   it('delegates login/logout/auto-login to the Hub auth singleton', async () => {

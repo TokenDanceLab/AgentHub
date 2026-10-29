@@ -1,4 +1,11 @@
 {
+  "browserSession.logoutTitle": "Log out",
+  "browserSession.logoutDescription": "Log out of AgentHub here, or also end the Account browser session used to sign in to TokenDance apps.",
+  "browserSession.logoutLocal": "Log out of AgentHub",
+  "browserSession.logoutAccount": "Log out of AgentHub and Account",
+  "browserSession.logoutFailed": "Could not end the session. Please retry.",
+  "browserSession.unavailable": "Unable to check your session. Check your connection and retry.",
+  "browserSession.retry": "Retry session check",
   "surface.status.realSnapshot.label": "Real snapshot",
   "surface.status.realSnapshot.description": "Rendered from a verified live response or preserved service snapshot.",
   "surface.status.localSource.label": "Local source",

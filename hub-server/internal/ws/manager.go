@@ -438,6 +438,11 @@ func (m *Manager) pingAll() {
 			defer wg.Done()
 			for c := range jobs {
 				ctx, cancel := context.WithTimeout(context.Background(), config.WSPingTimeout)
+				if err := c.ValidateSession(ctx); err != nil {
+					cancel()
+					m.Unregister(c.ID)
+					continue
+				}
 				err := c.W.Ping(ctx)
 				cancel()
 				if err != nil {

@@ -22,7 +22,7 @@ const useWebAuthMock = vi.hoisted(() => vi.fn());
 const ensureAuthMock = vi.hoisted(() => vi.fn());
 const logoutMock = vi.hoisted(() => vi.fn(async () => undefined));
 const useAuthMock = vi.hoisted(() => vi.fn());
-const getAccessTokenMock = vi.hoisted(() => vi.fn<() => string | null>(() => null));
+const isHubAuthenticatedMock = vi.hoisted(() => vi.fn<() => boolean>(() => false));
 const hubClientStub = vi.hoisted(() => ({
   me: vi.fn(async () => ({ id: 'web-user', username: 'web-user', nickname: 'Web User', avatar_url: '' })),
   listPublicSkills: vi.fn(async () => ({ items: [] })),
@@ -66,7 +66,7 @@ vi.mock('@/hooks/useWebAuth', () => ({
 
 vi.mock('@/hooks/useAuth', () => ({
   useAuth: useAuthMock,
-  getAccessToken: getAccessTokenMock,
+  isHubAuthenticated: isHubAuthenticatedMock,
 }));
 
 vi.mock('@/api/hubClient', () => ({
@@ -101,8 +101,8 @@ describe('Web app root', () => {
     localStorage.clear();
     sessionStorage.clear();
     queryClient.clear();
-    getAccessTokenMock.mockReturnValue(null);
-    useAuthMock.mockReturnValue({ logout: logoutMock, user: null });
+    isHubAuthenticatedMock.mockReturnValue(false);
+    useAuthMock.mockReturnValue({ logout: logoutMock, logoutAccount: vi.fn(), isAuthenticated: false, user: null });
     ensureAuthMock.mockReturnValue(true);
     useWebAuthMock.mockReturnValue({ ensureAuth: ensureAuthMock, authReady: true });
     useHubStore.getState().clear();
@@ -173,8 +173,8 @@ describe('Web app root', () => {
   it('reuses the authenticated profile without a second profile request', () => {
     vi.stubEnv('PROD', true);
     vi.stubEnv('VITE_AGENTHUB_DATA_MODE', '');
-    getAccessTokenMock.mockReturnValue('test-session');
-    useAuthMock.mockReturnValue({ logout: logoutMock, user: authPageSuccessUser });
+    isHubAuthenticatedMock.mockReturnValue(true);
+    useAuthMock.mockReturnValue({ logout: logoutMock, logoutAccount: vi.fn(), isAuthenticated: true, user: authPageSuccessUser });
     useHubStore.getState().setAuthenticated(true, authPageSuccessUser.id, authPageSuccessUser.username);
     render(<App />);
     expect(screen.getByRole('button', { name: 'Web Auth User' })).toBeInTheDocument();
@@ -432,9 +432,10 @@ describe('Web app root', () => {
   });
 
   it('logs out the Web session, clears private queries, and opens the auth surface', async () => {
-    getAccessTokenMock.mockReturnValue('web-token');
+    isHubAuthenticatedMock.mockReturnValue(true);
+    useAuthMock.mockReturnValue({ logout: logoutMock, logoutAccount: vi.fn(), isAuthenticated: true, user: null });
     logoutMock.mockImplementationOnce(async () => {
-      getAccessTokenMock.mockReturnValue(null);
+      isHubAuthenticatedMock.mockReturnValue(false);
       useHubStore.getState().clear();
     });
     useHubStore.getState().setAuthenticated(true, 'web-user', 'Web User');
@@ -444,6 +445,7 @@ describe('Web app root', () => {
 
     fireEvent.click(await screen.findByRole('button', { name: /^(Web User|user\.fallbackName)$/ }));
     fireEvent.click(screen.getByRole('button', { name: /^(退出登录|Log out|user\.logout)$/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'browserSession.logoutLocal' }));
 
     await waitFor(() => {
       expect(logoutMock).toHaveBeenCalledTimes(1);
@@ -455,7 +457,8 @@ describe('Web app root', () => {
 
   it('opens auth instead of silently using mock data for guarded unauthenticated Hub work', async () => {
     vi.stubEnv('VITE_AGENTHUB_DATA_MODE', 'observed');
-    getAccessTokenMock.mockReturnValue('web-token');
+    isHubAuthenticatedMock.mockReturnValue(true);
+    useAuthMock.mockReturnValue({ logout: logoutMock, logoutAccount: vi.fn(), isAuthenticated: true, user: null });
     ensureAuthMock.mockImplementation(() => {
       useHubStore.getState().setShowAuthModal(true);
       return false;
@@ -464,7 +467,7 @@ describe('Web app root', () => {
     render(<App />);
 
     // Simulate the token expiring after the workbench mounted, before sending.
-    getAccessTokenMock.mockReturnValue(null);
+    isHubAuthenticatedMock.mockReturnValue(false);
 
     // Drive the real composer, so the auth gate is exercised through the real
     // shared shell → web platform adapter path rather than a stub button.

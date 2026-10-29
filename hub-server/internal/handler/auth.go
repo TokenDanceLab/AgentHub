@@ -54,6 +54,10 @@ func (h *AuthHandler) Refresh(c *gin.Context) {
 }
 
 func (h *AuthHandler) Logout(c *gin.Context) {
+	if _, browser := c.Get("browser_session"); browser {
+		FailWithMessage(c, errcode.ErrBadRequest, "browser sessions use /client/auth/browser/logout")
+		return
+	}
 	userID := c.GetString("user_id")
 	deviceID := c.GetString("device_id")
 	// Scope revocation by the authenticated token's OWN device_type

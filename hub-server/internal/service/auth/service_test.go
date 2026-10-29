@@ -95,6 +95,8 @@ func expectActiveRefreshIdentity(mock sqlmock.Sqlmock) {
 			testRefreshIdentity, "user-uuid", "account", "https://account.example",
 			"subject", "active", time.Now(), time.Now(), time.Now(),
 		))
+	mock.ExpectExec(`INSERT INTO "oidc_subject_epochs"`).WithArgs("https://account.example", "subject", int64(0), int64(0)).WillReturnResult(sqlmock.NewResult(0, 0))
+	mock.ExpectQuery(`FROM "oidc_subject_epochs"`).WithArgs("https://account.example", "subject", 1).WillReturnRows(sqlmock.NewRows([]string{"issuer", "subject", "generation", "last_logout_iat"}).AddRow("https://account.example", "subject", 0, 0))
 }
 
 // ==================== RefreshToken ====================

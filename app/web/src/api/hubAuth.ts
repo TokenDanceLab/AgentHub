@@ -1,23 +1,26 @@
-// Web Hub auth adapter (issue #1537).
-// Thin shell over the shared auth state machine (@shared/api/auth):
-// the token lifecycle, OIDC PKCE flow, refresh fallback, logout cleanup and
-// snapshot/listener pattern live in app/shared/src/api/auth/authStateMachine.ts;
-// this file injects the Web platform ports (sessionStorage tokens, browser
-// callback route, current-window redirect) and keeps the historical
-// createHubAuth() / HubAuthState / HubAuth surface for existing callers.
+// Browser navigation and cache ownership around the shared cookie-session core.
 
-import { createHubAuthCore } from '@shared/api/auth';
-import type { HubAuth } from '@shared/api/auth';
-import { createWebHubAuthPorts } from './auth/webPorts';
+import { createBrowserSessionAuth } from '@shared/api/auth';
+import { createWebBrowserAuthPorts } from './auth/webPorts';
 import { createHubClient } from './hubClient';
 import type { HubClient } from './hubClient';
+import { setBrowserCsrfToken } from './browserSessionRuntime';
+import { clearWebSessionData } from '@/platform/clearWebSessionData';
+import { useHubStore } from '@/stores/hubStore';
 
 export { OidcError } from '@shared/api/auth';
 export type { HubAuth, HubAuthState } from '@shared/api/auth';
 
-export function createHubAuth(client?: HubClient): HubAuth {
-  return createHubAuthCore(createWebHubAuthPorts(), {
-    client,
-    createClient: (opts) => createHubClient(opts),
+export function createHubAuth(client?: HubClient) {
+  const ports = createWebBrowserAuthPorts();
+  return createBrowserSessionAuth({
+    ...ports,
+    client: client ?? createHubClient(),
+    setCsrfToken: setBrowserCsrfToken,
+    syncSession(user) {
+      if (!user || useHubStore.getState().userId !== user.id) clearWebSessionData();
+      if (user) useHubStore.getState().setAuthenticated(true, user.id, user.username);
+      else useHubStore.getState().clear();
+    },
   });
 }
