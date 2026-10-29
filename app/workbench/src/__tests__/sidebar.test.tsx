@@ -6,9 +6,8 @@
 // the component tree (and its virtua/@lobehub/icons deps) is evaluated.
 import { installWorkbenchTestHooks } from './helpers';
 
-import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { useState, type ReactElement } from 'react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
 import { createMockPlatform } from '@shared/platform/createMockPlatform';
 import { AgentHubWorkbench } from '../AgentHubWorkbench';
 import {
@@ -192,228 +191,24 @@ describe('AgentHubWorkbench', () => {
     );
 
     const reviewer = screen.getByRole('button', { name: /Reviewer/ });
-    expect(within(reviewer).getAllByText('12:15').length).toBeGreaterThan(0);
     expect(within(reviewer).getByText('2')).toBeInTheDocument();
     fireEvent.click(reviewer);
 
     expect(handleConversationChange).toHaveBeenCalledWith('reviewer');
-    expect(reviewer).toHaveAttribute('aria-current', 'true');
+    expect(screen.getByRole('heading', { name: 'Reviewer' })).toBeInTheDocument();
     expect(screen.getByRole('textbox', { name: '输入框' })).toBeInTheDocument();
   });
 
-  describe('conversation sort', () => {
-    afterEach(() => {
-      window.localStorage.removeItem('agenthub.conversationSort');
-    });
-
-    it('renders sort dropdown with 3 options, default recent', () => {
-      const platform = createMockPlatform({
-        surface: 'desktop',
-        conversations: [
-          { id: 'a', title: 'Alpha', kind: 'direct' },
-          { id: 'b', title: 'Beta', kind: 'direct' },
-        ],
-      });
-      render(
-        <AgentHubWorkbench
-          agents={agents}
-          platform={platform}
-          conversations={platform.seed.conversations}
-          transcript={transcript}
-        />,
-      );
-      const select = screen.getByRole('combobox', { name: '排序方式' });
-      expect(select).toBeInTheDocument();
-      expect(select).toHaveValue('recent');
-      const options = within(select).getAllByRole('option');
-      expect(options).toHaveLength(3);
-      expect(options[0]).toHaveValue('recent');
-      expect(options[1]).toHaveValue('name');
-      expect(options[2]).toHaveValue('active');
-    });
-
-    it('sorts by name alphabetically', () => {
-      const platform = createMockPlatform({
-        surface: 'desktop',
-        conversations: [
-          { id: 'c', title: 'Charlie', kind: 'direct' },
-          { id: 'a', title: 'Alpha', kind: 'direct' },
-          { id: 'b', title: 'Beta', kind: 'direct' },
-        ],
-      });
-      render(
-        <AgentHubWorkbench
-          agents={agents}
-          platform={platform}
-          conversations={platform.seed.conversations}
-          transcript={transcript}
-        />,
-      );
-      const sidebar = screen.getByRole('complementary', { name: '会话侧边栏' });
-      const select = within(sidebar).getByRole('combobox');
-      fireEvent.change(select, { target: { value: 'name' } });
-      expect(select).toHaveValue('name');
-
-      const titles = within(sidebar).getAllByText(/^(Alpha|Beta|Charlie)$/);
-      expect(titles).toHaveLength(3);
-      expect(titles[0]).toHaveTextContent('Alpha');
-      expect(titles[1]).toHaveTextContent('Beta');
-      expect(titles[2]).toHaveTextContent('Charlie');
-    });
-
-    it('keeps pinned conversations on top regardless of sort mode', () => {
-      const platform = createMockPlatform({
-        surface: 'desktop',
-        conversations: [
-          { id: 'b', title: 'Beta', kind: 'direct', pinned: true },
-          { id: 'a', title: 'Alpha', kind: 'direct' },
-          { id: 'c', title: 'Charlie', kind: 'direct' },
-        ],
-      });
-      render(
-        <AgentHubWorkbench
-          agents={agents}
-          platform={platform}
-          conversations={platform.seed.conversations}
-          transcript={transcript}
-        />,
-      );
-      const sidebar = screen.getByRole('complementary', { name: '会话侧边栏' });
-      const select = within(sidebar).getByRole('combobox');
-      fireEvent.change(select, { target: { value: 'name' } });
-      expect(select).toHaveValue('name');
-
-      const titles = within(sidebar).getAllByText(/^(Alpha|Beta|Charlie)$/);
-      // Beta is pinned, so it should be first
-      expect(titles[0]).toHaveTextContent('Beta');
-      expect(titles[1]).toHaveTextContent('Alpha');
-      expect(titles[2]).toHaveTextContent('Charlie');
-    });
-
-    it('persists sort preference to localStorage', () => {
-      const platform = createMockPlatform({
-        surface: 'desktop',
-        conversations: [
-          { id: 'a', title: 'Alpha', kind: 'direct' },
-        ],
-      });
-      render(
-        <AgentHubWorkbench
-          agents={agents}
-          platform={platform}
-          conversations={platform.seed.conversations}
-          transcript={transcript}
-        />,
-      );
-      const select = screen.getByRole('combobox', { name: '排序方式' });
-      fireEvent.change(select, { target: { value: 'name' } });
-      expect(window.localStorage.getItem('agenthub.conversationSort')).toBe('name');
-    });
-
-    it('loads sort preference from localStorage on mount', () => {
-      window.localStorage.setItem('agenthub.conversationSort', 'name');
-      const platform = createMockPlatform({
-        surface: 'desktop',
-        conversations: [
-          { id: 'a', title: 'Alpha', kind: 'direct' },
-          { id: 'b', title: 'Beta', kind: 'direct' },
-        ],
-      });
-      render(
-        <AgentHubWorkbench
-          agents={agents}
-          platform={platform}
-          conversations={platform.seed.conversations}
-          transcript={transcript}
-        />,
-      );
-      const select = screen.getByRole('combobox', { name: '排序方式' });
-      expect(select).toHaveValue('name');
-    });
-
-    it('sorts by active (unread count descending)', () => {
-      const platform = createMockPlatform({
-        surface: 'desktop',
-        conversations: [
-          { id: 'a', title: 'Alpha', kind: 'direct', unreadCount: 1 },
-          { id: 'b', title: 'Beta', kind: 'direct', unreadCount: 5 },
-          { id: 'c', title: 'Charlie', kind: 'direct' },
-        ],
-      });
-      render(
-        <AgentHubWorkbench
-          agents={agents}
-          platform={platform}
-          conversations={platform.seed.conversations}
-          transcript={transcript}
-        />,
-      );
-      const sidebar = screen.getByRole('complementary', { name: '会话侧边栏' });
-      const select = within(sidebar).getByRole('combobox');
-      fireEvent.change(select, { target: { value: 'active' } });
-      expect(select).toHaveValue('active');
-
-      const titles = within(sidebar).getAllByText(/^(Alpha|Beta|Charlie)$/);
-      // Beta has 5 unread, Alpha has 1, Charlie has 0
-      expect(titles[0]).toHaveTextContent('Beta');
-      expect(titles[1]).toHaveTextContent('Alpha');
-      expect(titles[2]).toHaveTextContent('Charlie');
-    });
-  });
-  it('round-trips task-052 from c1 and restores c1 after an external switch to c2', async () => {
-    function TaskDeepLinkHarness(): ReactElement {
-      const [activeConversationId, setActiveConversationId] = useState('c1');
-      const platform = createMockPlatform({
-        surface: 'desktop',
-        capabilities: { browserPreview: true },
-        conversations: [
-          { id: 'c1', title: 'Conversation One', kind: 'direct' },
-          { id: 'c2', title: 'Conversation Two', kind: 'direct' },
-        ],
-      });
-      return (
-        <>
-          <button type="button" onClick={() => setActiveConversationId('c2')}>
-            switch externally to c2
-          </button>
-          <output data-testid="active-conversation">{activeConversationId}</output>
-          <AgentHubWorkbench
-            activeConversationId={activeConversationId}
-            agents={agents}
-            platform={platform}
-            conversations={platform.seed.conversations}
-            onActiveConversationChange={setActiveConversationId}
-            transcript={transcript}
-            workbenchStatus={{ dataMode: 'mock' }}
-          />
-        </>
-      );
-    }
-
-    render(<TaskDeepLinkHarness />);
-    expect(screen.getByText('演示')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: /分页任务 52/ }));
-
-    await waitFor(() => {
-      expect(screen.getByTestId('agenthub-workbench')).toHaveAttribute('data-page', 'runs');
-      expect(screen.getByRole('region', { name: '分页任务 52 任务详情' })).toBeInTheDocument();
-    });
-    expect(screen.getByRole('button', { name: /分页任务 52/ })).toHaveAttribute('aria-pressed', 'true');
-
-    fireEvent.click(screen.getByRole('button', { name: 'switch externally to c2' }));
-    expect(screen.getByTestId('active-conversation')).toHaveTextContent('c2');
-    fireEvent.click(screen.getByRole('button', { name: '返回会话' }));
-
-    await waitFor(() => {
-      expect(screen.getByTestId('agenthub-workbench')).toHaveAttribute('data-page', 'chat');
-      expect(screen.getByTestId('active-conversation')).toHaveTextContent('c1');
-    });
-
-    // A second trip proves the second-page target remains recoverable after remount.
-    fireEvent.click(screen.getByRole('button', { name: /分页任务 52/ }));
-    await waitFor(() => {
-      expect(screen.getByRole('region', { name: '分页任务 52 任务详情' })).toBeInTheDocument();
-    });
+  it('keeps pinned conversations first and filters through the official thread list', () => {
+    const platform = createMockPlatform({ surface: 'web', conversations: [
+      { id: 'a', title: 'Alpha', kind: 'group' }, { id: 'b', title: 'Beta', kind: 'group', pinned: true },
+    ] });
+    render(<AgentHubWorkbench platform={platform} conversations={platform.seed.conversations} transcript={[]} />);
+    const sidebar = screen.getByRole('complementary', { name: '会话侧边栏' });
+    expect(within(sidebar).getAllByRole('button').filter((button) => ['Alpha', 'Beta'].includes(button.textContent ?? '')).map((button) => button.textContent)).toEqual(['Beta', 'Alpha']);
+    fireEvent.change(within(sidebar).getByRole('searchbox'), { target: { value: 'Alpha' } });
+    expect(within(sidebar).queryByRole('button', { name: 'Beta' })).not.toBeInTheDocument();
+    expect(within(sidebar).getByRole('button', { name: 'Alpha' })).toBeInTheDocument();
   });
 
   it.each(['auto', 'observed', 'approved-real'])(

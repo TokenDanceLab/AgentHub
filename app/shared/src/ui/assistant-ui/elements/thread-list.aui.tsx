@@ -1,4 +1,5 @@
 "use client";
+import { AssistantText, useAssistantText } from "../text";
 
 import { Button } from "../../../shadcn/ui/button";
 import { Input } from "../../../shadcn/ui/input";
@@ -22,6 +23,8 @@ import {
   TrashIcon,
 } from "lucide-react";
 import {
+  createContext,
+  useContext,
   forwardRef,
   Fragment,
   useEffect,
@@ -33,11 +36,15 @@ import {
   type FC,
 } from "react";
 
-export const ThreadList: FC = () => {
+type ThreadListCapabilities = { canRename?: boolean; canDelete?: boolean; canArchive?: boolean; archived?: boolean };
+const ThreadListCapabilitiesContext = createContext<ThreadListCapabilities>({});
+
+export const ThreadList: FC<ThreadListCapabilities> = (capabilities) => {
   const [search, setSearch] = useState("");
   const hasThreads = useAuiState((s) => s.threads.threadIds.length > 0);
 
   return (
+    <ThreadListCapabilitiesContext.Provider value={capabilities}>
     <ThreadListRoot>
       <ThreadListNew />
       {hasThreads && (
@@ -45,6 +52,7 @@ export const ThreadList: FC = () => {
       )}
       <ThreadListItems searchQuery={hasThreads ? search : ""} />
     </ThreadListRoot>
+    </ThreadListCapabilitiesContext.Provider>
   );
 };
 
@@ -55,6 +63,7 @@ export const ThreadListSearch = forwardRef<
     onValueChange: (value: string) => void;
   }
 >(({ className, value, onValueChange, ...props }, ref) => {
+  const t = useAssistantText();
   return (
     <div data-slot="aui_thread-list-search" className="relative px-0.5 py-1">
       <SearchIcon
@@ -66,8 +75,8 @@ export const ThreadListSearch = forwardRef<
         type="search"
         value={value}
         onChange={(event) => onValueChange(event.target.value)}
-        aria-label="Search threads"
-        placeholder="Search threads"
+        aria-label={t("Search threads")}
+        placeholder={t("Search threads")}
         className={cn("h-8 ps-8 text-sm", className)}
         {...props}
       />
@@ -285,7 +294,7 @@ export const ThreadListNew = forwardRef<
               data-slot="aui_thread-list-new-label"
               className={cn("whitespace-nowrap", labelClassName)}
             >
-              New Thread
+              <AssistantText>New Thread</AssistantText>
             </span>
           </>
         )}
@@ -322,6 +331,7 @@ const ThreadListSkeleton: FC = () => {
 
 export const ThreadListItem: FC = () => {
   const isRunning = useAuiState((s) => s.threadListItem.isRunning);
+  const unreadCount = useAuiState((s) => Number(s.threadListItem.custom?.unreadCount ?? 0));
   const [isRenaming, setIsRenaming] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const restoreFocusRef = useRef(false);
@@ -364,6 +374,7 @@ export const ThreadListItem: FC = () => {
             <ThreadListItemPrimitive.Title fallback="New Chat" />
           </span>
           {isRunning && <span className="sr-only">Running</span>}
+          {unreadCount > 0 && <span className="bg-primary text-primary-foreground ms-2 rounded-full px-1.5 text-xs">{unreadCount}</span>}
         </ThreadListItemPrimitive.Trigger>
       )}
       <ThreadListItemMore onRename={() => setIsRenaming(true)} />
@@ -438,6 +449,9 @@ const ThreadListItemRename: FC<{
 };
 
 const ThreadListItemMore: FC<{ onRename: () => void }> = ({ onRename }) => {
+  const { canRename, canDelete, canArchive, archived } = useContext(ThreadListCapabilitiesContext);
+  const mayRename = useAuiState((state) => state.threadListItem.custom?.canRename !== false);
+  if (!canRename && !canDelete && !canArchive) return null;
   return (
     <ThreadListItemMorePrimitive.Root sharedFocusGroup>
       <ThreadListItemMorePrimitive.Trigger asChild>
@@ -448,7 +462,7 @@ const ThreadListItemMore: FC<{ onRename: () => void }> = ({ onRename }) => {
           className="data-[state=open]:bg-accent absolute end-1.5 top-1/2 size-6 -translate-y-1/2 p-0 opacity-0 group-hover:opacity-100 group-has-focus-visible:opacity-100 group-data-active:opacity-100 data-[state=open]:opacity-100"
         >
           <MoreHorizontalIcon className="size-3.5" />
-          <span className="sr-only">More options</span>
+          <span className="sr-only"><AssistantText>More options</AssistantText></span>
         </Button>
       </ThreadListItemMorePrimitive.Trigger>
       <ThreadListItemMorePrimitive.Content
@@ -458,32 +472,32 @@ const ThreadListItemMore: FC<{ onRename: () => void }> = ({ onRename }) => {
         data-slot="aui_thread-list-item-more-content"
         className="bg-popover text-popover-foreground data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 data-[state=open]:animate-in data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=closed]:animate-out data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 z-50 min-w-32 overflow-hidden rounded-xl border p-1.5"
       >
-        <ThreadListItemMorePrimitive.Item
+        {canRename && mayRename && <ThreadListItemMorePrimitive.Item
           data-slot="aui_thread-list-item-more-item"
           className="hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground flex cursor-pointer items-center gap-2 rounded-lg px-2.5 py-1.5 text-sm outline-none select-none"
           onSelect={onRename}
         >
           <PencilIcon className="size-4" />
-          Rename
-        </ThreadListItemMorePrimitive.Item>
-        <ThreadListItemPrimitive.Archive asChild>
+          <AssistantText>Rename</AssistantText>
+        </ThreadListItemMorePrimitive.Item>}
+        {canArchive && <ThreadListItemPrimitive.Archive asChild>
           <ThreadListItemMorePrimitive.Item
             data-slot="aui_thread-list-item-more-item"
             className="hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground flex cursor-pointer items-center gap-2 rounded-lg px-2.5 py-1.5 text-sm outline-none select-none"
           >
             <ArchiveIcon className="size-4" />
-            Archive
+            <AssistantText>{archived ? "Unarchive" : "Archive"}</AssistantText>
           </ThreadListItemMorePrimitive.Item>
-        </ThreadListItemPrimitive.Archive>
-        <ThreadListItemPrimitive.Delete asChild>
+        </ThreadListItemPrimitive.Archive>}
+        {canDelete && <ThreadListItemPrimitive.Delete asChild>
           <ThreadListItemMorePrimitive.Item
             data-slot="aui_thread-list-item-more-item"
             className="text-destructive hover:bg-destructive/10 hover:text-destructive focus:bg-destructive/10 focus:text-destructive flex cursor-pointer items-center gap-2 rounded-lg px-2.5 py-1.5 text-sm outline-none select-none"
           >
             <TrashIcon className="size-4" />
-            Delete
+            <AssistantText>Delete</AssistantText>
           </ThreadListItemMorePrimitive.Item>
-        </ThreadListItemPrimitive.Delete>
+        </ThreadListItemPrimitive.Delete>}
       </ThreadListItemMorePrimitive.Content>
     </ThreadListItemMorePrimitive.Root>
   );

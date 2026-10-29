@@ -159,9 +159,13 @@ export function useWorkbenchSessionChrome({
   const bindConversationRuntime = useCallback((runtime: ConversationRuntime | null) => {
     conversationRuntimeRef.current = runtime;
   }, []);
-  const [composer, setComposer] = useState<WorkbenchSessionChrome['composer']>({
-    mode: 'ask', approvalMode: 'suggest', mentions: [], workDir: '',
-  });
+  const [executionSettings, setExecutionSettings] = useState<Record<string, WorkbenchSessionChrome['composer']>>({});
+  const composer = executionSettings[currentConversationId] ?? { mode: 'ask', approvalMode: 'suggest', mentions: [], workDir: '' };
+  const setComposer = useCallback((update: (value: WorkbenchSessionChrome['composer']) => WorkbenchSessionChrome['composer']) => {
+    setExecutionSettings((current) => ({ ...current, [currentConversationId]: update(current[currentConversationId] ?? {
+      mode: 'ask', approvalMode: 'suggest', mentions: [], workDir: '',
+    }) }));
+  }, [currentConversationId]);
   // Shell actions target the active library runtime; text and attachments have no shell copy.
   const dispatchComposer = useCallback((action: ComposerAction) => {
     const runtime = conversationRuntimeRef.current;
@@ -177,7 +181,7 @@ export function useWorkbenchSessionChrome({
       case 'addMention': setComposer((current) => ({ ...current, mentions: [...current.mentions.filter((item) => item.id !== action.mention.id), action.mention] })); break;
       case 'removeMention': setComposer((current) => ({ ...current, mentions: current.mentions.filter((item) => item.id !== action.mentionId) })); break;
     }
-  }, []);
+  }, [setComposer]);
 
   function selectConversation(conversationId: string): void {
     setLocalConversationId(conversationId);

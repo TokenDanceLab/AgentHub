@@ -56,6 +56,7 @@ describe('webPlatformMapping pure helpers', () => {
     })).toEqual({
       id: 'hub-private-1',
       title: 'Hub 私聊',
+      canRename: false, pinned: false, archived: false,
       kind: 'direct',
       subtitle: 'Hub private',
     });

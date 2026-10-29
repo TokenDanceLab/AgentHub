@@ -2,6 +2,9 @@ import { useTranslation } from 'react-i18next';
 import { useCallback } from 'react';
 
 const zh: Record<string, string> = {
+  'New Thread': '新建对话', 'No threads found': '没有匹配的对话', 'Search threads': '搜索对话',
+  'Rename': '重命名', 'Delete': '删除', 'Archive': '归档', 'Unarchive': '取消归档',
+  'More options': '更多选项', 'Active conversations': '当前对话', 'Archived conversations': '已归档对话',
   'Message input': '输入框', 'Send a message...': '输入消息…', 'Send message': '发送消息',
   'Stop generating': '停止生成', 'Cancel sending': '取消发送', 'Copy': '复制', 'Edit': '编辑',
   'Refresh': '重新生成', 'More': '更多', 'Previous': '上一条', 'Next': '下一条',

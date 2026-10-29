@@ -144,9 +144,9 @@ const taskAwareGroupBy = (
 export type ThreadProps = {
   components?: ThreadComponents | undefined;
   autoFocus?: boolean | undefined;
-  inputRef?: React.RefObject<HTMLTextAreaElement | null>;
-  submitMode?: "enter" | "ctrlEnter";
-  hideComposer?: boolean;
+  inputRef?: React.RefObject<HTMLTextAreaElement | null> | undefined;
+  submitMode?: "enter" | "ctrlEnter" | undefined;
+  hideComposer?: boolean | undefined;
 };
 
 const EMPTY_COMPONENTS: ThreadComponents = {};
@@ -204,7 +204,7 @@ export const Thread: FC<ThreadProps> = ({
   );
 };
 
-const ThreadRoot: FC<{ isEmpty: boolean; autoFocus: boolean; inputRef?: React.RefObject<HTMLTextAreaElement | null>; submitMode?: "enter" | "ctrlEnter"; hideComposer?: boolean }> = ({
+const ThreadRoot: FC<{ isEmpty: boolean; autoFocus: boolean; inputRef?: React.RefObject<HTMLTextAreaElement | null> | undefined; submitMode?: "enter" | "ctrlEnter" | undefined; hideComposer?: boolean | undefined }> = ({
   isEmpty,
   autoFocus,
   inputRef,
@@ -515,7 +515,7 @@ const ThreadSuggestionItem: FC = () => {
   );
 };
 
-const Composer: FC<{ autoFocus: boolean; inputRef?: React.RefObject<HTMLTextAreaElement | null>; submitMode?: "enter" | "ctrlEnter" }> = ({ autoFocus, inputRef, submitMode }) => {
+const Composer: FC<{ autoFocus: boolean; inputRef?: React.RefObject<HTMLTextAreaElement | null> | undefined; submitMode?: "enter" | "ctrlEnter" | undefined }> = ({ autoFocus, inputRef, submitMode }) => {
   const { ComposerControls } = useContext(ThreadComponentsContext);
   const t = useAssistantText();
   return (

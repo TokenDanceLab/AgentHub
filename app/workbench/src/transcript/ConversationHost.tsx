@@ -28,12 +28,13 @@ export type { MainchainSummary } from '../mainchain';
 
 export interface ConversationHostProps {
   transcript: TranscriptBlock[];
-  currentUserId?: string;
+  currentUserId?: string | undefined;
   activeConversation?: WorkbenchConversation | undefined;
   connectionStatus?: ConnectionStatusKind | undefined;
   inspectorCollapsed: boolean; onToggleInspector: () => void;
   workbenchStatus?: { dataMode?: string; replayLabel?: string; targetLabel?: string; initialLoading?: boolean; loadError?: string } | undefined;
   onAgentClick: (agentName: string, anchor: HTMLElement) => void;
+  onConversationAvatar?: ((conversation: WorkbenchConversation, anchor: HTMLElement) => void) | undefined;
   onBlockContextMenu: (blockId: string, event: React.MouseEvent) => void;
   onBlockSelect: (blockId: string, shiftKey?: boolean) => void;
   onBlockAction: (action: string, blockId: string, metadata?: Record<string, unknown>) => void;
@@ -77,6 +78,8 @@ export interface ConversationHostProps {
    * shows an honest loading state instead of the "no messages" empty state.
    */
   transcriptLoading?: boolean | undefined;
+  hasEarlierMessages?: boolean | undefined;
+  loadEarlierMessages?: (() => Promise<void>) | undefined;
   /** Split-view header controls (#1997); absent hides the split entry. */
   splitControls?: WorkbenchSplitControls | undefined;
 }
@@ -301,7 +304,12 @@ export const ConversationHost = React.memo(function ConversationHost(props: Conv
         currentUserId={props.currentUserId} onEdit={props.onEditMessage} inputRef={props.composerInputRef}
         submitMode={submitBehavior === 'ctrl-enter-send' ? 'ctrlEnter' : 'enter'}
         onContextMenu={props.onBlockContextMenu} onSelect={props.onBlockSelect}
+        onAuthorClick={(author, anchor) => {
+          if (author.role === 'agent') props.onAgentClick(author.name, anchor);
+          else props.onConversationAvatar?.({ id: author.id, title: author.name, kind: 'direct' }, anchor);
+        }}
         selectedIds={props.selectedBlockIds} selectionMode={props.selectionMode}
+        hasEarlier={props.hasEarlierMessages} onLoadEarlier={props.loadEarlierMessages}
         isLoading={props.transcriptLoading} isDisabled={!props.activeConversation}
         isSendDisabled={Boolean(selectedAgent && props.composerExecutionTargets && !props.selectedExecutionTargetId)}
         isRunning={props.isAgentRunning} onCancel={props.onCancelRun}

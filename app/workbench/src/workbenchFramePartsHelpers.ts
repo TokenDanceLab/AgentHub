@@ -127,6 +127,7 @@ export function buildChatConversationHostProps(
     inspectorCollapsed,
     onToggleInspector: toggleInspector,
     onAgentClick: openAgentProfile,
+    onConversationAvatar: profile.openConversationAvatar,
     onBlockContextMenu: stable?.onBlockContextMenu
       ?? createTranscriptBlockContextMenuHandler(transcript, openBlockContextMenu),
     onBlockSelect: stable?.onBlockSelect
@@ -167,6 +168,8 @@ export function buildChatConversationHostProps(
   assignIfDefined(hostProps, 'onCancelRun', props.onCancelRun);
   assignIfDefined(hostProps, 'onEditMessage', props.onEditMessage);
   assignIfDefined(hostProps, 'transcriptLoading', transcriptLoading);
+  assignIfDefined(hostProps, 'hasEarlierMessages', props.hasEarlierMessages);
+  assignIfDefined(hostProps, 'loadEarlierMessages', props.loadEarlierMessages);
   assignIfDefined(hostProps, 'splitControls', splitControls);
 
   return hostProps;

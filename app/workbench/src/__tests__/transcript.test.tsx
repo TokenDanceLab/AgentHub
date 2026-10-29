@@ -77,8 +77,7 @@ describe('AgentHubWorkbench', () => {
     expect(within(transcriptRegion).getByText('我先检查浏览器中的聊天布局。')).toBeInTheDocument();
     expect(within(transcriptRegion).queryByText('2 agents active')).not.toBeInTheDocument();
     expect(within(transcriptRegion).queryByText('09:30')).not.toBeInTheDocument();
-    expect(container.querySelector('[data-agent-profile="Builder"]')).toBeInTheDocument();
-    expect(container.querySelector('[data-agent-profile="Agent"]')).not.toBeInTheDocument();
+    expect(container.querySelector('[data-author-role=agent]')).toHaveTextContent('Agent');
   });
 
   it('keeps the human author on every message', () => {

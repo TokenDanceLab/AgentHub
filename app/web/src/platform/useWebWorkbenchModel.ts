@@ -25,7 +25,8 @@ import {
 } from '@shared/transcript';
 import { useToastStore } from '@shared/ui/toast';
 import { friendlyErrorMessage } from '@shared/errorReporting';
-import { createHubClient, type HubCreateDocumentRequest, type Session } from '@/api/hubClient';
+import { createHubClient, type HubCreateDocumentRequest, type Session, type HubMessage } from '@/api/hubClient';
+import { mergeMessageHistory, oldestMessageSequence } from './webMessageHistory';
 import {
   useHubExecutionTargets,
   usePingHubExecutionTarget,
@@ -224,14 +225,28 @@ export function useWebWorkbenchModel(dataMode: WorkbenchDataMode, selectedConver
 
   const messages = useQuery({
     queryKey: webQueryKeys.messages.of(activeHubSessionId),
-    queryFn: () => {
-      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- enabled gate guarantees the value when the query runs
-      return hubClient.getMessages(activeHubSessionId!, { limit: 80 });
+    queryFn: async () => {
+      if (!activeHubSessionId) return [];
+      const latest = await hubClient.getMessages(activeHubSessionId, { limit: 80 });
+      return mergeMessageHistory(queryClient.getQueryData<HubMessage[]>(webQueryKeys.messages.of(activeHubSessionId)) ?? [], latest);
     },
     enabled: Boolean(activeHubSessionId),
     staleTime: 5_000,
     placeholderData: (previous) => previous,
   });
+
+  const [historyExhausted, setHistoryExhausted] = useState<Record<string, boolean>>({});
+  const oldestSequence = oldestMessageSequence(messages.isPlaceholderData ? undefined : messages.data);
+  const hasEarlierMessages = Boolean(activeHubSessionId && oldestSequence && oldestSequence > 1 && !historyExhausted[activeHubSessionId]);
+  const loadEarlierMessages = useCallback(async () => {
+    if (!activeHubSessionId) return;
+    const key = webQueryKeys.messages.of(activeHubSessionId);
+    const before = oldestMessageSequence(queryClient.getQueryData<HubMessage[]>(key));
+    if (!before || before <= 1) return;
+    const earlier = await hubClient.getMessages(activeHubSessionId, { before_seq: before, limit: 80 });
+    queryClient.setQueryData<HubMessage[]>(key, (current = []) => mergeMessageHistory(current, earlier));
+    if (earlier.length < 80) setHistoryExhausted((current) => ({ ...current, [activeHubSessionId]: true }));
+  }, [activeHubSessionId, queryClient]);
 
   const replayedRuntimeEvents = useQuery({
     queryKey: webQueryKeys.agentTask.events(activeAgentTaskId),
@@ -838,6 +853,8 @@ export function useWebWorkbenchModel(dataMode: WorkbenchDataMode, selectedConver
     runtimeEvidence,
     workbenchStatus,
     transcript: surfacedTranscript,
+    hasEarlierMessages,
+    loadEarlierMessages,
     agentActivity,
   };
 }

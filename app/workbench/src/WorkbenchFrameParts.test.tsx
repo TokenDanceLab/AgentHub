@@ -20,11 +20,11 @@ import {
 /** Last ConversationHost props seen by the mock (referential-stability gate). */
 const hostPropsLog = vi.hoisted(() => ({ last: null as Record<string, unknown> | null }));
 
-vi.mock('./transcript/ConversationSidebar', () => ({
-  ConversationSidebar: (props: Record<string, unknown>) => (
+vi.mock('@shared/ui/assistant-ui/AssistantThreadList', () => ({
+  AssistantThreadList: (props: Record<string, unknown>) => (
     <div
-      data-active-id={props.activeConversationId as string}
-      data-on-start-new-conversation={String(Boolean(props.onStartNewConversation))}
+      data-active-id={props.currentId as string}
+      data-on-start-new-conversation={String(Boolean(props.onNew))}
       data-testid="sidebar"
     >
       {/* #1835 review: a focusable descendant so the collapsed-sidebar test
