@@ -4,6 +4,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 // TestEventLog_TruncateCounterIncrements verifies that truncateLocked
@@ -39,23 +40,9 @@ func TestEventLog_TruncateCounterIncrements(t *testing.T) {
 	if got := log.EventLogTruncations(); got < 1 {
 		t.Fatalf("expected truncations >= 1 after exceeding maxSize, got %d", got)
 	}
-	// Truncation runs under l.mu, so its duration IS the bus freeze (#2304).
-	// The cumulative counter must have moved: a duration series pinned at zero
-	// is indistinguishable from one that was never wired, which is the exact
-	// defect this family of metrics had.
-	//
-	// "last" is only asserted to be in range here, NOT to be > 0. With a 256-byte
-	// cap this test truncates dozens of times in a few milliseconds, and a
-	// truncation that returns through an early error branch (on Windows the
-	// rewrite can be denied; see the comment above) legitimately measures zero
-	// elapsed. Asserting last > 0 there was asserting on clock resolution, and
-	// it failed on the Native Windows job while passing on Linux.
-	// TestEventLog_TruncateDurationIsRecorded covers "last moves" deterministically
-	// by truncating a window large enough that no platform can measure it as 0.
-	if got := log.EventLogTruncateDurationNanos(); got <= 0 {
-		t.Fatalf("expected cumulative truncate duration > 0 after %d truncations, got %d ns",
-			log.EventLogTruncations(), got)
-	}
+	// Tiny operations may all fit inside one Windows clock tick. Counter
+	// movement is tested below with an injected monotonic clock, not a minimum
+	// runtime assumption or a sleep.
 	last, total := log.EventLogTruncateLastDurationNanos(), log.EventLogTruncateDurationNanos()
 	if last < 0 {
 		t.Fatalf("last truncate duration = %d ns, want >= 0", last)
@@ -109,10 +96,8 @@ func TestEventLog_GapCounterIncrementsOnReplayBeforeOldest(t *testing.T) {
 // never wired — which is precisely the defect the whole edge_event_log_* family
 // had — so this asserts movement rather than a magnitude.
 //
-// The retained window is sized so that one truncation must really read and
-// rewrite ~192 KiB: large enough that no platform's clock can measure it as
-// zero, small enough to stay a fast unit test. Large payloads keep the append
-// count low (a 256 KiB cap is crossed after a few dozen appends, not thousands).
+// An instance-local clock makes both successful and failed filesystem paths
+// prove exact timing accumulation without depending on OS clock resolution.
 func TestEventLog_TruncateDurationIsRecorded(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "duration.log")
@@ -122,6 +107,11 @@ func TestEventLog_TruncateDurationIsRecorded(t *testing.T) {
 		t.Fatalf("NewEventLog: %v", err)
 	}
 	t.Cleanup(func() { _ = log.Close() })
+	clock := time.Unix(0, 0)
+	log.now = func() time.Time {
+		clock = clock.Add(3 * time.Millisecond)
+		return clock
+	}
 
 	const maxSize = 256 * 1024 // keepBytes = maxSize*3/4 = 192 KiB
 	log.maxSize = maxSize
@@ -151,21 +141,7 @@ func TestEventLog_TruncateDurationIsRecorded(t *testing.T) {
 	if last > total {
 		t.Errorf("last truncate duration %d ns exceeds cumulative %d ns", last, total)
 	}
-	// Exactly one truncation happened (the loop stops at the first), so the
-	// failure counter decides whether that one truncation really did the
-	// read+rewrite. If it took an error branch instead, its duration is
-	// legitimately ~0 and asserting a magnitude would be asserting on the
-	// platform's filesystem semantics rather than on the metric.
-	if failures := log.EventLogTruncateFailures(); failures == 0 {
-		if total <= 0 {
-			t.Errorf("cumulative truncate duration = %d ns, want > 0 after rewriting a %d-byte window",
-				total, maxSize*3/4)
-		}
-		if last <= 0 {
-			t.Errorf("last truncate duration = %d ns, want > 0 after rewriting a %d-byte window",
-				last, maxSize*3/4)
-		}
-	} else {
-		t.Logf("truncation took %d error branch(es) on this platform; duration magnitude not asserted", failures)
+	if total != (3*time.Millisecond).Nanoseconds() || last != total {
+		t.Errorf("timing instrumentation total=%d last=%d; want exactly one 3ms truncation", total, last)
 	}
 }
