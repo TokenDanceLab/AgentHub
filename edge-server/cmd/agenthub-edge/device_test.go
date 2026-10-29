@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/agenthub/edge-server/internal/device"
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 )
 
@@ -50,6 +51,12 @@ func TestEnrollmentValidatesScopeWithoutModelCredentials(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, cfg.Enroll)
 	require.Nil(t, cfg.DeviceCredential)
+	deviceID := uuid.NewString()
+	renewal, err := buildConfig(append(append([]string(nil), args...), "--edge-device-id", deviceID))
+	require.NoError(t, err)
+	require.Equal(t, deviceID, renewal.EdgeDeviceID)
+	_, err = buildConfig(append(append([]string(nil), args...), "--edge-device-id", "invalid"))
+	require.Error(t, err)
 	_, err = buildConfig(append(args, "--enrollment-workspace", t.TempDir()))
 	require.Error(t, err)
 }

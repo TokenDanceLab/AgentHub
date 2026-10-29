@@ -37,22 +37,37 @@ func (cfg *config) validateDeviceMode() error {
 		return errors.New("enrolled mode requires protected loopback operation without Hub product tokens, JWT secrets or MCP sync")
 	}
 	if cfg.Enroll {
-		if strings.TrimSpace(cfg.EnrollmentName) == "" {
-			return errors.New("--enroll requires --enrollment-name")
-		}
-		if _, err := device.NewClient(cfg.HubURL, "", edgehttp.NewClient(30*time.Second)); err != nil {
-			return err
-		}
-		workspace, err := device.Workspace(cfg.EnrollmentWorkspace, cfg.WorkspaceAllowlist)
-		if err != nil {
-			return err
-		}
-		cfg.EnrollmentWorkspace = workspace
-		if _, err := os.Lstat(cfg.DeviceCredentialFile); !errors.Is(err, os.ErrNotExist) {
-			return errors.New("enrollment credential destination must not exist")
-		}
-		return nil
+		return cfg.validateEnrollment()
 	}
+	return cfg.validateEnrolledExecution()
+}
+
+func (cfg *config) validateEnrollment() error {
+	if strings.TrimSpace(cfg.EnrollmentName) == "" {
+		return errors.New("--enroll requires --enrollment-name")
+	}
+	if cfg.EdgeDeviceID != "" {
+		id, err := uuid.Parse(cfg.EdgeDeviceID)
+		if err != nil || id == uuid.Nil {
+			return errors.New("enrollment device ID must be a UUID")
+		}
+		cfg.EdgeDeviceID = id.String()
+	}
+	if _, err := device.NewClient(cfg.HubURL, "", edgehttp.NewClient(30*time.Second)); err != nil {
+		return err
+	}
+	workspace, err := device.Workspace(cfg.EnrollmentWorkspace, cfg.WorkspaceAllowlist)
+	if err != nil {
+		return err
+	}
+	cfg.EnrollmentWorkspace = workspace
+	if _, err := os.Lstat(cfg.DeviceCredentialFile); !errors.Is(err, os.ErrNotExist) {
+		return errors.New("enrollment credential destination must not exist")
+	}
+	return nil
+}
+
+func (cfg *config) validateEnrolledExecution() error {
 	if cfg.StoreBackend != "sqlite" || !filepath.IsAbs(cfg.StoreDB) || !filepath.IsAbs(cfg.DeviceJournalPath) || !filepath.IsAbs(cfg.EventLogPath) {
 		return errors.New("enrolled execution requires --store-backend sqlite, absolute --store-db, --device-journal-db and --event-log-path")
 	}
@@ -67,7 +82,7 @@ func (cfg *config) validateDeviceMode() error {
 		return err
 	}
 	if cfg.HubURL != "" && strings.TrimRight(cfg.HubURL, "/") != credential.HubURL {
-		return errors.New("Hub URL differs from enrolled credential")
+		return errors.New("hub URL differs from enrolled credential")
 	}
 	if _, err := device.NewClient(credential.HubURL, credential.Secret, edgehttp.NewClient(30*time.Second)); err != nil {
 		return err
@@ -88,7 +103,10 @@ func enrollDevice(cfg config, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	deviceID := uuid.NewString()
+	deviceID := cfg.EdgeDeviceID
+	if deviceID == "" {
+		deviceID = uuid.NewString()
+	}
 	enrollment, err := client.Start(ctx, device.StartRequest{DeviceID: deviceID, Name: cfg.EnrollmentName, RuntimeID: "openai-sdk", WorkspaceRoot: cfg.EnrollmentWorkspace})
 	if err != nil {
 		return err
@@ -103,7 +121,7 @@ func enrollDevice(cfg config, out io.Writer) error {
 	for {
 		select {
 		case <-ctx.Done():
-			return errors.New("Edge pairing expired or cancelled; start a new enrollment")
+			return errors.New("edge pairing expired or cancelled; start a new enrollment")
 		case <-ticker.C:
 		}
 		credential, pending, err := client.Exchange(ctx, enrollment)

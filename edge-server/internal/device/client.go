@@ -15,7 +15,7 @@ import (
 	"time"
 )
 
-var ErrUnauthorized = errors.New("Edge credential expired or revoked; pair this device again")
+var ErrUnauthorized = errors.New("edge credential expired or revoked; pair this device again")
 
 type Client struct {
 	origin     string
@@ -28,7 +28,7 @@ type Client struct {
 func NewClient(origin, credential string, transport *http.Client) (*Client, error) {
 	u, err := url.Parse(origin)
 	if err != nil || u.Scheme != "https" || u.Hostname() == "" || u.User != nil || u.RawQuery != "" || u.Fragment != "" || (u.Path != "" && u.Path != "/") {
-		return nil, errors.New("Hub URL must be an HTTPS origin without credentials, path, query or fragment")
+		return nil, errors.New("hub URL must be an HTTPS origin without credentials, path, query or fragment")
 	}
 	if transport == nil {
 		return nil, errors.New("device client requires an HTTP transport")
@@ -67,7 +67,7 @@ func (c *Client) Start(ctx context.Context, req StartRequest) (Enrollment, error
 	var result Enrollment
 	_, err := c.request(ctx, http.MethodPost, "/edge/enrollments/start", req, &result)
 	if err == nil && (result.ID == "" || result.UserCode == "" || result.PollSecret == "" || !result.ExpiresAt.After(time.Now())) {
-		err = errors.New("Hub returned invalid enrollment")
+		err = errors.New("hub returned invalid enrollment")
 	}
 	return result, err
 }
@@ -146,14 +146,14 @@ func (c *Client) request(ctx context.Context, method, path string, body, target 
 		if ctx.Err() != nil {
 			return 0, ctx.Err()
 		}
-		return 0, errors.New("Hub device transport unavailable")
+		return 0, errors.New("hub device transport unavailable")
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden {
 		return resp.StatusCode, ErrUnauthorized
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return resp.StatusCode, fmt.Errorf("Hub device request rejected (HTTP %d)", resp.StatusCode)
+		return resp.StatusCode, fmt.Errorf("hub device request rejected (HTTP %d)", resp.StatusCode)
 	}
 	const maxBody = 2 << 20
 	data, err := io.ReadAll(io.LimitReader(resp.Body, maxBody+1))
@@ -165,7 +165,7 @@ func (c *Client) request(ctx context.Context, method, path string, body, target 
 		Data json.RawMessage `json:"data"`
 	}
 	if json.Unmarshal(data, &envelope) != nil || envelope.Code != "ok" {
-		return resp.StatusCode, errors.New("Hub rejected device request")
+		return resp.StatusCode, errors.New("hub rejected device request")
 	}
 	if target != nil && json.Unmarshal(envelope.Data, target) != nil {
 		return resp.StatusCode, errors.New("invalid Hub device response")

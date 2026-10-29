@@ -45,7 +45,7 @@ func TestEnrolledPollRealExecutorReplayMultiturnAndCancel(t *testing.T) {
 		case 1:
 			require.Equal(t, "first question", body.Messages[len(body.Messages)-1].Content)
 		case 2:
-			var contents []string
+			contents := make([]string, 0, len(body.Messages))
 			for _, m := range body.Messages {
 				contents = append(contents, m.Content)
 			}

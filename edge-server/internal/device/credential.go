@@ -52,6 +52,7 @@ func SaveCredential(path string, c Credential) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
 		return errors.New("cannot create device credential directory")
 	}
+	// #nosec G117 -- serialization is solely for the operator's private 0600 credential store, never a log or product response.
 	data, err := json.Marshal(c)
 	if err != nil {
 		return errors.New("cannot encode device credential")
@@ -63,15 +64,15 @@ func SaveCredential(path string, c Credential) error {
 	temp := f.Name()
 	defer os.Remove(temp)
 	if err := f.Chmod(0600); err != nil {
-		f.Close()
+		_ = f.Close()
 		return errors.New("cannot secure device credential file")
 	}
 	if _, err := f.Write(data); err != nil {
-		f.Close()
+		_ = f.Close()
 		return errors.New("cannot write device credential file")
 	}
 	if err := f.Sync(); err != nil {
-		f.Close()
+		_ = f.Close()
 		return errors.New("cannot persist device credential file")
 	}
 	if err := f.Close(); err != nil {
@@ -95,10 +96,14 @@ func SaveCredential(path string, c Credential) error {
 
 func LoadCredential(path string, allowlist []string) (Credential, error) {
 	var c Credential
+	if !filepath.IsAbs(path) {
+		return c, errors.New("device credential file must be an absolute path")
+	}
 	info, err := os.Lstat(path)
 	if err != nil || !info.Mode().IsRegular() || info.Mode().Perm()&0077 != 0 || info.Size() > 16384 {
 		return c, errors.New("device credential must be a regular private 0600 file")
 	}
+	// #nosec G304 -- operator-selected absolute path, checked above for regular file type, private permissions and bounded size.
 	data, err := os.ReadFile(path)
 	if err != nil || json.Unmarshal(data, &c) != nil {
 		return c, errors.New("cannot read device credential")

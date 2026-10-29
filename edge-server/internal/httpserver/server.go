@@ -78,21 +78,21 @@ type Config struct {
 
 const defaultRESTRequestTimeout = 30 * time.Second
 
+func validateListenAddress(cfg Config) error {
+	if cfg.RemoteMode {
+		return security.ValidateRemoteListenAddr(cfg.Addr)
+	}
+	return security.ValidateLocalListenAddr(cfg.Addr)
+}
+
 // Run starts the HTTP server and blocks until a shutdown signal is received.
 func Run(cfg Config) error {
 	if cfg.Addr == "" {
 		cfg.Addr = "127.0.0.1:3210"
 	}
-	if cfg.RemoteMode {
-		if err := security.ValidateRemoteListenAddr(cfg.Addr); err != nil {
-			slog.Error("invalid remote listen address", "error", err)
-			return err
-		}
-	} else {
-		if err := security.ValidateLocalListenAddr(cfg.Addr); err != nil {
-			slog.Error("invalid local listen address", "error", err)
-			return err
-		}
+	if err := validateListenAddress(cfg); err != nil {
+		slog.Error("invalid listen address", "error", err)
+		return err
 	}
 	handler, err := newHandlerFromConfig(cfg)
 	if err != nil {

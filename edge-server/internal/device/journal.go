@@ -6,7 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
-	_ "modernc.org/sqlite"
+	_ "modernc.org/sqlite" // Register the SQLite driver for the durable device journal.
 )
 
 // Journal holds cancellation tombstones and pending acknowledgements. Keeping
@@ -20,9 +20,12 @@ func OpenJournal(path string) (*Journal, error) {
 	if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
 		return nil, err
 	}
+	// #nosec G304 -- absolute path is chosen locally by the operator; exclusive creation never follows an existing symlink.
 	f, err := os.OpenFile(path, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600)
 	if err == nil {
-		f.Close()
+		if err := f.Close(); err != nil {
+			return nil, err
+		}
 	} else if !errors.Is(err, os.ErrExist) {
 		return nil, err
 	}
@@ -39,7 +42,7 @@ func OpenJournal(path string) (*Journal, error) {
 		CREATE TABLE IF NOT EXISTS device_controls (id TEXT PRIMARY KEY, task_id TEXT NOT NULL, run_id TEXT NOT NULL, kind TEXT NOT NULL, acknowledged INTEGER NOT NULL DEFAULT 0);
 		CREATE TABLE IF NOT EXISTS device_deliveries (delivery_id TEXT PRIMARY KEY, task_id TEXT NOT NULL, scope TEXT NOT NULL);
 		CREATE TABLE IF NOT EXISTS device_admissions (task_id TEXT PRIMARY KEY, delivery_id TEXT NOT NULL, scope TEXT NOT NULL, run_id TEXT NOT NULL DEFAULT '')`); err != nil {
-		db.Close()
+		_ = db.Close()
 		return nil, err
 	}
 	return &Journal{db: db}, nil
@@ -52,7 +55,7 @@ func (j *Journal) BeginAdmission(taskID, deliveryID, scope string) (fresh bool, 
 	if err != nil {
 		return false, "", err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 	if _, err = tx.Exec(`INSERT INTO device_deliveries(delivery_id,task_id,scope) VALUES(?,?,?) ON CONFLICT(delivery_id) DO NOTHING`, deliveryID, taskID, scope); err != nil {
 		return false, "", err
 	}
