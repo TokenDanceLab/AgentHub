@@ -30,6 +30,9 @@ func (cfg *config) validateDeviceMode() error {
 	if !cfg.Enroll && cfg.DeviceCredentialFile == "" {
 		return nil
 	}
+	if err := device.ValidatePlatform(); err != nil {
+		return err
+	}
 	if !filepath.IsAbs(cfg.DeviceCredentialFile) {
 		return errors.New("enrolled mode requires an absolute --device-credential-file")
 	}

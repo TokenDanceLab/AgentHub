@@ -38,6 +38,8 @@ Hub 的 WS `agent.dispatch`、outbox HTTP POST `/v1/runs` 与已配对 Edge 的�
 
 独立 Edge 通过用户确认的 enrollment 获得专用 opaque credential，向 Hub 发起 HTTPS 请求；浏览器仍只访问 Hub，Edge API 保持 loopback。凭据、短码与身份撤销边界见 [身份设计](../docs/architecture/06-auth-identity.md)，字段与错误响应以 [OpenAPI](openapi.yaml) 为准。
 
+首版配对执行器要求 POSIX workspace 与私有文件／目录同步；Windows 在配对请求及持久状态访问前 fail-closed，不支持该独立配对模式。此限制不影响普通 Windows Local Edge／Desktop；Windows ACL、持久存储与 workspace wire 另行验收。
+
 - **目标绑定**：确认后建立 owner-scoped `cloud_edge` ExecutionTarget，绑定 `device_type=cloud_edge` 的设备及 `pairedDevice` 能力，与旧云设备注册共享每用户配额。普通 cloud 注册不产生此能力。运行时固定为 `openai-sdk`，工作目录固定为用户确认且 Edge 本地 allowlist 允许的目录；浏览器不能覆写 runtime、workspace 或把任务改投另一设备。健康状态由专用凭据保护的 heartbeat 更新。
 - **领取**：`GET /edge/device/poll?wait_seconds=20` 返回 `deliveries` 与 `controls`。delivery 包含 `delivery_id`、`task_id` 和复用现有 Edge run body 的 `run_request`。任务接受及重试复用既有 `delivery_outbox` 的 pull transport，不创建第二份任务队列。poll 超时返回空数组；收到 delivery 只表示送达，仍须由 admission 成功后的 task ACK 确认。重复领取必须返回原 run，不得启动第二次模型请求。
 - **执行与回传**：Edge 以 `callbackOwner: edge` 接收；ACK/stream/done/fail 使用 `/edge/device/tasks/{id}/...`，复用既有 callback schema。合并后的文本片段使用 `run.agent.text_delta`，稳定UUID `client_msg_id`作为持久run-event identity；同identity仅允许相同task/run/payload重试。片段原样保留空白、只进入runtime evidence与实时WS，不插入聊天消息。完成时仅将完整答案作为一条Hub聊天消息落库，并标记`agent_task.status=done`；Web在收到该消息后以它替换该task的实时文本，运行证据仍可读。第二轮从这些最终消息构造上下文，不拼接片段和整段答案。Hub每次校验凭据、owner、分配设备、task与run绑定；设备凭据不能调用旧Desktop callback、产品REST/WS或另一设备的任务。

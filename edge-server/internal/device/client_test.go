@@ -66,21 +66,10 @@ func TestEnrollmentExchangeAndPrivatePersistence(t *testing.T) {
 	got, pending, err := client.Exchange(context.Background(), enrollment)
 	require.NoError(t, err)
 	require.False(t, pending)
-	path := filepath.Join(t.TempDir(), "private", "credential.json")
-	require.NoError(t, SaveCredential(path, got))
-	info, err := os.Stat(path)
-	require.NoError(t, err)
-	require.Equal(t, os.FileMode(0600), info.Mode().Perm())
-	loaded, err := LoadCredential(path, []string{credential.WorkspaceRoot})
-	require.NoError(t, err)
-	require.Equal(t, got, loaded)
-	require.Error(t, SaveCredential(path, got))
+	assertPrivateCredentialStorage(t, got, credential.WorkspaceRoot)
 	_, _, err = client.Exchange(context.Background(), enrollment)
 	require.Error(t, err)
 	require.NotContains(t, err.Error(), credential.Secret)
-	require.NoError(t, os.Chmod(path, 0644))
-	_, err = LoadCredential(path, []string{credential.WorkspaceRoot})
-	require.Error(t, err)
 }
 
 func TestClientRefusesHTTPRedirectAndSecretErrors(t *testing.T) {
@@ -132,9 +121,15 @@ func TestClientStopsOnRevocationAndContext(t *testing.T) {
 func TestWorkspaceAndCredentialRejectScopeChanges(t *testing.T) {
 	c := fixtureCredential(t)
 	path := filepath.Join(t.TempDir(), "credential.json")
-	require.NoError(t, SaveCredential(path, c))
-	_, err := LoadCredential(path, []string{t.TempDir()})
-	require.Error(t, err)
+	if ValidatePlatform() == nil {
+		require.NoError(t, SaveCredential(path, c))
+		_, err := LoadCredential(path, []string{t.TempDir()})
+		require.Error(t, err)
+	} else {
+		require.ErrorIs(t, SaveCredential(path, c), ErrUnsupportedPlatform)
+		_, err := Workspace(c.WorkspaceRoot, []string{t.TempDir()})
+		require.Error(t, err)
+	}
 	link := filepath.Join(t.TempDir(), "workspace-link")
 	if err := os.Symlink(c.WorkspaceRoot, link); err == nil {
 		_, err = Workspace(link, []string{filepath.Dir(link)})

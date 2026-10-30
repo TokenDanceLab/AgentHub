@@ -50,6 +50,8 @@ Run `go run ./edge-server/cmd/agenthub-edge --help` from the repository root for
 
 独立 Edge 可通过 `--enroll` 向 HTTPS Hub 发起配对，展示短码；用户在已登录 Hub 中确认设备名、`openai-sdk` runtime 和 workspace 后，Edge 将专用 opaque credential 原子保存到新的私有文件。此流程不使用 Account token 作为设备或模型凭据。完整设备端点、7 天凭据和撤销语义以 [身份设计](../docs/architecture/06-auth-identity.md)、[dispatch 契约](../api/dispatch.md) 为准。
 
+此首版独立配对执行器要求 POSIX workspace 与私有文件权限／目录 fsync；Windows 在签发配对请求或读写凭据／journal 前明确拒绝。普通 Windows Local Edge／Desktop 模式不受影响。Windows 原生 ACL、持久存储与 workspace wire 支持完成独立验收前，不宣称支持该配对模式。
+
 配对需要 `--hub-url`、`--enrollment-name`、`--enrollment-workspace`、`--workspace-allowlist`、绝对 `--device-credential-file`。启动已配对执行时使用同一 credential file/allowlist，并配置 `--store-backend sqlite`、绝对 `--store-db`、`--device-journal-db`、`--event-log-path`。运行目录和凭据目录由操作者选择，不能放入 Git；credential 文件不得已有或被覆盖。过期/撤销后需重新配对，旧任务不会因此自动重新执行。
 
 重新配对同一设备时，传入原 UUID 的 `--edge-device-id` 并将新凭据保存到新的私有文件路径；确认后保留原 target。省略此参数会登记新设备并占用新的云设备配额。重配对需要在前次凭据签发或撤销后重新显式确认，不能通过重放旧确认续期。

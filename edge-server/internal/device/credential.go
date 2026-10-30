@@ -43,6 +43,9 @@ func Workspace(path string, allowlist []string) (string, error) {
 // SaveCredential creates a complete 0600 file atomically without replacing an
 // existing enrollment. Re-pairing requires an explicit operator file decision.
 func SaveCredential(path string, c Credential) error {
+	if err := ValidatePlatform(); err != nil {
+		return err
+	}
 	if err := c.Validate(); err != nil {
 		return err
 	}
@@ -96,6 +99,9 @@ func SaveCredential(path string, c Credential) error {
 
 func LoadCredential(path string, allowlist []string) (Credential, error) {
 	var c Credential
+	if err := ValidatePlatform(); err != nil {
+		return c, err
+	}
 	if !filepath.IsAbs(path) {
 		return c, errors.New("device credential file must be an absolute path")
 	}

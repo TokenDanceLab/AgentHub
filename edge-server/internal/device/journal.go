@@ -14,6 +14,9 @@ import (
 type Journal struct{ db *sql.DB }
 
 func OpenJournal(path string) (*Journal, error) {
+	if err := ValidatePlatform(); err != nil {
+		return nil, err
+	}
 	if !filepath.IsAbs(path) {
 		return nil, errors.New("device journal requires an absolute path")
 	}
