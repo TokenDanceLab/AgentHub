@@ -10,7 +10,7 @@
 |---|---|
 | Go 1.27.3 | Hub Server / Edge Server |
 | Node.js 24+ + corepack | pnpm workspace 和前端构建 |
-| PostgreSQL 16+ | Hub 数据库 |
+| PostgreSQL 18.6 | Hub 数据库（当前开发／CI默认稳定版本） |
 | Redis 7+ | Hub cache/session |
 | Git 2.40+；OpenSSL | 分支和 worktree；POSIX shell 生成本地 JWT secret |
 | Python 3.10+ + PyYAML | 文档、OpenAPI 与 E2E 合同校验 |
@@ -127,11 +127,13 @@ Web 当前把 Hub access/refresh token 存在 tab-scoped `sessionStorage`，不�
 |---|---|---|
 | L0 后端 | `make test`（复用 Go test cache）/ `make test-ci`（`-count=1`） | `test-edge` + `test-hub`，均为 `go test -short` |
 | L0 前端 | `make fe-test` / `make fe-test-changed` | 单个 Vitest 进程跑全部 project；`--changed` 只跑受 git 变更影响的用例 |
-| L1 集成 | `scripts/dev/dev-up.sh --full`（容器启动后返回）后执行 `make test-hub-integration` | 真实 PostgreSQL 16 + Redis 7；`-tags integration` |
+| L1 集成 | `scripts/dev/dev-up.sh --full`（容器启动后返回）后执行 `make test-hub-integration` | 真实 PostgreSQL 18.6 + Redis 7；`-tags integration` |
 | L2 fixture | `make test-edge-e2e` / `make e2e-local` | callback mock hub；后者组合 teamrun + OIDC/scenarios smoke |
 | 全量本地 | `make test-all` | Edge/Hub 非 `-short` race + L1，需 PostgreSQL + Redis |
 
 本机只跑改动相关的最小集：后端在模块目录执行 `cd hub-server && go test ./internal/<pkg> -short`（Edge 同理），前端 `make fe-test-changed`；`-race`、L1、打包和浏览器 lane 放 L3/CI。
+
+PostgreSQL 默认版本与 Docker 官方镜像固定在根 Compose、CI 和 fixture E2E。PG18 的卷挂载父目录是 `/var/lib/postgresql`，内部 `PGDATA` 带主版本；开发默认使用全新 `agenthub_pg18_data`，不复用或删除旧 `agenthub_pg_data`。已有 PG16 数据需要停写后的可验证 dump/restore 或 `pg_upgrade`，不能只换镜像。迁移前保留旧卷、配置和备份；新库验收与业务切换前可保持旧库服务，切换后不得用旧快照覆盖新写入。此仓默认版本变化不表示任何外部运行数据库已升级；运行事实与部署门禁归运维 STATE。最新稳定版以 [PostgreSQL 官方版本表](https://www.postgresql.org/support/versioning/) 为准。
 
 L3 需要单独准备的全栈环境。`scripts/dev/dev-up.sh` 默认启动 PostgreSQL/Redis 后在前台运行 Hub；`--full` 构建并启动 Hub 容器后返回；两者都不启动 Account、Edge 或 Web。真实 Account L3 需要可达的真实 Account issuer、已注册的 confidential client、真实浏览器 Authorization Code + PKCE、UserInfo 和 Hub session。fixture、stub、自签 Hub JWT 或只验证 OIDC 配置形状的运行只能算较低证据层；在 Account 专用 lane 未产出通过的 manifest 前，该项保持 pending。
 

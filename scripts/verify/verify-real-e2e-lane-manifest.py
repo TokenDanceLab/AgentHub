@@ -251,7 +251,7 @@ def assert_no_private_names(manifest, context="manifest"):
       * 内网后缀 hostname（*.internal / *.local / *.corp / *.lan）
 
     允许（不误报）：loopback/localhost URL、相对路径（tests/artifacts/...、
-    app/web）、镜像引用 postgres:16 / redis:7、报告 basename、枚举值。
+    app/web）、镜像引用 postgres:18.6 / redis:7、报告 basename、枚举值。
     单标签内网 host 仅在 URL host 位置判定（唯一无歧义位置）；裸单标签
     token（web/up/none/passed 等）不视作 hostname，避免把枚举误报为泄漏。
     """

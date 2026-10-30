@@ -1,7 +1,7 @@
 # ──────────────────────────────────────────────
 # AgentHub Hub Server — Docker Compose 开发环境
 # ──────────────────────────────────────────────
-# 启动完整 Hub 技术栈：PostgreSQL 16 + Redis 7 + Hub Server。
+# 启动完整 Hub 技术栈：PostgreSQL 18.6 + Redis 7 + Hub Server。
 #
 # 快速开始：
 #   cp .env.example .env              # 首次：复制环境变量（已提供默认值）
@@ -23,9 +23,9 @@
 # ──────────────────────────────────────────────
 
 services:
-  # ── PostgreSQL 16 ──────────────────────────
+  # ── PostgreSQL 18.6 ────────────────────────
   postgres:
-    image: postgres:16-alpine
+    image: postgres:18.6-alpine@sha256:10a5c69a83035ab5239f5620d708520e8b28f5aa1f2b20143e6024532edadfb5
     container_name: agenthub-postgres
     restart: unless-stopped
     mem_limit: ${AGENTHUB_POSTGRES_MEM_LIMIT:-512m}
@@ -38,7 +38,9 @@ services:
     ports:
       - "${AGENTHUB_BIND_HOST:-127.0.0.1}:${AGENTHUB_DB_PORT:-5432}:5432"
     volumes:
-      - pg_data:/var/lib/postgresql/data
+      # PG18 uses a versioned PGDATA under this parent. Never mount a PG16
+      # data directory into PG18; retain the old volume for explicit migration.
+      - pg18_data:/var/lib/postgresql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${AGENTHUB_DB_USER:-agenthub} -d ${AGENTHUB_DB_NAME:-agenthub}"]
       interval: 5s
@@ -170,8 +172,8 @@ services:
         max-file: "3"
 
 volumes:
-  pg_data:
-    name: agenthub_pg_data
+  pg18_data:
+    name: agenthub_pg18_data
   redis_data:
     name: agenthub_redis_data
   uploads_data:

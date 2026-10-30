@@ -362,7 +362,7 @@ generate_compose() {
   cat >"$COMPOSE" <<EOF
 services:
   pg:
-    image: postgres:16-alpine
+    image: postgres:18.6-alpine@sha256:10a5c69a83035ab5239f5620d708520e8b28f5aa1f2b20143e6024532edadfb5
     container_name: ${PROJECT_NAME}-pg
     environment:
       POSTGRES_USER: agenthub
@@ -566,7 +566,7 @@ doc = {
     "stack": [
         "account-oidc-fixture",
         "hub-server",
-        "postgres:16-alpine",
+        "postgres:18.6-alpine",
         "redis:7-alpine",
     ],
     "checks": {

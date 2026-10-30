@@ -3,7 +3,7 @@
 # AgentHub Docker Compose — 一键启动开发环境
 # （兼容 launcher；实现见同名 .py）
 # ───────────────────────────────────────────────
-# 启动 PostgreSQL 16 + Redis 7，然后在前台运行 Hub Server（--full 改为构建并启动 Hub 容器后返回）。
+# 启动 PostgreSQL 18.6 + Redis 7，然后在前台运行 Hub Server（--full 改为构建并启动 Hub 容器后返回）。
 #
 # 用法:
 #   ./scripts/dev/dev-up.sh          # 启动 postgres + redis，然后前台 go run hub-server
