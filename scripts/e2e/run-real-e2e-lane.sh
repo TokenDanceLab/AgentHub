@@ -351,7 +351,7 @@ manifest = {
         "hub": {"base_url": os.environ["MANIFEST_HUB_BASE_URL"], "state": os.environ["MANIFEST_HUB_STATE"]},
         "edge": {"base_url": os.environ["MANIFEST_EDGE_BASE_URL"], "state": os.environ["MANIFEST_EDGE_STATE"]},
         "web": {"base_url": os.environ["MANIFEST_WEB_BASE_URL"], "state": os.environ["MANIFEST_WEB_STATE"]},
-        "backend_services": ["postgres:16", "redis:7"],
+        "backend_services": ["postgres:18.6", "redis:7"],
     },
     "secret_handling": {
         "account_mode": "operator-supplied external identities (provision-real-e2e-stack.sh)",

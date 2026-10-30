@@ -28,7 +28,7 @@ cat > "$OUTPUT" << EOF
 # Generated: $(date -u +"%Y-%m-%dT%H:%M:%SZ")
 # WARNING: Keep this file secure. Do not commit to version control.
 
-# ── Database (host PostgreSQL 16) ───────────────────────────────────────
+# ── Database (operator-managed PostgreSQL) ──────────────────────────────
 PG_HOST=${PG_HOST}
 PG_PORT=${PG_PORT}
 PG_USER=${PG_USER}

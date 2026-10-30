@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """dev-up — 一键本地开发环境。
 
-Docker Compose 启动 PostgreSQL 16 + Redis 7，等待健康后 go run 启动 Hub
+Docker Compose 启动 PostgreSQL 18.6 + Redis 7，等待健康后 go run 启动 Hub
 Server。--full 连带构建并启动 hub-server 镜像，等待 Hub health 后打印服务表，
 不 go run。
 
