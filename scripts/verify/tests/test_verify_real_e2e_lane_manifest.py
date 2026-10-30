@@ -49,7 +49,7 @@ GOOD = {
         "hub": {"base_url": "http://localhost:8080", "state": "up"},
         "edge": {"base_url": "http://127.0.0.1:3210", "state": "up"},
         "web": {"base_url": "http://127.0.0.1:5174", "state": "up"},
-        "backend_services": ["postgres:16", "redis:7"],
+        "backend_services": ["postgres:18.6", "redis:7"],
     },
     "secret_handling": {
         "account_mode": "operator-supplied external identities (provision-real-e2e-stack.sh)",

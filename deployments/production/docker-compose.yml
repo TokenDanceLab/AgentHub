@@ -42,7 +42,7 @@ services:
         max-size: "5m"
         max-file: "2"
 
-  # ── Hub Server（Go 后端 API — 本地 PG16）──
+  # ── Hub Server（Go 后端 API — 操作者管理的 PostgreSQL）──
   hub-server:
     image: ghcr.io/tokendancelab/agenthub-hub-server:latest
     container_name: agenthub-hub
@@ -55,7 +55,7 @@ services:
       redis:
         condition: service_healthy
     environment:
-      # Local PostgreSQL 16 (127.0.0.1:<port>). PG_PASSWORD required;
+      # Operator-managed PostgreSQL (127.0.0.1:<port>). PG_PASSWORD required;
       # remaining defaults are deployment-neutral.
       # NOTE: PG_HOST default is host-only (no port); port via PG_PORT (default 5433).
       # Do not include a port in PG_HOST: DSN() uses PG_PORT separately.
