@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -33,6 +34,11 @@ func testService(t *testing.T) (*Service, Authorizer) {
 		failure_category TEXT, observed_target_id TEXT, route_key TEXT, observed_at DATETIME,
 		expires_at DATETIME, created_at DATETIME, updated_at DATETIME)`).Error)
 	s := New(db, "hub-test-client")
+	// Fresh confirmation must follow issuance/revocation, even when the host
+	// clock has coarse resolution. Advance fixture time without wall-clock waits.
+	base := time.Now().UTC()
+	var ticks atomic.Int64
+	s.now = func() time.Time { return base.Add(time.Duration(ticks.Add(1)) * time.Millisecond) }
 	return s, seedIdentity(t, db)
 }
 
