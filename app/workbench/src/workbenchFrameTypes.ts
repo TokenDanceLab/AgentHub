@@ -230,6 +230,7 @@ export interface WorkbenchRoutesFrameProps {
   userDisplayName?: string | undefined;
   /* ── Devices / execution-target management (#1819) ── */
   devicesTargets?: import('./pages/DevicesPage').DevicesPageTarget[] | undefined;
+  devicesPairing?: React.ReactNode;
   devicesLoading?: boolean | undefined;
   devicesError?: string | null | undefined;
   onDevicesRetry?: (() => void) | undefined;

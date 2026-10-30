@@ -53,6 +53,11 @@ func applyRunnerProfile(cfg *config) error {
 
 func buildAdapterRegistry(cfg config) *adapters.Registry {
 	reg := adapters.NewRegistry()
+	if cfg.DeviceCredential != nil {
+		registerSDKAdapters(reg, cfg)
+		reg.SetDefault("default", "openai-sdk")
+		return reg
+	}
 
 	registerClaudeCodeAdapter(reg, cfg)
 	registerCodexACPAdapter(reg, cfg)

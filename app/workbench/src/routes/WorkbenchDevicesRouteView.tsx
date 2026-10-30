@@ -9,6 +9,7 @@ import type { DevicesPageTarget } from '../pages/DevicesPage';
 
 export interface WorkbenchDevicesRouteViewProps {
   targets?: DevicesPageTarget[] | undefined;
+  pairing?: React.ReactNode;
   loading?: boolean | undefined;
   error?: string | null | undefined;
   onRetry?: (() => void) | undefined;
@@ -18,6 +19,7 @@ export interface WorkbenchDevicesRouteViewProps {
 
 export function WorkbenchDevicesRouteView({
   targets,
+  pairing,
   loading,
   error,
   onRetry,
@@ -27,6 +29,7 @@ export function WorkbenchDevicesRouteView({
   return (
     <DevicesPage
       targets={targets}
+      pairing={pairing}
       loading={loading}
       error={error}
       onRetry={onRetry}

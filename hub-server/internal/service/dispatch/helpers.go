@@ -117,10 +117,16 @@ func PromptFromMessage(msg *model.Message) string {
 	switch msg.ContentType {
 	case model.ContentTypeText, model.ContentTypeCode, model.ContentTypeDiff:
 		var payload struct {
-			Text string `json:"text"`
+			Text    string `json:"text"`
+			Content string `json:"content"`
 		}
-		if err := json.Unmarshal([]byte(msg.Content), &payload); err == nil && strings.TrimSpace(payload.Text) != "" {
-			return payload.Text
+		if err := json.Unmarshal([]byte(msg.Content), &payload); err == nil {
+			if strings.TrimSpace(payload.Text) != "" {
+				return payload.Text
+			}
+			if strings.TrimSpace(payload.Content) != "" {
+				return payload.Content
+			}
 		}
 	}
 	return msg.Content
@@ -135,10 +141,16 @@ func ExtractMessageText(msg *model.Message) string {
 	switch msg.ContentType {
 	case model.ContentTypeText, model.ContentTypeCode, model.ContentTypeDiff:
 		var payload struct {
-			Text string `json:"text"`
+			Text    string `json:"text"`
+			Content string `json:"content"`
 		}
-		if err := json.Unmarshal([]byte(msg.Content), &payload); err == nil && payload.Text != "" {
-			return payload.Text
+		if err := json.Unmarshal([]byte(msg.Content), &payload); err == nil {
+			if payload.Text != "" {
+				return payload.Text
+			}
+			if payload.Content != "" {
+				return payload.Content
+			}
 		}
 	}
 	// For non-text messages or unparseable content, just return raw content.

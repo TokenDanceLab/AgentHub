@@ -3,6 +3,7 @@ import { isWorkbenchRealDataMode } from '@shared/demo';
 import type { TranscriptBlock } from '@shared/transcript';
 import type { ExecutionTargetInventoryItem } from '@/api/executionTargetQueries';
 import { errorMessage } from '@shared/errors';
+import { isSupportedWebTarget } from './webPlatformDispatchHelpers';
 
 export type WebExecutionTargetStatusState =
   | 'hidden'
@@ -33,7 +34,7 @@ export function resolveWebExecutionTargetStatus(input: {
   const visibleRealMode = input.hubReady || isWorkbenchRealDataMode(input.dataMode);
   if (!visibleRealMode) return { state: 'hidden' };
   if (!input.hubReady) {
-    return targetStatus('signed-out', 'Sign in to Hub before Web can select a local_edge execution target.');
+    return targetStatus('signed-out', 'Sign in to Hub before Web can select a Desktop or paired Edge execution target.');
   }
   if (input.isFetching && !input.targets) {
     return targetStatus('loading', 'Loading Hub execution targets before Web dispatch.');
@@ -46,37 +47,37 @@ export function resolveWebExecutionTargetStatus(input: {
   if (targets.length === 0) {
     return targetStatus(
       'no-target',
-      'No online local_edge execution target is available. Web real Hub mode will not dispatch agent tasks to mock targets.',
+      'No Desktop or paired Edge execution target is available. Web will not dispatch agent tasks to mock targets.',
     );
   }
 
-  const localEdgeTargets = targets.filter((target) => target.target_type === 'local_edge');
-  if (localEdgeTargets.length === 0) {
+  const supportedTargets = targets.filter(isSupportedWebTarget);
+  if (supportedTargets.length === 0) {
     return targetStatus(
       'wrong-profile',
-      'Hub reported execution targets, but none are local_edge Desktop/Edge targets for Web agent dispatch.',
+      'Hub reported execution targets, but none are supported Desktop or paired Edge targets for Web agent dispatch.',
     );
   }
 
-  const selectedTarget = localEdgeTargets.find((target) =>
+  const selectedTarget = supportedTargets.find((target) =>
     target.is_online === true && (target.health_state === 'online' || target.health_state === 'healthy')
   );
   if (!selectedTarget) {
-    const mismatchTarget = localEdgeTargets.find((target) => target.health_state === 'mismatch');
+    const mismatchTarget = supportedTargets.find((target) => target.health_state === 'mismatch');
     if (mismatchTarget) {
       return targetStatus(
         'mismatch',
         `Desktop/Edge target binding mismatch: ${executionTargetLabel(mismatchTarget)}. Web will not dispatch until Hub target and Desktop Edge identity match.`,
       );
     }
-    const staleTarget = localEdgeTargets.find((target) => target.health_state === 'stale');
+    const staleTarget = supportedTargets.find((target) => target.health_state === 'stale');
     if (staleTarget) {
       return targetStatus(
         'stale',
-        `Desktop/Edge target health is stale: ${executionTargetLabel(staleTarget)}. Web will wait for a fresh Desktop check-in before dispatch.`,
+        `Desktop/Edge target health is stale: ${executionTargetLabel(staleTarget)}. Web will wait for a fresh device check-in before dispatch.`,
       );
     }
-    const degradedTarget = localEdgeTargets.find((target) =>
+    const degradedTarget = supportedTargets.find((target) =>
       target.is_online === true && target.health_state === 'degraded'
     );
     if (degradedTarget) {
@@ -87,7 +88,7 @@ export function resolveWebExecutionTargetStatus(input: {
     }
     return targetStatus(
       'offline',
-      'Desktop/Edge local_edge targets are offline or unavailable. Web real Hub mode will not dispatch agent tasks to mock targets.',
+      'Desktop or paired Edge targets are offline or unavailable. Web will not dispatch agent tasks to mock targets.',
     );
   }
 
@@ -96,7 +97,7 @@ export function resolveWebExecutionTargetStatus(input: {
     selectedTarget,
     block: targetStatusBlock(
       'ready',
-      `Selected local_edge execution target: ${selectedTarget.name || selectedTarget.id} (${selectedTarget.id}).`,
+      `Selected ${selectedTarget.target_type} execution target: ${selectedTarget.name || selectedTarget.id} (${selectedTarget.id}).`,
     ),
   };
 }

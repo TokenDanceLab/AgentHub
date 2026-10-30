@@ -271,6 +271,7 @@ export function buildWorkbenchRoutesProps(
   assignIfDefined(routesProps, 'userDisplayName', props.userDisplayName);
   assignIfDefined(routesProps, 'platformSurface', props.platformSurface);
   assignIfDefined(routesProps, 'devicesTargets', props.devicesTargets);
+  assignIfDefined(routesProps, 'devicesPairing', props.devicesPairing);
   assignIfDefined(routesProps, 'devicesLoading', props.devicesLoading);
   assignIfDefined(routesProps, 'devicesError', props.devicesError);
   assignIfDefined(routesProps, 'onDevicesRetry', props.onDevicesRetry);

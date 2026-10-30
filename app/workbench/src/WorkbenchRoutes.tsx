@@ -225,6 +225,7 @@ export function WorkbenchRoutes({
   userDisplayName,
   platformSurface,
   devicesTargets,
+  devicesPairing,
   devicesLoading,
   devicesError,
   onDevicesRetry,
@@ -324,6 +325,7 @@ export function WorkbenchRoutes({
         <PageErrorBoundary>
           <WorkbenchDevicesRouteView
             targets={devicesTargets}
+            pairing={devicesPairing}
             loading={devicesLoading}
             error={devicesError}
             onRetry={onDevicesRetry}

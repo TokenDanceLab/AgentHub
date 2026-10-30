@@ -67,13 +67,13 @@ func TestHubOutputCollectorBoundsAndFallback(t *testing.T) {
 	// Empty builder uses fallback when no streamed content was kept.
 	c2 := newHubOutputCollector(32)
 	c2.SetFallback(" final result ")
-	if got := c2.Final(); got != "final result" {
-		t.Fatalf("Final() fallback = %q, want %q", got, "final result")
+	if got := c2.Final(); got != " final result " {
+		t.Fatalf("Final() fallback = %q, want %q", got, " final result ")
 	}
 
 	// First non-empty fallback wins.
 	c2.SetFallback("ignored")
-	if got := c2.Final(); got != "final result" {
+	if got := c2.Final(); got != " final result " {
 		t.Fatalf("Final() after second fallback = %q, want first fallback", got)
 	}
 
@@ -81,6 +81,24 @@ func TestHubOutputCollectorBoundsAndFallback(t *testing.T) {
 	c3 := newHubOutputCollector(0)
 	if c3.maxBytes != hubCallbackFinalMaxBytes {
 		t.Fatalf("maxBytes = %d, want %d", c3.maxBytes, hubCallbackFinalMaxBytes)
+	}
+}
+
+func TestHubOutputCollectorPreservesReplyWhitespace(t *testing.T) {
+	t.Parallel()
+	chunks := []string{"  开始\n", "\n\t", "结束  "}
+	c := newHubOutputCollector(128)
+	for _, chunk := range chunks {
+		c.Append(chunk)
+	}
+	c.SetFallback("fallback must not replace streamed output")
+	if got, want := c.Final(), strings.Join(chunks, ""); got != want {
+		t.Fatalf("Final() = %q, want original reply %q", got, want)
+	}
+	empty := newHubOutputCollector(128)
+	empty.SetFallback(" \n\t ")
+	if got := empty.Final(); got != "" {
+		t.Fatalf("blank fallback = %q, want empty output", got)
 	}
 }
 

@@ -72,7 +72,9 @@ export function formatAgentTargetPreference(value: string[] | Record<string, unk
 export function workbenchAgentToAgentConfig(agent: WorkbenchAgent): AgentConfig {
   const runtimeLabel = agent.runtimeId?.trim() || 'Hub 配置档案';
   const providerLabel = agent.provider?.trim();
-  const modelLabel = [providerLabel, agent.model?.trim()].filter(Boolean).join(' / ') || '未配置模型';
+  const modelLabel = (runtimeLabel === 'openai-sdk'
+    ? agent.model?.trim()
+    : [providerLabel, agent.model?.trim()].filter(Boolean).join(' / ')) || '未配置模型';
   const targetPreference = formatAgentTargetPreference(agent.targetPreferences);
   return {
     id: agent.id,

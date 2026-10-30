@@ -27,9 +27,12 @@ type deliveryOutboxRecord struct {
 	NextRetryAt  *time.Time `gorm:"type:timestamptz;index:idx_delivery_outbox_status_nr,priority:2"`
 	LastError    string     `gorm:"type:text;default:''"`
 	EdgeDeviceID string     `gorm:"type:uuid;default:null"`
-	CreatedAt    time.Time  `gorm:"autoCreateTime"`
-	UpdatedAt    time.Time  `gorm:"autoUpdateTime:false"`
-	DeliveredAt  *time.Time `gorm:"type:timestamptz"`
+	Transport    string     `gorm:"type:varchar(16);not null;default:push"`
+	// Internal grant binding, intentionally excluded from public Entry/payload.
+	PairedCredentialHash string     `gorm:"type:varchar(64);not null;default:''" json:"-"`
+	CreatedAt            time.Time  `gorm:"autoCreateTime"`
+	UpdatedAt            time.Time  `gorm:"autoUpdateTime:false"`
+	DeliveredAt          *time.Time `gorm:"type:timestamptz"`
 }
 
 // TableName overrides the default pluralized table name for GORM.
@@ -70,6 +73,7 @@ func recordFromEntry(e deliveryoutbox.Entry) *deliveryOutboxRecord {
 		NextRetryAt:  e.NextRetryAt,
 		LastError:    e.LastError,
 		EdgeDeviceID: e.EdgeDeviceID,
+		Transport:    e.Transport,
 		CreatedAt:    e.CreatedAt,
 		UpdatedAt:    e.UpdatedAt,
 		DeliveredAt:  e.DeliveredAt,
@@ -88,6 +92,7 @@ func (r deliveryOutboxRecord) toEntry() deliveryoutbox.Entry {
 		NextRetryAt:  r.NextRetryAt,
 		LastError:    r.LastError,
 		EdgeDeviceID: r.EdgeDeviceID,
+		Transport:    r.Transport,
 		CreatedAt:    r.CreatedAt,
 		UpdatedAt:    r.UpdatedAt,
 		DeliveredAt:  r.DeliveredAt,
@@ -153,6 +158,7 @@ func (s *DeliveryOutboxStore) UpdateByDeliveryID(ctx context.Context, deliveryID
 // ClaimRetry implements deliveryoutbox.Store.
 func (s *DeliveryOutboxStore) ClaimRetry(ctx context.Context, deliveryID string, statusIn []string, expectedAttempt int, patch deliveryoutbox.Patch) (int64, error) {
 	result := s.db.WithContext(ctx).Model(&deliveryOutboxRecord{}).
+		Where("transport = ?", "push").
 		Where("delivery_id = ? AND status IN ? AND attempt_count = ?",
 			deliveryID, statusIn, expectedAttempt).
 		Updates(patchToMap(patch))
@@ -173,6 +179,7 @@ func (s *DeliveryOutboxStore) UpdateByTaskID(ctx context.Context, taskID string,
 func (s *DeliveryOutboxStore) ScanPending(ctx context.Context, createdBefore time.Time, limit int) ([]deliveryoutbox.Entry, error) {
 	var rows []deliveryOutboxRecord
 	err := s.db.WithContext(ctx).
+		Where("transport = ?", "push").
 		Where("status = ? AND created_at <= ?", deliveryoutbox.StatusPending, createdBefore).
 		Limit(limit).
 		Find(&rows).Error
@@ -190,6 +197,7 @@ func (s *DeliveryOutboxStore) ScanPending(ctx context.Context, createdBefore tim
 func (s *DeliveryOutboxStore) ScanSent(ctx context.Context, updatedBefore time.Time, limit int) ([]deliveryoutbox.Entry, error) {
 	var rows []deliveryOutboxRecord
 	err := s.db.WithContext(ctx).
+		Where("transport = ?", "push").
 		Where("status = ? AND updated_at <= ?", deliveryoutbox.StatusSent, updatedBefore).
 		Limit(limit).
 		Find(&rows).Error
@@ -207,6 +215,7 @@ func (s *DeliveryOutboxStore) ScanSent(ctx context.Context, updatedBefore time.T
 func (s *DeliveryOutboxStore) ScanRetrying(ctx context.Context, dueAt time.Time, limit int) ([]deliveryoutbox.Entry, error) {
 	var rows []deliveryOutboxRecord
 	err := s.db.WithContext(ctx).
+		Where("transport = ?", "push").
 		Where("status = ? AND next_retry_at IS NOT NULL AND next_retry_at <= ?", deliveryoutbox.StatusRetrying, dueAt).
 		Limit(limit).
 		Find(&rows).Error

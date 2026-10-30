@@ -16,6 +16,10 @@ function baseAgent(overrides: Partial<WorkbenchAgent> = {}): WorkbenchAgent {
 }
 
 describe('workbenchAgentMapping', () => {
+  it('keeps SDK model IDs editable without adding a provider label', () => {
+    expect(workbenchAgentToAgentConfig(baseAgent({ runtimeId: 'openai-sdk', provider: 'Vendor', model: 'vendor/model-id' })))
+      .toMatchObject({ engine: 'openai-sdk', model: 'vendor/model-id' });
+  });
   it('maps workbench agent status to AgentsPage state', () => {
     expect(workbenchAgentStateToAgentState('available')).toBe('ready');
     expect(workbenchAgentStateToAgentState('configuring')).toBe('waiting');

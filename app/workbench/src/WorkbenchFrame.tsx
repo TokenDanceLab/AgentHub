@@ -107,6 +107,7 @@ export function WorkbenchFrame({
   hasEarlierMessages,
   loadEarlierMessages,
   devicesTargets,
+  devicesPairing,
   devicesLoading,
   devicesError,
   onDevicesRetry,
@@ -457,6 +458,7 @@ export function WorkbenchFrame({
             currentUserId={currentUserId}
             userDisplayName={userDisplayName}
             devicesTargets={devicesTargets}
+            devicesPairing={devicesPairing}
             devicesLoading={devicesLoading}
             devicesError={devicesError}
             onDevicesRetry={onDevicesRetry}

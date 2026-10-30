@@ -137,6 +137,8 @@ Edge workbench 默认：`*.created`/`*.updated`/run 态 **UPSERT** + `seq` **水
 
 客户端 SSOT `hubEvents.ts` 必须与 `frame.go` + OpenAPI 1:1；契约测试防漂移。聊天可见新事件先补 shared transcript 测试；禁止 debug/mock/mode 元数据进主气泡。
 
+已配对文本Edge的typed stream仅持久化为run events，并通过`agent.stream`广播；`run.agent.text_delta`保留原始空白，重试按稳定UUID identity与task/run/payload精确去重。完成答案由done callback单独生成一条`message.new`，其`agent_task.status=done`表明聊天历史已接管该task的实时文本。思考/结果等runtime metadata不进入第二轮聊天上下文；详见[dispatch契约](dispatch.md)。
+
 ## Fixture And Real-Evidence Boundary
 
 Adapter fixture 是 no-spend 合同：可证 parser/redaction/replay/transcript，不能证真实登录、CLI/模型执行、生产部署或 packaged Desktop。证据标签由 `scripts/verify/verify-real-e2e-contract.py` 内嵌规范维护；stub 须 `real_tested=false`。

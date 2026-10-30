@@ -18,6 +18,7 @@ import (
 	"github.com/agenthub/hub-server/internal/model"
 	"github.com/agenthub/hub-server/internal/repository"
 	"github.com/agenthub/hub-server/internal/service/dispatch"
+	"github.com/agenthub/hub-server/internal/service/edgedevice"
 )
 
 // defaultEdgePort is the standard Edge Server listen port used as a fallback
@@ -34,6 +35,21 @@ func (s *Service) Ping(ctx context.Context, id, ownerID string) error {
 	}
 	if t.OwnerID != ownerID {
 		return errcode.AuthDeviceMismatch
+	}
+	if t.TargetType == "cloud_edge" && t.DeviceID != nil {
+		paired, err := edgedevice.IsPairedDevice(s.db.WithContext(ctx), *t.DeviceID)
+		if err != nil {
+			return err
+		}
+		if paired {
+			// Pull-only devices have no inbound listener. A user refresh must
+			// not overwrite authenticated heartbeat evidence with a host probe.
+			evidence, err := repository.GetExecutionTargetEvidence(s.db.WithContext(ctx), t.ID)
+			if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+				return err
+			}
+			return dispatch.ValidateTargetHealth(edgedevice.Health(t, evidence, time.Now()))
+		}
 	}
 
 	// Per-type health strategy (#1544): each target type proves its health

@@ -152,6 +152,7 @@ func scenarioTestDB(t *testing.T) *gorm.DB {
 			created_at DATETIME
 		)`,
 		`CREATE TABLE pending_agent_tasks (
+			cancel_requested_at DATETIME, cancel_applied_at DATETIME, cancel_error TEXT DEFAULT '',
 			id TEXT PRIMARY KEY,
 			agent_instance_id TEXT NOT NULL,
 			triggered_by_user_id TEXT NOT NULL,

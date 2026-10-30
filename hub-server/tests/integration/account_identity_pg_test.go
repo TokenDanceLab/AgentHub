@@ -23,9 +23,10 @@ func TestMigration0076_RealPG_BackfillsLegacyAndPreservesNoopDown(t *testing.T) 
 	version, dirty, err := m.Version()
 	require.NoError(t, err)
 	require.False(t, dirty)
-	require.Equal(t, uint(79), version)
+	require.GreaterOrEqual(t, version, uint(80))
+	latestVersion := version
 
-	require.NoError(t, m.Steps(-4))
+	require.NoError(t, m.Migrate(75))
 	version, dirty, err = m.Version()
 	require.NoError(t, err)
 	require.False(t, dirty)
@@ -58,11 +59,11 @@ func TestMigration0076_RealPG_BackfillsLegacyAndPreservesNoopDown(t *testing.T) 
 		VALUES (?, ?, 'desktop', ?, ?, ?, false)
 	`, refreshID, userID, deviceID, refreshRaw, now.Add(time.Hour)).Error)
 
-	require.NoError(t, m.Steps(4))
+	require.NoError(t, m.Migrate(latestVersion))
 	version, dirty, err = m.Version()
 	require.NoError(t, err)
 	require.False(t, dirty)
-	require.Equal(t, uint(79), version)
+	require.Equal(t, latestVersion, version)
 
 	var identity model.UserIdentity
 	require.NoError(t, db.Where("issuer = ? AND subject = ?", "legacy:tokendance-id", legacySub).First(&identity).Error)
@@ -77,7 +78,7 @@ func TestMigration0076_RealPG_BackfillsLegacyAndPreservesNoopDown(t *testing.T) 
 
 	// The down files are no-ops for identity data. Returning the version must
 	// not drop the table/column or reopen the legacy refresh chain.
-	require.NoError(t, m.Steps(-4))
+	require.NoError(t, m.Migrate(75))
 	version, dirty, err = m.Version()
 	require.NoError(t, err)
 	require.False(t, dirty)

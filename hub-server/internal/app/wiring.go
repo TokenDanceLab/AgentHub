@@ -19,6 +19,7 @@ import (
 	"github.com/agenthub/hub-server/internal/egress"
 	"github.com/agenthub/hub-server/internal/handler"
 	"github.com/agenthub/hub-server/internal/log"
+	"github.com/agenthub/hub-server/internal/model"
 	"github.com/agenthub/hub-server/internal/outboundhttp"
 	"github.com/agenthub/hub-server/internal/repository"
 	"github.com/agenthub/hub-server/internal/service/agent"
@@ -31,6 +32,8 @@ import (
 	"github.com/agenthub/hub-server/internal/service/contact"
 	"github.com/agenthub/hub-server/internal/service/device"
 	"github.com/agenthub/hub-server/internal/service/document"
+	"github.com/agenthub/hub-server/internal/service/edgedevice"
+	"github.com/agenthub/hub-server/internal/service/edgeenrollment"
 	"github.com/agenthub/hub-server/internal/service/executiontarget"
 	"github.com/agenthub/hub-server/internal/service/mcpserver"
 	"github.com/agenthub/hub-server/internal/service/message"
@@ -214,6 +217,19 @@ func (a *App) initServices(ctx context.Context) error {
 	// constructs transport clients.
 	edgeDispatchClient := outboundhttp.NewClient(a.Config.Edge.Timeout)
 	a.AgentService = agent.NewService(a.DB, a.bus, a.mgr, a.CacheClient, a.RelayService, a.Config.Edge, edgeDispatchClient, a.Config.JWT.Secret)
+	a.EdgeEnrollmentService = edgeenrollment.New(a.DB, a.Config.AccountOIDC.ClientID)
+	a.EdgeDeviceService = edgedevice.New(a.DB, a.EdgeEnrollmentService)
+	a.EdgeDeviceService.SetCancelPublisher(func(ctx context.Context, task *model.PendingAgentTask) error {
+		ai, err := repository.GetAgentInstanceByID(a.DB.WithContext(ctx), task.AgentInstanceID)
+		if err != nil {
+			return err
+		}
+		return a.bus.Publish(ctx, bus.Event{Type: bus.EventTypeAgentCancel, Payload: bus.AgentCancelPayload{
+			AgentTaskPayload: bus.AgentTaskPayload{TaskID: task.ID, AgentInstanceID: task.AgentInstanceID, SessionID: ai.SessionID},
+			TriggeredBy:      task.TriggeredByUserID,
+		}})
+	})
+	a.AgentService.SetPairedDeviceService(a.EdgeDeviceService)
 
 	// Agent Profile service
 	agentProfileSvc := agentprofile.NewService(a.DB)
@@ -283,6 +299,7 @@ func (a *App) initHandlers(_ context.Context) error {
 	a.AuthHandler = handler.NewAuthHandler(a.AuthService)
 	a.DeviceHandler = handler.NewDeviceHandler(a.DeviceService)
 	a.DeviceHandler.SetJWTConfig(a.Config.JWT.Secret, a.Config.JWT.AccessTTL)
+	a.DeviceHandler.Paired = handler.NewEdgeEnrollmentHandler(a.EdgeEnrollmentService, a.EdgeDeviceService, a.Config.AccountOIDC.ClientID)
 	a.ContactHandler = handler.NewContactHandler(a.ContactService)
 	a.SessionHandler = handler.NewSessionHandler(a.SessionService)
 	a.MessageHandler = handler.NewMessageHandler(messageServiceWithReactions{
@@ -323,9 +340,7 @@ func (a *App) startServer(ctx context.Context) error {
 				case <-a.bg.Ctx().Done():
 					return nil
 				case <-ticker.C:
-					if err := a.AuthService.PruneExpiredSessions(a.bg.Ctx()); err != nil {
-						slog.Warn("auth session cleanup unavailable")
-					}
+					a.pruneExpiredCredentials(a.bg.Ctx())
 				}
 			}
 		})
@@ -424,6 +439,17 @@ func (a sessionAuditAdapter) RecordPrivilegedAction(ctx context.Context, in sess
 		AuthBasis:    in.AuthBasis,
 		Reason:       in.Reason,
 	})
+}
+
+func (a *App) pruneExpiredCredentials(ctx context.Context) {
+	if err := a.AuthService.PruneExpiredSessions(ctx); err != nil {
+		slog.Warn("auth session cleanup unavailable")
+	}
+	if a.EdgeEnrollmentService != nil {
+		if err := a.EdgeEnrollmentService.PruneExpiredEnrollments(ctx); err != nil {
+			slog.Warn("edge enrollment cleanup unavailable")
+		}
+	}
 }
 
 // executionTargetAuditAdapter satisfies executiontarget.PrivilegedActionAuditor.

@@ -59,9 +59,19 @@ func classifyHubCallbackEvent(eventType string) hubCallbackSideEffect {
 
 // hubCallbackTextForEvent extracts text and the hub side-effect for an event.
 func hubCallbackTextForEvent(eventType string, payload any) (string, hubCallbackSideEffect) {
+	if isStreamSnapshot(eventType, payload) {
+		return extractHubCallbackText(payload), hubCallbackFallback
+	}
 	effect := classifyHubCallbackEvent(eventType)
 	if effect == hubCallbackNone {
 		return "", hubCallbackNone
 	}
 	return extractHubCallbackText(payload), effect
+}
+
+// SDKs may emit a final block summarizing deltas already streamed. Preserve the
+// block for local observers, but never append it again to durable transcripts.
+func isStreamSnapshot(eventType string, payload any) bool {
+	fields, ok := payload.(map[string]any)
+	return eventType == adapters.BusEventTextBlock && ok && fields["streamSnapshot"] == true
 }

@@ -293,6 +293,7 @@ export function buildWorkbenchFrameProps(
   assignDefined(frameProps, 'hasEarlierMessages', props.hasEarlierMessages);
   assignDefined(frameProps, 'loadEarlierMessages', props.loadEarlierMessages);
   assignDefined(frameProps, 'devicesTargets', props.devicesTargets);
+  assignDefined(frameProps, 'devicesPairing', props.devicesPairing);
   assignDefined(frameProps, 'devicesLoading', props.devicesLoading);
   assignDefined(frameProps, 'devicesError', props.devicesError);
   assignDefined(frameProps, 'onDevicesRetry', props.onDevicesRetry);

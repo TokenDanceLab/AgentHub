@@ -73,6 +73,18 @@ func (s *DispatchService) prepareDirectCallbackRoute(ctx context.Context, task *
 	if task.EdgeDeviceID != "" && task.EdgeDeviceID != deviceID {
 		return false, false
 	}
+	if s.paired != nil {
+		paired, err := s.paired.IsPairedDevice(ctx, deviceID)
+		if err != nil {
+			return false, false
+		}
+		if paired {
+			// Global legacy HTTP configuration is not a paired device grant.
+			// Unbound work may choose its normal Desktop fallback; a reservation
+			// to this device never gains authority to change transport or target.
+			return false, task.EdgeDeviceID == ""
+		}
+	}
 	// Per-Edge circuit breaker: when Edge is down, consecutive dispatches would
 	// each block for the full HTTP client timeout (~30s), exhausting the
 	// dispatch semaphore and stalling the TTL/redispatch path. The breaker

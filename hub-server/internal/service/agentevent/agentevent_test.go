@@ -62,6 +62,17 @@ func TestInferRunEventType(t *testing.T) {
 }
 
 func TestNormalizeRunEventInput(t *testing.T) {
+	t.Run("preserves stream whitespace", func(t *testing.T) {
+		for _, text := range []string{"  text\n", "\n\n", "tail  "} {
+			_, payload, projection, err := NormalizeRunEventInput(model.AgentRunEventInput{Content: text})
+			require.NoError(t, err)
+			for _, raw := range []string{payload, projection} {
+				var decoded map[string]string
+				require.NoError(t, json.Unmarshal([]byte(raw), &decoded))
+				require.Equal(t, text, decoded["content"])
+			}
+		}
+	})
 	t.Run("explicit type with payload", func(t *testing.T) {
 		eventType, payload, content, err := NormalizeRunEventInput(model.AgentRunEventInput{
 			EventType: "run.agent.tool_call",

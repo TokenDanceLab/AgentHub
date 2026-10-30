@@ -38,6 +38,13 @@ func main() {
 		}
 		return
 	}
+	if cfg.Enroll {
+		if err := enrollDevice(cfg, os.Stdout); err != nil {
+			slog.Error("Edge pairing failed", "reason", err)
+			os.Exit(1)
+		}
+		return
+	}
 
 	repository, err := newStoreFromConfig(cfg)
 	if err != nil {
@@ -78,6 +85,8 @@ func main() {
 	}
 
 	serverConfig := httpserver.Config{
+		DeviceCredential:   cfg.DeviceCredential,
+		DeviceJournalPath:  cfg.DeviceJournalPath,
 		Addr:               cfg.Addr,
 		Store:              repository,
 		AdapterRegistry:    adapterReg,

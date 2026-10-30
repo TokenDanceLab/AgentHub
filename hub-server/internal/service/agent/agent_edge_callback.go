@@ -272,6 +272,9 @@ func (s *EdgeCallbackService) HandleTaskStream(ctx context.Context, edgeUserID, 
 	if err != nil {
 		return err
 	}
+	if stream.RuntimeOnly {
+		return s.handleRuntimeEvent(ctx, task, ai, edgeRunID, stream.ClientMsgID, eventType, eventPayload)
+	}
 	// #2274: stamp the producing task id into the projected message so the
 	// transcript can offer "regenerate" with the identity the endpoint actually
 	// requires (task id), instead of the shell guessing from a message id.
@@ -410,7 +413,9 @@ func (s *EdgeCallbackService) publishStreamEvents(ctx context.Context, ai *model
 	if s.bus == nil {
 		return
 	}
-	s.publishToBus(ctx, bus.Event{Type: bus.EventTypeMessageNew, Payload: msg}, "failed to publish message-new event", "session_id", ai.SessionID)
+	if msg != nil {
+		s.publishToBus(ctx, bus.Event{Type: bus.EventTypeMessageNew, Payload: msg}, "failed to publish message-new event", "session_id", ai.SessionID)
+	}
 	s.publishToBus(ctx, bus.Event{Type: ws.TypeAgentStream, Payload: runEvent}, "failed to publish agent-stream event", "task_id", taskID)
 	// #1478: fan the same run event into the team-run view when the
 	// run belongs to a team run. No-op when the session is not a team run;
@@ -655,7 +660,7 @@ func (s *EdgeCallbackService) HandleTaskDone(ctx context.Context, edgeUserID, ed
 	// text (a single-chunk stream followed by a done callback with the same
 	// content), skip inserting an identical duplicate so the chat does not
 	// render the final answer twice.
-	if shouldSkipDoneFinalInsert(s.db, ai.SessionID, task.AgentInstanceID, finalContent) {
+	if shouldSkipDoneFinalInsert(s.db, ai.SessionID, task.AgentInstanceID, finalContent, task.ID) {
 		finalContent = ""
 	}
 
@@ -694,7 +699,7 @@ func (s *EdgeCallbackService) buildDoneFinalMessage(ctx context.Context, ai *mod
 	}
 	// #2274: same task-ref stamp as the stream projection path, so both
 	// agent messages of one run carry the identity of the run that made them.
-	messageContent = agentevent.StampAgentTaskRef(messageContent, task.ID)
+	messageContent = agentevent.StampAgentTaskFinalRef(messageContent, task.ID)
 	if s.seq == nil {
 		return nil, errcode.ErrInternal.WithMessage("edge callback sequence allocator not configured")
 	}
@@ -858,7 +863,7 @@ func (s *EdgeCallbackService) authorizeTaskEdgeCallback(task *model.PendingAgent
 // JSON-shaped content is compared canonically: Postgres jsonb re-serializes
 // stored JSON (key order + whitespace), so raw string equality would miss
 // duplicates for decision/structured outputs (#1414).
-func shouldSkipDoneFinalInsert(db *gorm.DB, sessionID, senderID, finalContent string) bool {
+func shouldSkipDoneFinalInsert(db *gorm.DB, sessionID, senderID, finalContent, taskID string) bool {
 	if finalContent == "" {
 		return false
 	}
@@ -869,6 +874,14 @@ func shouldSkipDoneFinalInsert(db *gorm.DB, sessionID, senderID, finalContent st
 	last := latest[0]
 	if last.SenderType != model.SenderTypeAgent || last.SenderID != senderID {
 		return false
+	}
+	var metadata struct {
+		Task struct {
+			ID string `json:"task_id"`
+		} `json:"agent_task"`
+	}
+	if json.Unmarshal([]byte(last.Content), &metadata) != nil || metadata.Task.ID != taskID {
+		return false // an earlier turn by the same agent is not this task's reply
 	}
 	return canonicalContent(last.Content) == canonicalContent(finalContent)
 }
@@ -890,6 +903,23 @@ func canonicalContent(raw string) string {
 	}
 	var value any
 	if err := json.Unmarshal([]byte(raw), &value); err != nil {
+		return raw
+	}
+	if record, ok := value.(map[string]any); ok {
+		delete(record, "agent_task") // Hub-owned projection metadata is not answer text
+	}
+	canonical, err := json.Marshal(value)
+	if err != nil {
+		return raw
+	}
+	return string(canonical)
+}
+
+func canonicalJSON(raw string) string {
+	var value any
+	decoder := json.NewDecoder(strings.NewReader(raw))
+	decoder.UseNumber() // event identity must not round distinct large integers
+	if decoder.Decode(&value) != nil {
 		return raw
 	}
 	canonical, err := json.Marshal(value)

@@ -160,8 +160,9 @@ func emitOpenAIFinalEvents(emitter EventEmitter, scope map[string]any, model str
 	text := st.currentText.String()
 	if text != "" {
 		emitter.Emit(BusEventTextBlock, scope, map[string]any{
-			"content":  text,
-			"provider": "openai",
+			"content":        text,
+			"provider":       "openai",
+			"streamSnapshot": true, // summary of already emitted deltas, not additional text
 		})
 	}
 

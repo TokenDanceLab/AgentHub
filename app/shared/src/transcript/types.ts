@@ -64,6 +64,8 @@ export interface TextTranscriptBlock extends TranscriptBlockBase {
    * server-truthful task to regenerate, and offering the click would be a lie.
    */
   agentTaskId?: string;
+  /** Hub-confirmed final reply; partial runtime deltas yield to this message. */
+  agentTaskStatus?: 'done';
   displayTitle?: string;
   displayDetail?: string;
   badgeLabel?: string;

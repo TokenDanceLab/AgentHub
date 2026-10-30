@@ -116,6 +116,20 @@ func (s *DispatchService) TriggerAgentTask(ctx context.Context, userID, triggerM
 		time.Now().Add(config.PendingTaskTTL),
 	)
 	task.ModelParams = modelParams
+	if targetType == "cloud_edge" {
+		// Paired Edge is a pull-only transport. Task admission and its immutable
+		// delivery must commit together; there is no availability fallback.
+		payload, err := s.buildPairedPayload(ctx, task, ai, dispatch.PromptFromMessage(msg), modelParams, customAgent)
+		if err != nil {
+			return nil, err
+		}
+		created, err := s.paired.CreateTask(ctx, task, payload)
+		if err := dispatch.TurnInProgressError(err, errors.Is(err, repository.ErrTurnInProgressActive)); err != nil {
+			return nil, err
+		}
+		s.recordDispatchAudit(ctx, auditActionTaskDispatch, created.ID, userID, auditOutcomeSuccess, "")
+		return created, nil
+	}
 	// #1430: per-agent_instance TurnInProgress gate. Rejects a second concurrent
 	// trigger while one task is non-terminal (queued/dispatched/running). The
 	// check-then-create runs inside a transaction with a row lock so concurrent
@@ -154,6 +168,15 @@ func (s *DispatchService) validateDispatchTarget(ctx context.Context, userID, ta
 	if err != nil && !repository.IsEvidenceNotFound(err) {
 		return nil, err
 	}
+	if target.TargetType == "cloud_edge" && s.paired != nil {
+		if err := dispatch.ValidateTargetOwner(target.OwnerID, userID); err != nil {
+			return nil, err
+		}
+		if err := s.paired.ValidateTarget(ctx, target, evidence); err != nil {
+			return nil, err
+		}
+		return dispatch.NewTargetSnapshot(target.ID, target.TargetType, *target.DeviceID), nil
+	}
 	healthState := dispatch.ResolveExecutionTargetHealthState(target, evidence, time.Now())
 	if err := dispatch.PreDeviceTargetValidation(target.OwnerID, userID, target.TargetType, healthState); err != nil {
 		return nil, err
@@ -177,6 +200,14 @@ func (s *DispatchService) validateDispatchTarget(ctx context.Context, userID, ta
 // delivery (HTTP / WS / offline / relay). Exported so the AgentService
 // facade and the service-level integration tests can drive it directly.
 func (s *DispatchService) DispatchTask(ctx context.Context, task *model.PendingAgentTask, ai *model.AgentInstance, prompt, modelParams, targetType string, customAgent *model.CustomAgent) {
+	if s.paired != nil {
+		paired, err := s.paired.IsPairedDevice(ctx, task.EdgeDeviceID)
+		if err != nil || paired {
+			// Pull deliveries already exist transactionally. Never recreate them
+			// through orphan recovery, HTTP fallback, WS, or Redis offline queues.
+			return
+		}
+	}
 	// Payload assembly is pure; history loaders stay orchestration-side.
 	dp := dispatch.AssembleDispatchPayload(dispatch.AssemblePayloadInput{
 		TaskID:           task.ID,
@@ -451,6 +482,15 @@ func (s *DispatchService) RedispatchDelivery(ctx context.Context, taskID, delive
 // outbox-owned redispatch offline success still marks sent (#866). Running is
 // non-retryable (#1000).
 func (s *DispatchService) redispatchDelivery(ctx context.Context, rec redispatchTarget) error {
+	if s.paired != nil {
+		paired, err := s.paired.IsPairedDevice(ctx, rec.EdgeDeviceID)
+		if err != nil {
+			return err
+		}
+		if paired {
+			return errors.New("paired delivery is owned by the device poll transport")
+		}
+	}
 	dp, newPayload, err := dispatch.PrepareRedispatchPayload(rec.Payload, rec.DeliveryID)
 	if err != nil {
 		kind, unwrap := dispatch.RedispatchPrepFailure(err)

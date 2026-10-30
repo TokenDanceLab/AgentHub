@@ -58,5 +58,8 @@ func GlobalRateLimit(cacheClient *cache.Client) gin.HandlerFunc {
 // isAuthPath returns true if the request path is an authentication endpoint
 // that must always fail closed when Redis is unavailable.
 func isAuthPath(c *gin.Context) bool {
-	return strings.HasPrefix(c.Request.URL.Path, "/client/auth/")
+	path := c.Request.URL.Path
+	return strings.HasPrefix(path, "/client/auth/") ||
+		strings.HasPrefix(path, "/edge/enrollments/") ||
+		strings.HasPrefix(path, "/web/edge-enrollments/")
 }

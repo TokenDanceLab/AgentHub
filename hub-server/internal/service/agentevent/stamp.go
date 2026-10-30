@@ -15,6 +15,16 @@ import "encoding/json"
 //   - an existing `agent_task` ref is never overwritten;
 //   - empty task id or invalid json leaves the content unchanged.
 func StampAgentTaskRef(content string, taskID string) string {
+	return stampAgentTaskRef(content, taskID, "")
+}
+
+// StampAgentTaskFinalRef marks the completed reply, so live deltas can yield
+// to the authoritative history message without hiding runtime evidence.
+func StampAgentTaskFinalRef(content string, taskID string) string {
+	return stampAgentTaskRef(content, taskID, "done")
+}
+
+func stampAgentTaskRef(content string, taskID string, status string) string {
 	if taskID == "" || content == "" {
 		return content
 	}
@@ -25,7 +35,11 @@ func StampAgentTaskRef(content string, taskID string) string {
 	if _, exists := obj["agent_task"]; exists {
 		return content
 	}
-	ref, err := json.Marshal(map[string]string{"task_id": taskID})
+	fields := map[string]string{"task_id": taskID}
+	if status != "" {
+		fields["status"] = status
+	}
+	ref, err := json.Marshal(fields)
 	if err != nil {
 		return content
 	}

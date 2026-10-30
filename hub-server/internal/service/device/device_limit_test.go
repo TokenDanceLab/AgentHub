@@ -18,6 +18,8 @@ func setupDeviceLimitDB(t *testing.T) *gorm.DB {
 	t.Helper()
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	require.NoError(t, err)
+	require.NoError(t, db.Exec(`CREATE TABLE users (id TEXT PRIMARY KEY, deleted_at DATETIME)`).Error)
+	require.NoError(t, db.Exec(`INSERT INTO users (id) VALUES ('user-a'), ('user-b')`).Error)
 	require.NoError(t, db.Exec(`
 		CREATE TABLE devices (
 			id TEXT PRIMARY KEY,

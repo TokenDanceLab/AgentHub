@@ -259,8 +259,8 @@ func TestThreadTranscriptEmitter_ResultFallback(t *testing.T) {
 	if len(writer.items) != 1 {
 		t.Fatalf("CreateItem calls = %d, want 1", len(writer.items))
 	}
-	if writer.items[0].Content != "only-result" {
-		t.Fatalf("Content = %q, want only-result", writer.items[0].Content)
+	if writer.items[0].Content != " only-result " {
+		t.Fatalf("Content = %q, want original result whitespace", writer.items[0].Content)
 	}
 }
 

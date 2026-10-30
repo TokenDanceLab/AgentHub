@@ -203,6 +203,7 @@ export interface AgentHubWorkbenchProps {
      `devicesTargets === undefined` means the shell is not Hub-connected and
      the page renders sign-in guidance instead of an empty list. */
   devicesTargets?: import('./pages/DevicesPage').DevicesPageTarget[] | undefined;
+  devicesPairing?: React.ReactNode;
   devicesLoading?: boolean | undefined;
   devicesError?: string | null | undefined;
   onDevicesRetry?: (() => void) | undefined;

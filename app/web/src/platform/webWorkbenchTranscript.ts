@@ -165,9 +165,19 @@ export function resolveWebWorkbenchTranscript(
       : resolveDemoWorkbenchTranscript(conversationId || WORKBENCH_DEMO_FALLBACK_CONVERSATION_ID);
   }
   if (activeHubSessionId) {
+    const hubBlocks = normalizeHubMessagesToTranscript(messages, t);
+    const completedTasks = new Set(hubBlocks.flatMap((block) =>
+      block.kind === 'text' && block.author.role === 'agent' && block.agentTaskStatus === 'done' && block.agentTaskId
+        ? [block.agentTaskId] : []
+    ));
+    // Runtime evidence stays in the inspector/history; completed chat text is
+    // owned by the final Hub message, not a second rendering of its deltas.
+    const runtimeEvents = liveRuntimeEvents.filter((event) =>
+      !((event.event_type === 'run.agent.text_delta' || event.event_type === 'run.agent.text_block') && event.task_id && completedTasks.has(event.task_id))
+    );
     return orderTranscriptBlocks([
-      ...normalizeHubMessagesToTranscript(messages, t),
-      ...normalizeHubRuntimeEventsToTranscript(liveRuntimeEvents),
+      ...hubBlocks,
+      ...normalizeHubRuntimeEventsToTranscript(runtimeEvents),
     ]);
   }
   return isWorkbenchRealDataMode(dataMode)

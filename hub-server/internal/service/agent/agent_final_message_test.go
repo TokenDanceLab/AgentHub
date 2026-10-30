@@ -25,9 +25,9 @@ func TestShouldSkipDoneFinalInsert_IdenticalLatestAgentMessage(t *testing.T) {
 	mock.ExpectQuery(`FROM "messages"`).
 		WithArgs("sess-1", 1).
 		WillReturnRows(sqlmock.NewRows([]string{"id", "session_id", "seq_id", "client_msg_id", "sender_type", "sender_id", "content_type", "content"}).
-			AddRow("msg-9", "sess-1", int64(9), "cmid-9", model.SenderTypeAgent, "agent-1", "text", `{"content":"ANSWER"}`))
+			AddRow("msg-9", "sess-1", int64(9), "cmid-9", model.SenderTypeAgent, "agent-1", "text", `{"content":"ANSWER","agent_task":{"task_id":"task-1"}}`))
 
-	got := shouldSkipDoneFinalInsert(db, "sess-1", "agent-1", "ANSWER")
+	got := shouldSkipDoneFinalInsert(db, "sess-1", "agent-1", "ANSWER", "task-1")
 	assert.True(t, got)
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
@@ -41,7 +41,7 @@ func TestShouldSkipDoneFinalInsert_PartialStreamDoesNotSuppress(t *testing.T) {
 		WillReturnRows(sqlmock.NewRows([]string{"id", "session_id", "seq_id", "client_msg_id", "sender_type", "sender_id", "content_type", "content"}).
 			AddRow("msg-9", "sess-1", int64(9), "cmid-9", model.SenderTypeAgent, "agent-1", "text", `{"content":"PARTIAL"}`))
 
-	got := shouldSkipDoneFinalInsert(db, "sess-1", "agent-1", "PARTIAL ANSWER")
+	got := shouldSkipDoneFinalInsert(db, "sess-1", "agent-1", "PARTIAL ANSWER", "task-1")
 	assert.False(t, got)
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
@@ -55,7 +55,7 @@ func TestShouldSkipDoneFinalInsert_UserMessageAfterAgentDoesNotSuppress(t *testi
 		WillReturnRows(sqlmock.NewRows([]string{"id", "session_id", "seq_id", "client_msg_id", "sender_type", "sender_id", "content_type", "content"}).
 			AddRow("msg-9", "sess-1", int64(9), "cmid-9", model.SenderTypeUser, "user-1", "text", `{"text":"follow-up"}`))
 
-	got := shouldSkipDoneFinalInsert(db, "sess-1", "agent-1", "follow-up")
+	got := shouldSkipDoneFinalInsert(db, "sess-1", "agent-1", "follow-up", "task-1")
 	assert.False(t, got)
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
@@ -68,7 +68,7 @@ func TestShouldSkipDoneFinalInsert_NoMessages(t *testing.T) {
 		WithArgs("sess-1", 1).
 		WillReturnRows(sqlmock.NewRows([]string{"id", "session_id", "seq_id", "client_msg_id", "sender_type", "sender_id", "content_type", "content"}))
 
-	got := shouldSkipDoneFinalInsert(db, "sess-1", "agent-1", "ANSWER")
+	got := shouldSkipDoneFinalInsert(db, "sess-1", "agent-1", "ANSWER", "task-1")
 	assert.False(t, got)
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
@@ -78,7 +78,7 @@ func TestShouldSkipDoneFinalInsert_EmptyFinalContent(t *testing.T) {
 	defer sqlDB.Close()
 
 	// Empty final content short-circuits before any DB read.
-	got := shouldSkipDoneFinalInsert(db, "sess-1", "agent-1", "")
+	got := shouldSkipDoneFinalInsert(db, "sess-1", "agent-1", "", "task-1")
 	assert.False(t, got)
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
@@ -105,7 +105,7 @@ func TestHandleTaskDone_SkipsDuplicateFinalMessage(t *testing.T) {
 	mock.ExpectQuery(`FROM "messages"`).
 		WithArgs("sess-1", 1).
 		WillReturnRows(sqlmock.NewRows([]string{"id", "session_id", "seq_id", "client_msg_id", "sender_type", "sender_id", "content_type", "content"}).
-			AddRow("msg-9", "sess-1", int64(9), "cmid-9", model.SenderTypeAgent, "agent-1", "text", `{"content":"FINAL ANSWER"}`))
+			AddRow("msg-9", "sess-1", int64(9), "cmid-9", model.SenderTypeAgent, "agent-1", "text", `{"content":"FINAL ANSWER","agent_task":{"task_id":"task-done-dedup"}}`))
 
 	// Transaction must contain only the status update — no message insert.
 	mock.ExpectBegin()
@@ -170,9 +170,9 @@ func TestShouldSkipDoneFinalInsert_JSONCanonicalMatch(t *testing.T) {
 	mock.ExpectQuery(`FROM "messages"`).
 		WithArgs("sess-1", 1).
 		WillReturnRows(sqlmock.NewRows([]string{"id", "session_id", "seq_id", "client_msg_id", "sender_type", "sender_id", "content_type", "content"}).
-			AddRow("msg-9", "sess-1", int64(9), "cmid-9", model.SenderTypeAgent, "agent-1", "text", `{"summary":"42","action":"finish"}`))
+			AddRow("msg-9", "sess-1", int64(9), "cmid-9", model.SenderTypeAgent, "agent-1", "text", `{"summary":"42","action":"finish","agent_task":{"task_id":"task-1"}}`))
 
-	got := shouldSkipDoneFinalInsert(db, "sess-1", "agent-1", `{"action":"finish","summary":"42"}`)
+	got := shouldSkipDoneFinalInsert(db, "sess-1", "agent-1", `{"action":"finish","summary":"42"}`, "task-1")
 	assert.True(t, got)
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
@@ -182,6 +182,17 @@ func TestCanonicalContent(t *testing.T) {
 	assert.Equal(t, "plain text", canonicalContent("plain text"))
 	// The projection wrapper {"content": X} unwraps to X.
 	assert.Equal(t, "x", canonicalContent(`{"content":"x"}`))
+}
+
+func TestIdenticalAnswerFromPreviousTaskDoesNotSuppressNewTurn(t *testing.T) {
+	db := newAgentRunEventTestDB(t)
+	svc := &Service{db: db, bus: newTestBus(t), cacheClient: &mockAgentCache{}}
+	require.NoError(t, svc.HandleTaskDone(context.Background(), "user-1", "dev-1", "task-1", "run-1", "same answer"))
+	require.NoError(t, db.Model(&model.PendingAgentTask{}).Where("id = ?", "task-1").Updates(map[string]any{"id": "task-2", "status": model.TaskStatusRunning, "edge_run_id": "run-2"}).Error)
+	require.NoError(t, svc.HandleTaskDone(context.Background(), "user-1", "dev-1", "task-2", "run-2", "same answer"))
+	var messages []model.Message
+	require.NoError(t, db.Order("seq_id").Find(&messages).Error)
+	require.Len(t, messages, 2, "same text from different tasks is two distinct turns")
 }
 
 // #2274: the done-final message must carry the producing task ref, exactly

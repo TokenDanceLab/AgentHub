@@ -26,6 +26,7 @@ import { createHubClient } from '@/api/hubClient';
 import AuthPage from '@/components/AuthPage';
 import { LogoutDialog } from '@/components/LogoutDialog';
 import { StartConversationModal } from '@/components/StartConversationModal';
+import { EdgePairingPanel } from '@/components/EdgePairingPanel';
 import {
   createWebPlatform,
   resolveWebWorkbenchAgents,
@@ -323,6 +324,7 @@ function WebWorkbenchRoot() {
         agents={agents}
         composerExecutionTargets={workbench.composerExecutionTargets}
         devicesTargets={workbench.devicesTargets}
+        devicesPairing={hubReady ? <EdgePairingPanel /> : undefined}
         devicesLoading={workbench.devicesLoading}
         devicesError={workbench.devicesError}
         onDevicesRetry={workbench.onDevicesRetry}

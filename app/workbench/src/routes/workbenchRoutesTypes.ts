@@ -114,6 +114,7 @@ export interface WorkbenchRoutesProps {
   /* ── Devices / execution-target management (#1819) ── */
   /** Registered execution targets; undefined = shell not Hub-connected. */
   devicesTargets?: import('../pages/DevicesPage').DevicesPageTarget[] | undefined;
+  devicesPairing?: React.ReactNode;
   devicesLoading?: boolean | undefined;
   devicesError?: string | null | undefined;
   onDevicesRetry?: (() => void) | undefined;

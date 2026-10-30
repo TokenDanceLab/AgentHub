@@ -57,6 +57,11 @@ func TestMapSenderType(t *testing.T) {
 }
 
 func TestExtractMessageText(t *testing.T) {
+	t.Run("completed assistant text excludes Hub metadata and preserves whitespace", func(t *testing.T) {
+		msg := &model.Message{ContentType: model.ContentTypeText, Content: `{"content":"  answer\n\nend  ","agent_task":{"task_id":"task-1","status":"done"}}`}
+		assert.Equal(t, "  answer\n\nend  ", ExtractMessageText(msg))
+		assert.Equal(t, "  answer\n\nend  ", PromptFromMessage(msg))
+	})
 	t.Run("nil message", func(t *testing.T) {
 		assert.Equal(t, "", ExtractMessageText(nil))
 	})

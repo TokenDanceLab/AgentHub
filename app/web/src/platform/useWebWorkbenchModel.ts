@@ -27,6 +27,7 @@ import { useToastStore } from '@shared/ui/toast';
 import { friendlyErrorMessage } from '@shared/errorReporting';
 import { createHubClient, type HubCreateDocumentRequest, type Session, type HubMessage } from '@/api/hubClient';
 import { mergeMessageHistory, oldestMessageSequence } from './webMessageHistory';
+import { isDispatchableWebTarget, isPairedEdgeTarget } from './webPlatformDispatchHelpers';
 import {
   useHubExecutionTargets,
   usePingHubExecutionTarget,
@@ -513,11 +514,7 @@ export function useWebWorkbenchModel(dataMode: WorkbenchDataMode, selectedConver
 
   const executionTargets = useHubExecutionTargets({ enabled: hubReady });
   const onlineLocalEdgeTargets = useMemo(
-    () => (executionTargets.data?.items ?? []).filter((target) =>
-      target.target_type === 'local_edge' &&
-      target.is_online === true &&
-      (target.health_state === 'online' || target.health_state === 'healthy')
-    ),
+    () => (executionTargets.data?.items ?? []).filter(isDispatchableWebTarget),
     [executionTargets.data],
   );
   const composerExecutionTargets = useMemo(
@@ -527,14 +524,16 @@ export function useWebWorkbenchModel(dataMode: WorkbenchDataMode, selectedConver
           const name = target.name ? String(target.name) : '';
           return {
             id,
-            label: name ? `${name} (${id})` : id,
+            label: isPairedEdgeTarget(target)
+              ? t('edgePairing.targetLabel', { ns: 'common', name: name || id })
+              : name ? `${name} (${id})` : id,
             // Already filtered to online + healthy above; the explicit marker
             // lets session-chrome default selection trust the entry (#1819).
             healthy: true,
           };
         })
       : undefined,
-    [hubReady, realMode, onlineLocalEdgeTargets],
+    [hubReady, realMode, onlineLocalEdgeTargets, t],
   );
   const executionTargetStatus = useMemo(
     () => resolveWebExecutionTargetStatus({

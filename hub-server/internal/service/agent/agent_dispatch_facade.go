@@ -7,6 +7,15 @@ import (
 	"github.com/agenthub/hub-server/internal/service/dispatchsvc"
 )
 
+// SetPairedDeviceService installs the separate credential-bound pull transport.
+// Construction-time only; no browser/native authentication behavior changes.
+func (s *Service) SetPairedDeviceService(p dispatchsvc.PairedDevicePort) {
+	if s.dispatch == nil {
+		s.dispatch = s.dispatchService()
+	}
+	s.dispatch.SetPairedDeviceService(p)
+}
+
 // ── Service facade (wiring/handler stability) ───────────────────────────
 //
 // Thin delegating methods that forward Service API surface to the composed

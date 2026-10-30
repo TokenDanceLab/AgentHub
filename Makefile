@@ -76,7 +76,7 @@ test-oidc:
 
 # Hub 集成 lane（//go:build integration，需 PG + Redis service 容器）。
 test-hub-integration:
-	cd hub-server && go test -tags integration ./tests/integration/ -count=1 -timeout 300s
+	cd hub-server && go test -tags integration ./tests/integration/ ./internal/service/edgeenrollment/ ./internal/service/edgedevice/ -count=1 -timeout 300s
 
 # 零依赖 E2E 组合（无需 PG/Redis/真实 CLI）。
 e2e-local: test-edge-e2e test-teamrun test-oidc

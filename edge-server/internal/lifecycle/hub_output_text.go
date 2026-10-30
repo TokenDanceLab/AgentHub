@@ -45,24 +45,24 @@ func (c *hubOutputCollector) Append(text string) {
 }
 
 func (c *hubOutputCollector) SetFallback(text string) {
-	if text == "" {
+	if strings.TrimSpace(text) == "" {
 		return
 	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if c.fallback == "" {
-		c.fallback = strings.TrimSpace(text)
+		c.fallback = text
 	}
 }
 
 func (c *hubOutputCollector) Final() string {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	content := strings.TrimSpace(c.builder.String())
+	content := c.builder.String()
 	if content == "" {
 		content = c.fallback
 	}
-	if content == "" {
+	if strings.TrimSpace(content) == "" {
 		return ""
 	}
 	if c.truncated {

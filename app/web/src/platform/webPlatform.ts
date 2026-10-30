@@ -12,6 +12,7 @@ import type { AttachmentRef, ComposerAttachment, ComposerIntent, ComposerSubmitR
 import { computeFileHash } from '@shared/composer';
 import { isTurnInProgressError } from '@shared/errors';
 import { webQueryKeys } from '@shared/stores/queryKeys';
+import { fetchAllPages } from '@shared/hub/paginate';
 import { queryClient as defaultQueryClient } from '@/api/queryClient';
 import {
   createHubClient,
@@ -28,7 +29,10 @@ import { createWebSettingsAdapter } from './webSettingsAdapter';
 import { recordWebAgentTaskIndex } from './webPlatformAgentTask';
 import {
   buildHubAgentTaskModelParams,
-  isDispatchableLocalEdgeTarget,
+  isDispatchableWebTarget,
+  isPairedEdgeTarget,
+  validatePairedEdgeIntent,
+  buildPairedEdgeModelParams,
   targetDispatchBlockerLabel,
 } from './webPlatformDispatchHelpers';
 import { webConversations } from './webPlatformFixtures';
@@ -322,25 +326,26 @@ async function submitWebComposerIntent(
   const assertSession = () => {
     if (generation !== getBrowserSessionGeneration()) throw new DOMException('Session changed', 'AbortError');
   };
-  // Upload any attachments that have a File reference but no server-side ref yet
-  const pendingUploads = intent.attachments.filter((a) => a.file && !a.attachmentRef);
-  const enrichedAttachments = pendingUploads.length > 0
-    ? await uploadPendingAttachments(intent)
-    : intent.attachments;
-  const enrichedIntent = { ...intent, attachments: enrichedAttachments };
-  assertSession();
-
   // #1406 @agent 派单：选取 dispatchRole !== 'context' 的第一个 mention 作为派单目标。
   // backward-compat：已有 mention（无 dispatchRole）视为可派单；显式 'context' 跳过。
-  const dispatchMention = enrichedIntent.mentions.find(
+  const dispatchMention = intent.mentions.find(
     (m) => m.dispatchRole !== 'context',
   );
   if (dispatchMention && !dispatchMention.runtimeId) {
     throw new Error(`Mentioned Hub agent "${dispatchMention.label}" is missing a runtime id.`);
   }
   const dispatchTarget = dispatchMention
-    ? await resolveWebDispatchTarget(hubClient, (enrichedIntent as WebComposerIntent).executionTargetId)
+    ? await resolveWebDispatchTarget(hubClient, (intent as WebComposerIntent).executionTargetId)
     : undefined;
+  if (dispatchTarget) validatePairedEdgeIntent(dispatchTarget, intent);
+  assertSession();
+  // Validate the execution contract before uploading or persisting anything.
+  const pendingUploads = intent.attachments.filter((a) => a.file && !a.attachmentRef);
+  const enrichedAttachments = pendingUploads.length > 0
+    ? await uploadPendingAttachments(intent)
+    : intent.attachments;
+  const enrichedIntent = { ...intent, attachments: enrichedAttachments };
+  assertSession();
   const agentInstance = dispatchMention
     ? await ensureMentionedAgentInstance(hubClient, enrichedIntent.conversationId, dispatchMention, options.queryClient)
     : undefined;
@@ -419,6 +424,7 @@ async function redispatchWebTask(
     hubClient,
     (intent as WebComposerIntent).executionTargetId,
   );
+  validatePairedEdgeIntent(dispatchTarget, intent);
   const agentInstance = await ensureMentionedAgentInstance(
     hubClient,
     intent.conversationId,
@@ -523,7 +529,7 @@ async function triggerMentionedAgent(
   hubClient: WebRunHubClient,
   triggerMessageId: string,
   agentInstanceId: string | undefined,
-  target: Pick<ExecutionTarget, 'id'> | undefined,
+  target: ExecutionTarget | undefined,
   intent: ComposerIntent,
 ): Promise<PendingAgentTask> {
   if (!agentInstanceId) {
@@ -535,27 +541,26 @@ async function triggerMentionedAgent(
   return hubClient.triggerAgentTask(triggerMessageId, {
     agent_instance_id: agentInstanceId,
     target_id: target.id,
-    model_params: JSON.stringify(buildHubAgentTaskModelParams(intent)),
+    // A paired Edge's server-owned workspace cannot be overridden by a browser.
+    model_params: JSON.stringify(isPairedEdgeTarget(target) ? buildPairedEdgeModelParams(intent) : buildHubAgentTaskModelParams(intent)),
   });
 }
 
 async function resolveWebDispatchTarget(
   hubClient: WebRunHubClient,
   executionTargetId: string | undefined,
-): Promise<Pick<ExecutionTarget, 'id'>> {
+): Promise<ExecutionTarget> {
   const requestedTargetId = executionTargetId?.trim();
   if (!requestedTargetId) {
     throw new Error('Select a Desktop/Edge target before Web can dispatch real Hub work.');
   }
-  if (!hubClient.listExecutionTargets) {
+  const listExecutionTargets = hubClient.listExecutionTargets;
+  if (!listExecutionTargets) {
     throw new Error('Hub execution target inventory is required for Web Hub dispatch.');
   }
-  const inventory = await hubClient.listExecutionTargets({
-    target_type: 'local_edge',
-    pageSize: 50,
-  });
-  const onlineLocalEdgeTargets = inventory.items.filter(isDispatchableLocalEdgeTarget);
-  const target = onlineLocalEdgeTargets.find((item) => item.id === requestedTargetId);
+  const inventory = await fetchAllPages((params) => listExecutionTargets(params), { pageSize: 50, maxPages: 10 });
+  const dispatchableTargets = inventory.items.filter(isDispatchableWebTarget);
+  const target = dispatchableTargets.find((item) => item.id === requestedTargetId);
   if (!target) {
     const requested = inventory.items.find((item) => item.id === requestedTargetId);
     if (requested) {

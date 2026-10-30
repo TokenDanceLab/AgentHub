@@ -3,6 +3,7 @@ package router
 import (
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
 
@@ -21,6 +22,54 @@ import (
 // form fields and boundary markers sit on top of the raw file bytes, so a
 // file at exactly MaxSize would exceed a body limit of exactly MaxSize.
 const uploadMultipartHeadroom int64 = 1 << 20 // 1 MiB
+
+func pairedHandler(device *handler.DeviceHandler) *handler.EdgeEnrollmentHandler {
+	if device == nil {
+		return nil
+	}
+	return device.Paired
+}
+
+func legacyCallbackMiddleware(device *handler.DeviceHandler) gin.HandlerFunc {
+	if h := pairedHandler(device); h != nil {
+		return h.LegacyCallback
+	}
+	return func(c *gin.Context) { c.Next() }
+}
+
+func setupPairedEdgeRoutes(r *gin.Engine, auth *middleware.AuthMiddleware, cacheClient *cache.Client, h *handler.EdgeEnrollmentHandler, agent *handler.AgentHandler) {
+	if h == nil {
+		return
+	}
+	body := middleware.BodyLimit(config.DefaultRequestBodyLimit)
+	timeout := middleware.Timeout(config.DefaultRequestTimeout)
+	limit := func(scope string, n int, user bool) gin.HandlerFunc {
+		return middleware.RateLimit(cacheClient, n, time.Minute, func(c *gin.Context) string {
+			key := scope + ":" + c.ClientIP()
+			if user {
+				key += ":" + c.GetString("user_id")
+			}
+			return key
+		})
+	}
+	enroll := r.Group("/edge/enrollments", body, timeout)
+	enroll.POST("/start", limit("edge-enroll-start", 6, false), h.Start)
+	enroll.POST("/exchange", limit("edge-enroll-exchange", 60, false), h.Exchange)
+	web := r.Group("/web", body, timeout, auth.Handler(), auth.RequireHubSession())
+	web.POST("/edge-enrollments/preview", limit("edge-enroll-confirm", 12, true), h.Preview)
+	web.POST("/edge-enrollments/confirm", limit("edge-enroll-confirm", 12, true), h.Confirm)
+	web.POST("/edge-devices/:device_id/revoke", h.Revoke)
+	device := r.Group("/edge/device", body, h.DeviceAuth)
+	device.POST("/heartbeat", timeout, h.Heartbeat)
+	// Poll's 20-second contract must not inherit the normal 15-second guard.
+	device.GET("/poll", middleware.Timeout(25*time.Second), h.Poll)
+	device.POST("/controls/:control_id/ack", timeout, h.AckControl)
+	tasks := device.Group("/tasks", timeout, h.TaskAuthorization)
+	tasks.POST("/:id/ack", agent.TaskAck)
+	tasks.POST("/:id/stream", agent.TaskStream)
+	tasks.POST("/:id/done", agent.TaskDone)
+	tasks.POST("/:id/fail", agent.TaskFail)
+}
 
 func SetupRoutes(r *gin.Engine, cfg *config.Config, authMW *middleware.AuthMiddleware, jwtSecret string, cacheClient *cache.Client, authHandler *handler.AuthHandler, wsHandler *handler.WebSocketHandler, deviceHandler *handler.DeviceHandler, contactHandler *handler.ContactHandler, sessionHandler *handler.SessionHandler, messageHandler *handler.MessageHandler, agentHandler *handler.AgentHandler, customAgentHandler *handler.CustomAgentHandler, attachmentHandler *handler.AttachmentHandler, notificationHandler *handler.NotificationHandler, healthHandler *handler.HealthHandler, publicHandler *handler.PublicHandler, oidcHandler *handler.OIDCHandler, agentProfileHandler *handler.AgentProfileHandler, skillHandler *handler.SkillHandler, mcpHandler *handler.MCPServerHandler, marketHandler *handler.MarketHandler, pbHandler *handler.ProviderBindingHandler, targetHandler *handler.ExecutionTargetHandler, auditHandler *handler.AuditHandler, relayHandler *handler.RelayHandler, agentTeamHandler *handler.AgentTeamHandler, documentHandler *handler.DocumentHandler, settingsHandler *handler.UserSettingsHandler, workspaceHandlers ...*handler.WorkspaceHandler) error {
 	var workspaceHandler *handler.WorkspaceHandler
@@ -60,6 +109,7 @@ func SetupRoutes(r *gin.Engine, cfg *config.Config, authMW *middleware.AuthMiddl
 	// is registered separately below with upload-specific limits.
 	guardBody := middleware.BodyLimit(config.DefaultRequestBodyLimit)
 	guardTimeout := middleware.Timeout(config.DefaultRequestTimeout)
+	setupPairedEdgeRoutes(r, authMW, cacheClient, pairedHandler(deviceHandler), agentHandler)
 
 	if healthHandler != nil {
 		r.GET("/health", guardBody, guardTimeout, healthHandler.Check)
@@ -251,10 +301,11 @@ func SetupRoutes(r *gin.Engine, cfg *config.Config, authMW *middleware.AuthMiddl
 		// AGENTHUB_RATE_LIMIT_FAIL_OPEN (default fail-open). Re-registering an
 		// existing device_id still counts against the frequency window.
 		edge.POST("/devices/register", middleware.RateLimit(cacheClient, config.AuthRegisterRateLimit, config.AuthRateLimitWindow, middleware.IPKey), deviceHandler.Register)
-		edge.POST("/agent-tasks/:id/ack", agentHandler.TaskAck)
-		edge.POST("/agent-tasks/:id/stream", agentHandler.TaskStream)
-		edge.POST("/agent-tasks/:id/done", agentHandler.TaskDone)
-		edge.POST("/agent-tasks/:id/fail", agentHandler.TaskFail)
+		legacyCallback := legacyCallbackMiddleware(deviceHandler)
+		edge.POST("/agent-tasks/:id/ack", legacyCallback, agentHandler.TaskAck)
+		edge.POST("/agent-tasks/:id/stream", legacyCallback, agentHandler.TaskStream)
+		edge.POST("/agent-tasks/:id/done", legacyCallback, agentHandler.TaskDone)
+		edge.POST("/agent-tasks/:id/fail", legacyCallback, agentHandler.TaskFail)
 	}
 
 	// Cloud Edge registration (authenticated, no device type restriction).

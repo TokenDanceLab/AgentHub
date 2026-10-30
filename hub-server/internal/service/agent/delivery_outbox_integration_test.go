@@ -40,6 +40,8 @@ func newOutboxDB(t *testing.T) *gorm.DB {
 			id TEXT PRIMARY KEY,
 			task_id TEXT NOT NULL,
 			delivery_id TEXT NOT NULL UNIQUE,
+			transport TEXT NOT NULL DEFAULT 'push',
+			paired_credential_hash TEXT NOT NULL DEFAULT '',
 			payload TEXT NOT NULL,
 			status TEXT NOT NULL DEFAULT 'pending',
 			attempt_count INTEGER NOT NULL DEFAULT 0,
@@ -78,6 +80,9 @@ func newOutboxDB(t *testing.T) *gorm.DB {
 			created_at DATETIME,
 			dispatched_at DATETIME,
 			finished_at DATETIME,
+			cancel_requested_at DATETIME,
+			cancel_applied_at DATETIME,
+			cancel_error TEXT NOT NULL DEFAULT '',
 			expire_at DATETIME NOT NULL
 		)`,
 		`CREATE TABLE sessions (

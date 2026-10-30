@@ -28,13 +28,25 @@ type startedProcess struct {
 	hasAdapter      bool
 }
 
-// buildAndStartProcess constructs the command, opens pipes, starts the
-// subprocess, and performs post-start setup (process tracking, stdin
-// management, metrics, status transition).
-//
-// On failure, it publishes the error/cancellation event and returns a
-// non-nil error — the caller must return from run() immediately.
-// On success, the returned startedProcess is ready for output collection.
+func (e *ProcessExecutor) snapshotWorkdir(run store.Run, workDir string) {
+	if workDir == "" || e.textOnly {
+		return
+	}
+	snapshot := adapters.TakeWorkdirSnapshot(workDir)
+	e.mu.Lock()
+	e.workDirs[run.ID] = workDir
+	e.surfacers[run.ID] = snapshot
+	e.mu.Unlock()
+	// Persist and publish the checkpoint before run.started. An inaccessible
+	// workdir produces no snapshot and must not claim checkpoint evidence.
+	if snapshot != nil {
+		e.publishRunCheckpoint(run, workDir, snapshot)
+	}
+}
+
+// buildAndStartProcess constructs and starts the command, then tracks its
+// process, stdin, metrics and status. On error the caller must stop the run;
+// on success the returned process is ready for output collection.
 func (e *ProcessExecutor) buildAndStartProcess(
 	ctx context.Context,
 	run store.Run,
@@ -70,21 +82,7 @@ func (e *ProcessExecutor) buildAndStartProcess(
 		e.bus.Publish(adapters.BusEventCLIInvocationPlan, runScope(run), plan.Payload())
 	}
 
-	// Pre-run workdir snapshot for auto-surface.
-	if workDir != "" {
-		snapshot := adapters.TakeWorkdirSnapshot(workDir)
-		e.mu.Lock()
-		e.workDirs[run.ID] = workDir
-		e.surfacers[run.ID] = snapshot
-		e.mu.Unlock()
-		// #1968 checkpoint evidence: persist the pre-run snapshot and emit the
-		// checkpoint event before run.started so the timeline card precedes
-		// run output. A nil snapshot (empty/inaccessible workdir) is an honest
-		// absence — no checkpoint event, no card.
-		if snapshot != nil {
-			e.publishRunCheckpoint(run, workDir, snapshot)
-		}
-	}
+	e.snapshotWorkdir(run, workDir)
 
 	_, extraEnv, err := e.profile.ExtraEnvTemplate.Expand(runCtx)
 	if err != nil {

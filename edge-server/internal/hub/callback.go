@@ -39,6 +39,8 @@ import (
 // client, assembled at the composition root (#1564). Zero fields fall back to
 // DefaultCallbackConfig semantics.
 type CallbackConfig struct {
+	// DeviceMode selects the isolated enrolled-device callback endpoints.
+	DeviceMode bool
 	// Timeout bounds each individual request (default 30s).
 	Timeout time.Duration
 	// MaxAttempts is the total number of attempts including the first
@@ -303,6 +305,13 @@ func (c *CallbackClient) TaskAck(ctx context.Context, taskID string, runID strin
 // (older callers that cannot derive one still work, they just lose replay
 // protection). The body carries client_msg_id alongside run_id and content.
 func (c *CallbackClient) TaskStream(ctx context.Context, taskID string, runID string, clientMsgID string, content string) error {
+	if c.cfg.DeviceMode {
+		payload, err := json.Marshal(map[string]string{"content": content})
+		if err != nil {
+			return err
+		}
+		return c.TaskStreamEvent(ctx, taskID, runID, clientMsgID, "run.agent.text_delta", payload)
+	}
 	return c.callback(ctx, taskID, "stream", runID, map[string]string{
 		"run_id":        runID,
 		"client_msg_id": clientMsgID,
@@ -334,6 +343,15 @@ func (c *CallbackClient) TaskStreamEvent(ctx context.Context, taskID string, run
 
 // TaskDone reports that the task has completed successfully.
 func (c *CallbackClient) TaskDone(ctx context.Context, taskID string, result TaskResult) error {
+	if c.cfg.DeviceMode && result.FinalContent != "" {
+		// Paired SDK output is text, even when the model emits valid JSON.
+		// Keep model-produced fields out of Hub-owned message metadata.
+		content, err := json.Marshal(map[string]string{"content": result.FinalContent})
+		if err != nil {
+			return err
+		}
+		result.FinalContent = string(content)
+	}
 	return c.callback(ctx, taskID, "done", result.RunID, map[string]string{
 		"run_id":        result.RunID,
 		"final_content": result.FinalContent,
@@ -380,7 +398,11 @@ func (c *CallbackClient) callback(ctx context.Context, taskID string, action str
 // callbacks and the typed stream request share this single serializer and
 // retry loop.
 func (c *CallbackClient) callbackWithRetry(ctx context.Context, taskID string, action string, runID string, body any, retryableAction bool) error {
-	url := fmt.Sprintf("%s/edge/agent-tasks/%s/%s", c.hubURL, taskID, action)
+	prefix := "/edge/agent-tasks/"
+	if c.cfg.DeviceMode {
+		prefix = "/edge/device/tasks/"
+	}
+	url := fmt.Sprintf("%s%s%s/%s", c.hubURL, prefix, taskID, action)
 
 	payload, err := json.Marshal(body)
 	if err != nil {

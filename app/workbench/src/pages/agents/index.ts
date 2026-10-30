@@ -40,7 +40,6 @@ export {
 
 export {
   EDIT_ENGINE_OPTIONS,
-  EDIT_MODEL_OPTIONS,
   EDIT_MODE_OPTIONS,
   TOOL_PERMISSION_LABELS,
   buildStatusNoticeClassName,

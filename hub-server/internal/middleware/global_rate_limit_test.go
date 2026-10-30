@@ -92,6 +92,9 @@ func TestGlobalRateLimitFailClosed_AuthPath(t *testing.T) {
 		"/client/auth/oidc/callback",
 		"/client/auth/me",
 		"/client/auth/logout",
+		"/edge/enrollments/start",
+		"/edge/enrollments/exchange",
+		"/web/edge-enrollments/confirm",
 	}
 
 	for _, path := range tests {
@@ -143,6 +146,11 @@ func TestIsAuthPath(t *testing.T) {
 		{"/client/auth/me", true},
 		{"/client/auth/logout", true},
 		{"/client/auth/", true},
+		{"/edge/enrollments/start", true},
+		{"/edge/enrollments/exchange", true},
+		{"/web/edge-enrollments/confirm", true},
+		{"/web/edge-enrollments/preview", true},
+		{"/edge/device/poll", false},
 		{"/api/test", false},
 		{"/client/ws", false},
 		{"/client/sessions", false},
