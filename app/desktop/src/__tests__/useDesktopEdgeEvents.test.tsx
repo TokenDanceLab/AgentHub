@@ -158,13 +158,12 @@ describe('useDesktopEdgeEvents batching', () => {
     });
 
     // The final transcript must reflect exactly the 2 unique events merged
-    // into one text block (same author+run). The normalizer strips trailing
-    // whitespace from each delta, so the merged text is 'firstsecond'.
+    // into one text block (same author+run), retaining original delta whitespace.
     const finalBlocks = seenTranscripts[seenTranscripts.length - 1] ?? [];
     expect(finalBlocks).toHaveLength(1);
     const mergedBlock = finalBlocks[0] as { kind: string; text: string };
     expect(mergedBlock.kind).toBe('text');
-    expect(mergedBlock.text).toBe('firstsecond');
+    expect(mergedBlock.text).toBe('first second ');
   });
 
   it('flushes pending events and closes the stream on unmount', () => {
