@@ -177,7 +177,7 @@ describe('normalizeEdgeEventsToTranscript', () => {
       }, '2026-06-07T03:00:03Z'),
     ]);
 
-    expect(blocks.map((block) => block.id)).toEqual(['edge-event-evt-early', 'edge-event-evt-late']);
+    expect(blocks.map((block) => block.id)).toEqual(['edge-event-evt-early', 'edge-event-evt-empty']);
     expect(blocks[0]).toEqual(expect.objectContaining({
       author: { id: 'edge', name: 'Edge', role: 'system' },
       kind: 'text',
@@ -508,7 +508,7 @@ describe('normalizeEdgeEventsToTranscript edge cases', () => {
 
     expect(blocks).toHaveLength(1);
     expect(blocks[0]!.kind).toBe('text');
-    expect((blocks[0]! as { text: string }).text).toBe('Part1,2, 3.');
+    expect((blocks[0]! as { text: string }).text).toBe('Part 1, 2, 3.');
   });
 
   it('merges consecutive thinking blocks into a single thinking block', () => {
@@ -725,7 +725,7 @@ describe('normalizeEdgeEventsToTranscript edge cases', () => {
     expect((blocks[0]! as { text: string }).text).toBe('Valid content.');
   });
 
-  it('filters out empty-payload and whitespace-only blocks', () => {
+  it('filters empty diagnostics but preserves whitespace deltas inside the reply', () => {
     const blocks = normalizeEdgeEventsToTranscript([
       edgeEvent('evt-empty-text', 1, 'run.output', {
         runId: 'run-x',
@@ -742,7 +742,7 @@ describe('normalizeEdgeEventsToTranscript edge cases', () => {
     ]);
 
     expect(blocks).toHaveLength(1);
-    expect((blocks[0]! as { text: string }).text).toBe('real content');
+    expect((blocks[0]! as { text: string }).text).toBe('\n\t  real content');
   });
 
   it('preserves merge behavior across sorted-out-of-order text_delta events', () => {
@@ -764,7 +764,7 @@ describe('normalizeEdgeEventsToTranscript edge cases', () => {
 
     expect(blocks).toHaveLength(1);
     expect(blocks[0]!.id).toBe('edge-event-evt-early'); // Earliest timestamp wins as base block ID
-    expect((blocks[0]! as { text: string }).text).toBe('Should besortedlast.');
+    expect((blocks[0]! as { text: string }).text).toBe('Should be sorted last.');
   });
 
   // ── 7. Newly-wired real edge-server events ────────────────────────────

@@ -32,6 +32,46 @@ interface BackendRequestLog {
 }
 
 test.describe('Web shared chat flow contract', () => {
+  test('replaces paired live deltas with one completed history reply after refresh', async ({ page }, testInfo) => {
+    const chunks = ['PAIRED_STREAM_BEGIN\n\n', 'A long paragraph remains one reply. '.repeat(80), '\n\nPAIRED_STREAM_END'];
+    const reply = chunks.join('');
+    const options: ChatFlowHubStubOptions = {
+      // A done summary alone must not discard live text before history arrives.
+      taskStatus: 'done',
+      messages: [],
+      runtimeEvents: chunks.map((content, index) => ({
+        id: `paired-delta-${index}`, task_id: TASK_ID, edge_run_id: 'run-paired',
+        session_id: SESSION_ID, agent_instance_id: 'agent-builder', agent_label: 'Builder',
+        event_seq: index + 1, event_type: 'run.agent.text_delta', payload: { content },
+        created_at: `2026-06-26T08:00:0${index + 1}Z`,
+      })),
+    };
+    const backendRequests = await installChatFlowHubStub(page, options);
+    await enterApprovedRealHubSession(page, { activeTaskStatus: 'done' });
+    const replies = page.getByRole('log').locator('[data-slot=aui_assistant-message-root]');
+    await expect(replies).toHaveCount(1);
+    await expect(replies).toContainText('PAIRED_STREAM_BEGIN');
+    await expect(replies).toContainText('PAIRED_STREAM_END');
+    await page.screenshot({ path: testInfo.outputPath('paired-live-reply.png') });
+
+    options.messages = [{
+      id: 'paired-final-message', session_id: SESSION_ID, seq_id: 1,
+      sender_type: 'agent', sender_id: 'agent-builder', content_type: 'text',
+      content: { content: reply, agent_task: { task_id: TASK_ID, status: 'done' } },
+      created_at: '2026-06-26T08:00:04Z',
+    }];
+    await page.reload();
+    await expect(page.getByRole('heading', { name: 'Chat flow contract' })).toBeVisible();
+    await expect(page.getByRole('log').locator('[data-block-id="hub-message-paired-final-message"]')).toBeVisible();
+    await expect(replies).toHaveCount(1);
+    await expect(replies).toContainText('PAIRED_STREAM_BEGIN');
+    await expect(replies).toContainText('PAIRED_STREAM_END');
+    await expect(page.getByRole('log').locator('[data-block-id^="edge-event-hub-runtime-paired-delta-"]')).toHaveCount(0);
+    await expect.poll(() => horizontalOverflow(page)).toBeLessThanOrEqual(1);
+    await page.screenshot({ path: testInfo.outputPath('paired-final-reply.png') });
+    assertE2EDataModeScenario(WEB_CHAT_FLOW_SCENARIO, backendRequests.requests);
+  });
+
   test('keeps the assistant-ui composer usable in both themes and compact viewports', async ({ page }, testInfo) => {
     await installChatFlowHubStub(page, { taskStatus: 'done' });
     await enterApprovedRealHubSession(page, { activeTaskStatus: 'done' });
@@ -206,6 +246,9 @@ async function enterApprovedRealHubSession(
 }
 
 interface ChatFlowHubStubOptions {
+  /** Explicit stubbed data; never real Account/model evidence. */
+  messages?: unknown[];
+  runtimeEvents?: unknown[];
   messagePostDelayMs?: number;
   /**
    * Task status reported by the stubbed events/summary endpoints. Must stay
@@ -322,7 +365,7 @@ async function fulfillHubRoute(
   }
 
   if (pathname === `/client/sessions/${SESSION_ID}/messages`) {
-    await route.fulfill(json(hubEnvelope([{
+    await route.fulfill(json(hubEnvelope(options.messages ?? [{
       id: 'message-chat-flow-user',
       session_id: SESSION_ID,
       seq_id: 1,
@@ -374,7 +417,7 @@ async function fulfillHubRoute(
   }
 
   if (pathname === `/web/agent-tasks/${TASK_ID}/events`) {
-    await route.fulfill(json(hubEnvelope(chatFlowEvents())));
+    await route.fulfill(json(hubEnvelope(options.runtimeEvents ?? chatFlowEvents())));
     return;
   }
 

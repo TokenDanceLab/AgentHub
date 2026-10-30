@@ -213,6 +213,7 @@ function normalizeHubMessage(
     // (`agent_task.task_id`, stamped by hub's edge callback paths); without
     // writing it onto the block the shell cannot offer an honest regenerate.
     ...(metadata?.agentTask?.task_id ? { agentTaskId: metadata.agentTask.task_id } : {}),
+    ...(metadata?.agentTask?.task_id && metadata.agentTask.status === 'done' ? { agentTaskStatus: 'done' as const } : {}),
     kind: 'text',
     text,
     ...(visibleState.displayTitle ? { displayTitle: visibleState.displayTitle } : {}),

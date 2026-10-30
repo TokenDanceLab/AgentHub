@@ -4,6 +4,7 @@ package edgedevice_test
 
 import (
 	"context"
+	"encoding/json"
 	"os"
 	"strings"
 	"sync"
@@ -129,13 +130,22 @@ func TestPostgresTriggerCallbacksPersistSecondTurnAndCancelReceipt(t *testing.T)
 	require.Len(t, poll.Deliveries, 1)
 	require.NoError(t, f.service.AuthorizeTask(ctx, f.p, first.ID))
 	require.NoError(t, svc.HandleTaskAck(ctx, f.auth.UserID, f.p.DeviceID, first.ID, "first-run"))
-	stream := model.AgentRunEventInput{EventType: model.RunEventTypeOutputBatch, Content: "The remembered value is 42.", ClientMsgID: uuid.NewString()}
-	require.NoError(t, svc.HandleTaskStream(ctx, f.auth.UserID, f.p.DeviceID, first.ID, "first-run", stream))
-	require.NoError(t, svc.HandleTaskStream(ctx, f.auth.UserID, f.p.DeviceID, first.ID, "first-run", stream))
+	chunks := []string{"  The remembered value ", "is 42.\n", "\n", "tail  "}
+	for _, text := range chunks {
+		stream := model.AgentRunEventInput{RuntimeOnly: true, EventType: "run.agent.text_delta", Content: text, ClientMsgID: uuid.NewString()}
+		require.NoError(t, svc.HandleTaskStream(ctx, f.auth.UserID, f.p.DeviceID, first.ID, "first-run", stream))
+		require.NoError(t, svc.HandleTaskStream(ctx, f.auth.UserID, f.p.DeviceID, first.ID, "first-run", stream))
+	}
+	result := model.AgentRunEventInput{RuntimeOnly: true, EventType: "run.agent.result", Payload: json.RawMessage(`{"success":true}`), ClientMsgID: uuid.NewString()}
+	require.NoError(t, svc.HandleTaskStream(ctx, f.auth.UserID, f.p.DeviceID, first.ID, "first-run", result))
 	var eventCount int64
 	require.NoError(t, f.db.Model(&model.AgentRunEvent{}).Where("task_id = ?", first.ID).Count(&eventCount).Error)
-	require.EqualValues(t, 1, eventCount, "stream retry must preserve the existing typed event identity")
-	require.NoError(t, svc.HandleTaskDone(ctx, f.auth.UserID, f.p.DeviceID, first.ID, "first-run", "The remembered value is 42."))
+	require.EqualValues(t, len(chunks)+1, eventCount, "stream retry must preserve the existing typed event identity")
+	var beforeFinal int64
+	require.NoError(t, f.db.Model(&model.Message{}).Where("session_id = ?", f.agent.SessionID).Count(&beforeFinal).Error)
+	require.EqualValues(t, 1, beforeFinal, "runtime evidence must not contaminate chat history")
+	answer := strings.Join(chunks, "")
+	require.NoError(t, svc.HandleTaskDone(ctx, f.auth.UserID, f.p.DeviceID, first.ID, "first-run", answer))
 	var persisted []model.Message
 	require.NoError(t, f.db.Where("session_id = ?", f.agent.SessionID).Order("seq_id").Find(&persisted).Error)
 	require.Len(t, persisted, 2)
@@ -159,6 +169,7 @@ func TestPostgresTriggerCallbacksPersistSecondTurnAndCancelReceipt(t *testing.T)
 	require.Equal(t, "user", req.Messages[0].Role)
 	require.Equal(t, "assistant", req.Messages[1].Role)
 	require.Contains(t, req.Messages[1].Content, "42")
+	require.Equal(t, answer, req.Messages[1].Content)
 	require.NoError(t, svc.HandleTaskAck(ctx, f.auth.UserID, f.p.DeviceID, second.ID, "second-run"))
 	require.NoError(t, svc.CancelTask(ctx, f.auth.UserID, second.ID))
 	require.Equal(t, model.TaskStatusRunning, f.task(t, second.ID).Status)

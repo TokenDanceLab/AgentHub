@@ -31,6 +31,10 @@ type AgentRunEvent struct {
 }
 
 func (e *AgentRunEvent) BeforeCreate(tx *gorm.DB) error {
+	// Typed text callbacks use their deterministic UUID as durable event identity.
+	if e.ID != "" {
+		return nil
+	}
 	id, err := uuidv7.New()
 	if err != nil {
 		return err
@@ -40,6 +44,8 @@ func (e *AgentRunEvent) BeforeCreate(tx *gorm.DB) error {
 }
 
 type AgentRunEventInput struct {
+	// RuntimeOnly is set by the authenticated paired-device handler, never wire input.
+	RuntimeOnly bool            `json:"-"`
 	EventType   string          `json:"event_type,omitempty"`
 	Payload     json.RawMessage `json:"payload,omitempty"`
 	Content     string          `json:"content,omitempty"`

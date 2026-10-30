@@ -9,6 +9,7 @@ import (
 
 	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/model"
+	"github.com/agenthub/hub-server/internal/service/edgeenrollment"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -373,6 +374,28 @@ func TestAgentHandler_TaskAck(t *testing.T) {
 
 func TestAgentHandler_TaskStream(t *testing.T) {
 	gin.SetMode(gin.TestMode)
+	t.Run("runtime-only policy comes from paired principal not JSON", func(t *testing.T) {
+		for _, paired := range []bool{false, true} {
+			called := false
+			h := NewAgentHandler(&mockAgentService{handleTaskStream: func(_ context.Context, _, _, _, _ string, input model.AgentRunEventInput) error {
+				called = true
+				require.Equal(t, paired, input.RuntimeOnly)
+				return nil
+			}})
+			r := gin.New()
+			r.POST("/stream/:id", func(c *gin.Context) {
+				if paired {
+					c.Set("edge_device_principal", &edgeenrollment.Principal{})
+				}
+				h.TaskStream(c)
+			})
+			body := bytes.NewBufferString(`{"content":"text","runtime_only":true}`)
+			req := httptest.NewRequest(http.MethodPost, "/stream/"+edgeTaskIDFixture, body)
+			req.Header.Set("Content-Type", "application/json")
+			r.ServeHTTP(httptest.NewRecorder(), req)
+			require.True(t, called)
+		}
+	})
 
 	t.Run("success", func(t *testing.T) {
 		called := false

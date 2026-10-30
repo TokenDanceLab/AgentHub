@@ -27,6 +27,8 @@ import (
 // data, never production inference or an operator credential.
 func TestEnrolledPollRealExecutorReplayMultiturnAndCancel(t *testing.T) {
 	workspace := t.TempDir()
+	answerChunks := []string{"  中文 paragraph\n", strings.Repeat("multi chunk text ", 100), "\n\n", "tail  "}
+	answer := strings.Join(answerChunks, "")
 	var modelCalls atomic.Int32
 	modelStopped := make(chan struct{})
 	modelStarted := make(chan struct{})
@@ -50,7 +52,7 @@ func TestEnrolledPollRealExecutorReplayMultiturnAndCancel(t *testing.T) {
 				contents = append(contents, m.Content)
 			}
 			require.Contains(t, contents, "first question")
-			require.Contains(t, contents, "fixture answer")
+			require.Contains(t, contents, answer)
 			require.Equal(t, "second question", contents[len(contents)-1])
 		case 3:
 			w.Header().Set("Content-Type", "text/event-stream")
@@ -64,7 +66,13 @@ func TestEnrolledPollRealExecutorReplayMultiturnAndCancel(t *testing.T) {
 			t.Error("replay unexpectedly started a new model call")
 		}
 		w.Header().Set("Content-Type", "text/event-stream")
-		_, _ = fmt.Fprint(w, "data: {\"choices\":[{\"delta\":{\"content\":\"fixture answer\"}}]}\n\ndata: [DONE]\n\n")
+		for _, content := range answerChunks {
+			chunk, err := json.Marshal(map[string]any{"choices": []any{map[string]any{"delta": map[string]string{"content": content}}}})
+			require.NoError(t, err)
+			_, _ = fmt.Fprintf(w, "data: %s\n\n", chunk)
+			w.(http.Flusher).Flush()
+		}
+		_, _ = fmt.Fprint(w, "data: [DONE]\n\n")
 	}))
 	defer model.Close()
 	t.Setenv("OPENAI_BASE_URL", model.URL)
@@ -87,7 +95,9 @@ func TestEnrolledPollRealExecutorReplayMultiturnAndCancel(t *testing.T) {
 			if strings.HasSuffix(r.URL.Path, "/done") {
 				var result hub.TaskResult
 				require.NoError(t, json.NewDecoder(r.Body).Decode(&result))
-				require.Equal(t, "fixture answer", result.FinalContent)
+				var text map[string]string
+				require.NoError(t, json.Unmarshal([]byte(result.FinalContent), &text))
+				require.Equal(t, answer, text["content"])
 				done <- r.URL.Path
 			}
 		case r.URL.Path == "/edge/device/controls/task-3/ack":
@@ -167,8 +177,8 @@ func TestEnrolledPollRealExecutorReplayMultiturnAndCancel(t *testing.T) {
 			assistantMessages = append(assistantMessages, item.Content)
 		}
 	}
-	require.Equal(t, []string{"fixture answer"}, assistantMessages)
-	second := delivery("task-2", "second question", []runnerctx.Message{{Role: "user", Content: "first question"}, {Role: "assistant", Content: "fixture answer"}})
+	require.Equal(t, []string{answer}, assistantMessages)
+	second := delivery("task-2", "second question", []runnerctx.Message{{Role: "user", Content: "first question"}, {Role: "assistant", Content: answer}})
 	batches <- device.Batch{Deliveries: []device.Delivery{first, second}}
 	select {
 	case <-done:

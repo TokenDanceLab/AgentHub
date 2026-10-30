@@ -218,6 +218,7 @@ func (h *AgentHandler) TaskStream(c *gin.Context) {
 	edgeUserID := c.GetString("user_id")
 	edgeDeviceID := c.GetString("device_id")
 	stream := req.normalizedStream()
+	stream.RuntimeOnly = edgePrincipal(c) != nil
 	if stream.Content == "" && len(stream.Payload) == 0 {
 		Fail(c, errcode.ErrBadRequest)
 		return

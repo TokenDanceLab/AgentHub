@@ -119,6 +119,8 @@ Hub WS event
 
 Web live `AGENT_STREAM` transcript commits use a one-display-frame (16 ms) microbatch: every original event ID and sequence remains intact and ordered while React commits burst arrivals together. A non-stream frame, transport disconnect, conversation switch, or effect cleanup flushes pending stream events first. React Query invalidation is a separate 250 ms trailing window.
 
+Paired text Edge callbacks persist deltas as runtime events, preserving whitespace; only the complete reply becomes a Hub chat message. Web replaces a task's live text only after receiving its authoritative message with `agent_task.status=done`, leaving other tasks and non-text runtime evidence intact. The next turn uses completed Hub messages, not delta projections. Wire and replay semantics are owned by [dispatch.md](../../api/dispatch.md).
+
 Desktop may also consume Local Edge EventStore / Run lifecycle events through the Desktop adapter. The UI layer only sees normalized transcript blocks and evidence refs.
 
 ## Settings And Profiles

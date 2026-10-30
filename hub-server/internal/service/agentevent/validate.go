@@ -12,7 +12,8 @@ import (
 // event type, payload JSON, and projected message content.
 func NormalizeRunEventInput(stream model.AgentRunEventInput) (eventType, payload, messageContent string, err error) {
 	eventType = strings.TrimSpace(stream.EventType)
-	content := strings.TrimSpace(stream.Content)
+	// Visible output is data: trimming a delta changes the completed reply.
+	content := stream.Content
 
 	if len(stream.Payload) > 0 {
 		if !json.Valid(stream.Payload) {

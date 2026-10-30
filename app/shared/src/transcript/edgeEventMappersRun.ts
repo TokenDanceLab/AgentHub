@@ -162,7 +162,11 @@ export function outputBatchTextBlock(event: EventEnvelope): TranscriptBlock | nu
 }
 
 export function agentTextBlock(event: EventEnvelope): TranscriptBlock | null {
-  const text = cleanText(stringField(event.payload.content) ?? stringField(event.payload.text));
+  const value = typeof event.payload.content === 'string' ? event.payload.content : event.payload.text;
+  // Deltas are bytes of the reply, including spaces and paragraph boundaries.
+  const text = event.type === 'run.agent.text_delta'
+    ? (typeof value === 'string' ? value : undefined)
+    : cleanText(stringField(value));
   if (!text) return null;
   if (isRuntimeDiagnosticText(text)) return null;
   const runId = eventRunId(event);
