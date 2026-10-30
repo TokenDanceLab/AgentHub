@@ -84,7 +84,7 @@ func TestEnrollmentExchangeAndPrivatePersistence(t *testing.T) {
 }
 
 func TestClientRefusesHTTPRedirectAndSecretErrors(t *testing.T) {
-	for _, origin := range []string{"http://127.0.0.1:1234", "https://user:password@hub.example", "https://hub.example?secret=x", "https://hub.example/path"} {
+	for _, origin := range []string{"http://127.0.0.1:1234", "https://user:password@hub.example", "https://hub.example?secret=x", "https://hub.example/path"} { // Synthetic URI credentials rejected by this test; # leak-guard-allow:LG-F4C6A155
 		_, err := NewClient(origin, "secret", http.DefaultClient)
 		require.Error(t, err)
 	}
