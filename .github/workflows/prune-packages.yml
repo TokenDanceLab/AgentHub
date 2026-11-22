@@ -1,0 +1,73 @@
+name: Prune container package versions
+
+on:
+  schedule:
+    - cron: "0 3 * * 1"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Only report what would be deleted"
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: prune-packages
+  cancel-in-progress: false
+
+jobs:
+  prune:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        package: [agenthub-web, agenthub-hub-server]
+    steps:
+      - name: Delete old untagged versions
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ORG: TokenDanceLab
+          PACKAGE: ${{ matrix.package }}
+          DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run || 'false' }}
+        run: |
+          set -euo pipefail
+          base="/orgs/$ORG/packages/container/$PACKAGE/versions"
+          versions=$(gh api "$base?per_page=100" --paginate)
+          total=$(jq 'length' <<<"$versions")
+          tagged=$(jq '[.[] | select(((.metadata.container.tags // []) | length) > 0)] | length' <<<"$versions")
+          tagged_buckets=$(jq -r '[.[] | select(((.metadata.container.tags // []) | length) > 0) | .created_at[0:16]] | unique | .[]' <<<"$versions")
+          cutoff=$(date -u -d '30 days ago' +%Y-%m-%dT%H:%M:%SZ)
+
+          # Candidates: untagged, older than 30 days, beyond the newest 200 versions.
+          # A version sharing a creation minute with a tagged version is kept: that is
+          # how multi-arch child manifests of a tagged index look on GHCR.
+          ids=()
+          while IFS=$'\t' read -r id bucket; do
+            [ -z "$id" ] && continue
+            if ! grep -qxF "$bucket" <<<"$tagged_buckets"; then
+              ids+=("$id")
+            fi
+          done < <(
+            jq -r --arg cutoff "$cutoff" '
+              [.[] | select(((.metadata.container.tags // []) | length) == 0)]
+              | sort_by(.created_at) | reverse | .[200:]
+              | .[] | select(.created_at < $cutoff)
+              | "\(.id)\t\(.created_at[0:16])"' <<<"$versions"
+          )
+
+          echo "package=$PACKAGE total=$total tagged=$tagged delete_candidates=${#ids[@]} dry_run=$DRY_RUN"
+          if [ "$DRY_RUN" = "true" ]; then
+            if [ "${#ids[@]}" -gt 0 ]; then printf 'would delete %s\n' "${ids[@]:0:20}"; fi
+            exit 0
+          fi
+          for id in "${ids[@]:-}"; do
+            [ -z "$id" ] && continue
+            if gh api -X DELETE "$base/$id" >/dev/null; then
+              echo "deleted $id"
+            else
+              echo "failed $id"
+            fi
+          done
